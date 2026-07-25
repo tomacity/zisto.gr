@@ -1228,7 +1228,7 @@ function Footer() {
           <img
             src={WORDMARK}
             alt="Zisto"
-            className="mt-20 h-10 w-auto opacity-90 invert md:h-14"
+            className="mt-20 h-10 w-auto opacity-90 md:h-14"
             draggable={false}
           />
         </Reveal>
