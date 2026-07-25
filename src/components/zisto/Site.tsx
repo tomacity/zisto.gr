@@ -5,6 +5,7 @@ import {
   type ReactNode,
   type CSSProperties,
 } from "react";
+import { createPortal } from "react-dom";
 
 const WORDMARK = "/images/zisto-wordmark.png";
 const MONOGRAM = "/images/zisto-monogram.png";
@@ -346,7 +347,11 @@ function StarRating() {
 }
 
 function ConfettiBurst() {
-  const pieces = Array.from({ length: 48 }, (_, index) => index);
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const pieces = Array.from({ length: 70 }, (_, index) => index);
 
   const colors = [
     "#DC2727",
@@ -356,18 +361,18 @@ function ConfettiBurst() {
     "#FF6B6B",
   ];
 
-  return (
+  return createPortal(
     <div
-      className="pointer-events-none fixed inset-0 overflow-hidden"
-      style={{ zIndex: 999999 }}
+      className="pointer-events-none fixed inset-0 h-screen w-screen overflow-hidden"
+      style={{ zIndex: 2147483647 }}
       aria-hidden="true"
     >
       {pieces.map((piece) => {
         const isLeft = piece % 2 === 0;
 
         const horizontalDistance = isLeft
-          ? 180 + Math.random() * 420
-          : -180 - Math.random() * 420;
+          ? 180 + Math.random() * 650
+          : -180 - Math.random() * 650;
 
         return (
           <span
@@ -377,27 +382,33 @@ function ConfettiBurst() {
               {
                 width: `${6 + Math.random() * 7}px`,
                 height: `${10 + Math.random() * 10}px`,
-                left: isLeft ? `${Math.random() * 12}%` : "auto",
-                right: isLeft ? "auto" : `${Math.random() * 12}%`,
-                top: `${45 + Math.random() * 30}%`,
+
+                left: isLeft ? `${Math.random() * 10}%` : "auto",
+                right: isLeft ? "auto" : `${Math.random() * 10}%`,
+
+                top: `${35 + Math.random() * 55}%`,
+
                 backgroundColor: colors[piece % colors.length],
                 opacity: 0,
+
                 animation: `zisto-confetti ${
-                  1.2 + Math.random() * 0.7
+                  1.2 + Math.random() * 0.8
                 }s cubic-bezier(0.2, 0.7, 0.3, 1) ${
-                  Math.random() * 0.15
+                  Math.random() * 0.18
                 }s forwards`,
+
                 "--confetti-x": `${horizontalDistance}px`,
-                "--confetti-y": `${-250 - Math.random() * 450}px`,
+                "--confetti-y": `${-300 - Math.random() * 600}px`,
                 "--confetti-rotation": `${
-                  (isLeft ? 1 : -1) * (360 + Math.random() * 720)
+                  (isLeft ? 1 : -1) * (360 + Math.random() * 900)
                 }deg`,
               } as CSSProperties
             }
           />
         );
       })}
-    </div>
+    </div>,
+    document.body,
   );
 }
 /* ================================================================== */
