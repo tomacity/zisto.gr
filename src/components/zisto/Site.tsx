@@ -344,6 +344,62 @@ function StarRating() {
     </>
   );
 }
+
+function ConfettiBurst() {
+  const pieces = Array.from({ length: 48 }, (_, index) => index);
+
+  const colors = [
+    "#DC2727",
+    "#222222",
+    "#FFFFFF",
+    "#FFB800",
+    "#FF6B6B",
+  ];
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 overflow-hidden"
+      style={{ zIndex: 999999 }}
+      aria-hidden="true"
+    >
+      {pieces.map((piece) => {
+        const isLeft = piece % 2 === 0;
+
+        const horizontalDistance = isLeft
+          ? 180 + Math.random() * 420
+          : -180 - Math.random() * 420;
+
+        return (
+          <span
+            key={piece}
+            className="absolute block rounded-sm"
+            style={
+              {
+                width: `${6 + Math.random() * 7}px`,
+                height: `${10 + Math.random() * 10}px`,
+                left: isLeft ? `${Math.random() * 12}%` : "auto",
+                right: isLeft ? "auto" : `${Math.random() * 12}%`,
+                top: `${45 + Math.random() * 30}%`,
+                backgroundColor: colors[piece % colors.length],
+                opacity: 0,
+                animation: `zisto-confetti ${
+                  1.2 + Math.random() * 0.7
+                }s cubic-bezier(0.2, 0.7, 0.3, 1) ${
+                  Math.random() * 0.15
+                }s forwards`,
+                "--confetti-x": `${horizontalDistance}px`,
+                "--confetti-y": `${-250 - Math.random() * 450}px`,
+                "--confetti-rotation": `${
+                  (isLeft ? 1 : -1) * (360 + Math.random() * 720)
+                }deg`,
+              } as CSSProperties
+            }
+          />
+        );
+      })}
+    </div>
+  );
+}
 /* ================================================================== */
 /*  HERO                                                              */
 /* ================================================================== */
