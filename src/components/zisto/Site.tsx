@@ -8,6 +8,7 @@ import {
 import { createPortal } from "react-dom";
 
 const WORDMARK = "/images/zisto-wordmark.png";
+const WORDMARKWHITE = "/images/zisto-wormark-white.png";
 const MONOGRAM = "/images/zisto-monogram.png";
 
 const RED = "#DC2727";
@@ -1226,7 +1227,7 @@ function Footer() {
 
         <Reveal delay={420}>
           <img
-            src={WORDMARK}
+            src={WORDMARKWHITE}
             alt="Zisto"
             className="mt-20 h-10 w-auto opacity-90 md:h-14"
             draggable={false}
