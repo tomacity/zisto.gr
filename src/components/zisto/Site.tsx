@@ -1041,31 +1041,6 @@ function Footer() {
       }}
     >
       {/* Steam elements */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-[10%] top-[18%] h-[220px] w-[220px] opacity-40"
-        style={{
-          transform: `translate3d(${mouse.x * -30}px, ${mouse.y * -30}px, 0)`,
-          transition: "transform 700ms cubic-bezier(0.22,1,0.36,1)",
-        }}
-      >
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-[8%] top-[8%] h-[180px] w-[180px] opacity-40"
-        style={{
-          transform: `translate3d(${mouse.x * 40}px, ${mouse.y * 40}px, 0)`,
-          transition: "transform 700ms cubic-bezier(0.22,1,0.36,1)",
-        }}
-      >
-        <Steam
-          stroke="rgba(255,255,255,0.25)"
-          redStroke={RED}
-          strokeWidth={7}
-          animate
-          className="h-full w-full"
-        />
-      </div>
 
       {/* Red glow */}
       <div
@@ -1100,7 +1075,7 @@ function Footer() {
                 className="group inline-flex items-center gap-4 rounded-full bg-white px-8 py-5 text-[15px] font-bold tracking-[-0.01em] text-[#222] shadow-[0_30px_60px_-15px_rgba(220,39,39,0.5)] transition-all duration-300 hover:bg-[#DC2727] hover:text-white"
               >
                 <span className="h-2 w-2 rounded-full bg-[#DC2727] transition-colors group-hover:bg-white" />
-                hello@zisto.gr
+                zisto.gr@gmail.com
                 <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
               </a>
             </Magnetic>
