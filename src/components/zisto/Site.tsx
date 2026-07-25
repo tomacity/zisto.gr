@@ -164,7 +164,7 @@ function Nav() {
             <img
               src={WORDMARK}
               alt="Zisto"
-              className="hidden h-12 w-auto md:block"
+              className="hidden h-6 w-auto md:block"
               draggable={false}
             />
             <img
