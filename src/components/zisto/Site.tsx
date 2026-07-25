@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+} from "react";
 
 const WORDMARK = "/images/zisto-wordmark.png";
 const MONOGRAM = "/images/zisto-monogram.png";
@@ -362,7 +368,7 @@ function ConfettiBurst() {
                 "--confetti-x": `${120 + Math.random() * 420}px`,
                 "--confetti-y": `${-200 - Math.random() * 450}px`,
                 "--confetti-rotate": `${360 + Math.random() * 720}deg`,
-              } as React.CSSProperties
+              } as CSSProperties
             }
           />
         ))}
@@ -383,7 +389,7 @@ function ConfettiBurst() {
                 "--confetti-x": `${-120 - Math.random() * 420}px`,
                 "--confetti-y": `${-200 - Math.random() * 450}px`,
                 "--confetti-rotate": `${-360 - Math.random() * 720}deg`,
-              } as React.CSSProperties
+              } as CSSProperties
             }
           />
         ))}
