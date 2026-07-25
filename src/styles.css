@@ -179,3 +179,44 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+
+.confetti-piece {
+  position: absolute;
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.confetti-left,
+.confetti-right {
+  animation-name: confetti-burst;
+  animation-timing-function: cubic-bezier(0.15, 0.65, 0.25, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform:
+      translate3d(0, 0, 0)
+      rotate(0deg);
+  }
+
+  65% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(
+        var(--confetti-x),
+        var(--confetti-y),
+        0
+      )
+      rotate(var(--confetti-rotate));
+  }
+}
