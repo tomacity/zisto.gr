@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import wordmarkAsset from "@/assets/zisto-wordmark.png.asset.json";
-import monogramAsset from "@/assets/zisto-monogram.png.asset.json";
 
-const WORDMARK = wordmarkAsset.url;
-const MONOGRAM = monogramAsset.url;
+const WORDMARK = "/images/zisto-wordmark.png";
+const MONOGRAM = "/images/zisto-monogram.png";
 
 const RED = "#DC2727";
 const INK = "#222222";
