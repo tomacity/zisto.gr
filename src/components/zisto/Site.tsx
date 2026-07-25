@@ -284,13 +284,8 @@ function StarRating() {
   const [selectedStar, setSelectedStar] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const handleStarHover = (star: number) => {
-    setHoveredStar(star);
-  };
-
   const handleStarClick = (star: number) => {
     setSelectedStar(star);
-    setHoveredStar(star);
 
     if (star >= 4) {
       setShowConfetti(false);
@@ -305,42 +300,44 @@ function StarRating() {
     }
   };
 
+  const activeStars = hoveredStar || selectedStar;
+
   return (
     <>
       <div
-        className="mt-5 flex items-center justify-center gap-2"
+        className="relative z-[100] mt-5 flex items-center justify-center gap-2 pointer-events-auto"
         onMouseLeave={() => setHoveredStar(0)}
         aria-label="Αξιολόγηση με αστέρια"
       >
-        {[1, 2, 3, 4, 5].map((star) => {
-          const activeStars = hoveredStar || selectedStar;
-
-          return (
-            <button
-              key={star}
-              type="button"
-              onMouseEnter={() => handleStarHover(star)}
-              onClick={() => handleStarClick(star)}
-              className="group cursor-pointer border-0 bg-transparent p-1"
-              aria-label={`${star} αστέρια`}
-              aria-pressed={selectedStar === star}
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onMouseEnter={() => setHoveredStar(star)}
+            onFocus={() => setHoveredStar(star)}
+            onMouseLeave={() => setHoveredStar(0)}
+            onBlur={() => setHoveredStar(0)}
+            onClick={() => handleStarClick(star)}
+            className="relative z-[101] cursor-pointer border-0 bg-transparent p-1 pointer-events-auto"
+            aria-label={`${star} αστέρια`}
+            aria-pressed={selectedStar === star}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-8 w-8 transition-all duration-200 ${
+                star <= activeStars
+                  ? "scale-110 fill-[#DC2727] stroke-[#DC2727]"
+                  : "fill-transparent stroke-[#222222]"
+              }`}
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <svg
-                viewBox="0 0 24 24"
-                className={`h-8 w-8 transition-all duration-200 ${
-                  star <= activeStars
-                    ? "scale-110 fill-[#DC2727] stroke-[#DC2727]"
-                    : "fill-transparent stroke-[#222222]"
-                }`}
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 2.75l2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.32l-5.7 2.99 1.09-6.35-4.62-4.5 6.38-.93L12 2.75z" />
-              </svg>
-            </button>
-          );
-        })}
+              <path d="M12 2.75l2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.32l-5.7 2.99 1.09-6.35-4.62-4.5 6.38-.93L12 2.75z" />
+            </svg>
+          </button>
+        ))}
       </div>
 
       {showConfetti && <ConfettiBurst />}
@@ -486,7 +483,7 @@ function Hero() {
             <img
               src={MONOGRAM}
               alt=""
-              className="absolute inset-0 h-full w-full select-none object-contain"
+              className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
               draggable={false}
               style={{ animation: "zisto-float 6s ease-in-out infinite" }}
             />
