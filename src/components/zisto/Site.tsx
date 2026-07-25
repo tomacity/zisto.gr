@@ -270,7 +270,127 @@ function Nav() {
     </>
   );
 }
+/* ================================================================== */
+/*  RATING SYSTEM                                                              */
+/* ================================================================== */
+function StarRating() {
+  const [hoveredStar, setHoveredStar] = useState(0);
+  const [selectedStar, setSelectedStar] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
+  
+  const handleStarHover = (star: number) => {
+    setHoveredStar(star);
+  };
 
+    // Το κομφετί εμφανίζεται μόνο στο 5ο αστέρι.
+    if (star >= 4) {
+      setShowConfetti(true);
+
+      window.setTimeout(() => {
+        setShowConfetti(false);
+      }, 1800);
+    }
+  };
+
+  return (
+    <>
+      <div
+        className="mt-5 flex items-center justify-center gap-2"
+        onMouseLeave={() => setHoveredStar(selectedStar)}
+        aria-label="Αξιολόγηση με αστέρια"
+      >
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onMouseEnter={() => handleStarHover(star)}
+            onClick={() => handleStarClick(star)}
+            className="group cursor-pointer border-0 bg-transparent p-1"
+            aria-label={`${star} αστέρια`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-8 w-8 transition-all duration-200 ${
+                star <= (hoveredStar || selectedStar)
+                  ? "scale-110 fill-[#DC2727] stroke-[#DC2727]"
+                  : "fill-transparent stroke-[#222222]"
+              }`}
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2.75l2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.32l-5.7 2.99 1.09-6.35-4.62-4.5 6.38-.93L12 2.75z" />
+            </svg>
+          </button>
+        ))}
+      </div>
+
+      {showConfetti && <ConfettiBurst />}
+    </>
+  );
+}
+
+function ConfettiBurst() {
+  const confettiPieces = Array.from({ length: 36 });
+
+  const colors = [
+    "#DC2727",
+    "#222222",
+    "#FFFFFF",
+    "#FFB800",
+    "#FF6B6B",
+  ];
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 overflow-hidden"
+      style={{ zIndex: 99999 }}
+      aria-hidden="true"
+    >
+      <div className="absolute inset-y-0 left-0 w-1/2">
+        {confettiPieces.map((_, index) => (
+          <span
+            key={`left-${index}`}
+            className="confetti-piece confetti-left"
+            style={
+              {
+                left: `${Math.random() * 18}%`,
+                top: `${25 + Math.random() * 50}%`,
+                backgroundColor: colors[index % colors.length],
+                animationDelay: `${Math.random() * 0.25}s`,
+                animationDuration: `${1.1 + Math.random() * 0.8}s`,
+                "--confetti-x": `${120 + Math.random() * 420}px`,
+                "--confetti-y": `${-200 - Math.random() * 450}px`,
+                "--confetti-rotate": `${360 + Math.random() * 720}deg`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+
+      <div className="absolute inset-y-0 right-0 w-1/2">
+        {confettiPieces.map((_, index) => (
+          <span
+            key={`right-${index}`}
+            className="confetti-piece confetti-right"
+            style={
+              {
+                right: `${Math.random() * 18}%`,
+                top: `${25 + Math.random() * 50}%`,
+                backgroundColor: colors[index % colors.length],
+                animationDelay: `${Math.random() * 0.25}s`,
+                animationDuration: `${1.1 + Math.random() * 0.8}s`,
+                "--confetti-x": `${-120 - Math.random() * 420}px`,
+                "--confetti-y": `${-200 - Math.random() * 450}px`,
+                "--confetti-rotate": `${-360 - Math.random() * 720}deg`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 /* ================================================================== */
 /*  HERO                                                              */
 /* ================================================================== */
@@ -338,7 +458,7 @@ function Hero() {
           <Reveal delay={80}>
             <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-[#222]/70 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-[#DC2727]" />
-              Ζήσ' το · Ζεστό
+              Ζήσ' το · zisto
             </div>
           </Reveal>
 
@@ -414,6 +534,8 @@ function Hero() {
               draggable={false}
               style={{ animation: "zisto-float 6s ease-in-out infinite" }}
             />
+            
+            <StarRating />
           </div>
         </div>
       </div>
