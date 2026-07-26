@@ -1473,7 +1473,7 @@ const DASHBOARD_METRICS = [
   {
     label: "Review clicks",
     value: "146",
-    change: "+12%",
+    change: "-12%",
     note: "11,7% των επισκέψεων",
   },
   {
@@ -1543,13 +1543,45 @@ function DashboardMetric({
           </p>
 
           <span
-            className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
-              index === 0
-                ? "bg-[#DC2727] text-white"
-                : "bg-[#DC2727]/10 text-[#DC2727]"
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${
+              change.startsWith("-")
+                ? "bg-red-100 text-red-600"
+                : "bg-green-100 text-green-700"
             }`}
           >
             {change}
+          
+            {change.startsWith("-") ? (
+              <svg
+                viewBox="0 0 16 16"
+                className="h-3 w-3"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 3v10M4 9l4 4 4-4"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : (
+              <svg
+                viewBox="0 0 16 16"
+                className="h-3 w-3"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 13V3M4 7l4-4 4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
           </span>
         </div>
 
@@ -1767,7 +1799,7 @@ function DashboardPage() {
 
             <div className="min-w-0">
               <p className="truncate text-[13px] font-bold">
-                Το Τσιπουράδικο
+                Το Τσιπουράδικο της Μυρσήνης
               </p>
               <p className="mt-1 text-[10px] text-white/40">Σύρος, Ελλάδα</p>
             </div>
