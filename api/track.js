@@ -84,8 +84,10 @@ export default async function handler(req, res) {
     const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
     if (!supabaseUrl || !supabaseSecretKey) {
-      console.error("Missing Supabase environment variables");
-
+      console.error("Supabase environment check:", {
+        hasUrl: Boolean(supabaseUrl),
+        hasSecretKey: Boolean(supabaseSecretKey),
+      });
       return res.status(500).json({
         error: "Server configuration error",
       });
