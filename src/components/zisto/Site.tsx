@@ -201,7 +201,7 @@ function Nav() {
 
           <div className="hidden items-center justify-end gap-3 md:flex">
             <a
-              href="/login"
+              href="/#/login"
               className="group relative px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#222]/65 transition-colors hover:text-[#222]"
             >
               Σύνδεση
@@ -274,7 +274,7 @@ function Nav() {
           </ul>
           <div className="mt-14 flex flex-wrap gap-3">
             <a
-              href="/login"
+              href="/#/login"
               onClick={() => setOpen(false)}
               className="inline-flex items-center gap-3 rounded-full border border-white/20 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white"
             >
@@ -1275,7 +1275,7 @@ function LoginPage() {
     setLoading(true);
 
     window.setTimeout(() => {
-      window.location.href = "/dashboard";
+      window.location.hash = "/dashboard";
     }, 650);
   };
 
@@ -1305,7 +1305,7 @@ function LoginPage() {
       />
 
       <header className="relative z-10 mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-5 md:px-10">
-        <a href="/" aria-label="Επιστροφή στην αρχική">
+        <a href="/#/" aria-label="Επιστροφή στην αρχική">
           <img
             src={WORDMARK}
             alt="Zisto"
@@ -1315,7 +1315,7 @@ function LoginPage() {
         </a>
 
         <a
-          href="/"
+          href="/#/"
           className="group inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#222]/60 transition-colors hover:text-[#222]"
         >
           <span className="transition-transform duration-300 group-hover:-translate-x-1">
@@ -1944,16 +1944,34 @@ function LandingPage() {
 }
 
 export function ZistoSite() {
-  const pathname =
-    typeof window !== "undefined"
-      ? window.location.pathname.replace(/\/+$/, "") || "/"
-      : "/";
+  const getRoute = () => {
+    if (typeof window === "undefined") {
+      return "/";
+    }
 
-  if (pathname === "/login") {
+    return window.location.hash.replace("#", "") || "/";
+  };
+
+  const [route, setRoute] = useState(getRoute);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setRoute(getRoute());
+      window.scrollTo(0, 0);
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+
+  if (route === "/login") {
     return <LoginPage />;
   }
 
-  if (pathname === "/dashboard") {
+  if (route === "/dashboard") {
     return <DashboardPage />;
   }
 
