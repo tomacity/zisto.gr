@@ -1604,7 +1604,28 @@ function DashboardMetric({
 }
 
 function DashboardChart() {
-  const maxValue = Math.max(...CHART_VALUES);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const chartData = [
+    { day: "Σάβ", date: "12", value: 38, menu: 24, reviews: 6 },
+    { day: "Κυρ", date: "13", value: 54, menu: 35, reviews: 9 },
+    { day: "Δευ", date: "14", value: 42, menu: 29, reviews: 5 },
+    { day: "Τρι", date: "15", value: 69, menu: 47, reviews: 11 },
+    { day: "Τετ", date: "16", value: 48, menu: 31, reviews: 7 },
+    { day: "Πεμ", date: "17", value: 76, menu: 52, reviews: 13 },
+    { day: "Παρ", date: "18", value: 91, menu: 63, reviews: 15 },
+    { day: "Σάβ", date: "19", value: 64, menu: 44, reviews: 10 },
+    { day: "Κυρ", date: "20", value: 82, menu: 56, reviews: 14 },
+    { day: "Δευ", date: "21", value: 105, menu: 72, reviews: 18 },
+    { day: "Τρι", date: "22", value: 78, menu: 51, reviews: 12 },
+    { day: "Τετ", date: "23", value: 118, menu: 81, reviews: 21 },
+    { day: "Πεμ", date: "24", value: 96, menu: 67, reviews: 16 },
+    { day: "Παρ", date: "25", value: 132, menu: 91, reviews: 24 },
+  ];
+
+  const maxValue = Math.max(...chartData.map((item) => item.value));
+  const activeItem =
+    activeIndex !== null ? chartData[activeIndex] : null;
 
   return (
     <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8">
@@ -1613,44 +1634,137 @@ function DashboardChart() {
           <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#DC2727]">
             Δραστηριότητα
           </p>
+
           <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em] md:text-[38px]">
             Τελευταίες 14 ημέρες
           </h2>
         </div>
 
         <div className="text-right">
-          <p className="text-[32px] font-black tracking-[-0.04em]">1.248</p>
+          <p className="text-[32px] font-black tracking-[-0.04em]">
+            1.248
+          </p>
+
           <p className="text-[10px] uppercase tracking-[0.2em] text-[#222]/40">
             συνολικά taps
           </p>
         </div>
       </div>
 
-      <div className="mt-12 flex h-[260px] items-end gap-2 md:gap-3">
-        {CHART_VALUES.map((value, index) => {
-          const height = Math.max(12, (value / maxValue) * 100);
+      <div className="relative mt-12">
+        {activeItem && (
+          <div
+            className="pointer-events-none absolute top-0 z-20 w-[150px] -translate-x-1/2 rounded-[12px] bg-[#222] p-3 text-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.6)]"
+            style={{
+              left: `${((activeIndex ?? 0) + 0.5) / chartData.length * 100}%`,
+              transform: "translate(-50%, -115%)",
+            }}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+              {activeItem.day}, {activeItem.date} Ιουλίου
+            </p>
 
-          return (
-            <div
-              key={`${value}-${index}`}
-              className="group relative flex h-full flex-1 items-end"
-            >
-              <div
-                className="w-full origin-bottom rounded-t-[5px] bg-[#222] transition-all duration-300 hover:bg-[#DC2727]"
-                style={{ height: `${height}%` }}
-              />
+            <p className="mt-2 text-[18px] font-black">
+              {activeItem.value} taps
+            </p>
 
-              <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 rounded bg-[#222] px-2 py-1 text-[9px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
-                {value}
-              </span>
+            <div className="mt-3 space-y-1 text-[10px] text-white/65">
+              <p className="flex justify-between gap-4">
+                <span>Menu opens</span>
+                <strong className="text-white">{activeItem.menu}</strong>
+              </p>
+
+              <p className="flex justify-between gap-4">
+                <span>Review clicks</span>
+                <strong className="text-white">
+                  {activeItem.reviews}
+                </strong>
+              </p>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        )}
 
-      <div className="mt-4 flex justify-between text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/30">
-        <span>12 Ιουλ</span>
-        <span>25 Ιουλ</span>
+        <div className="flex h-[260px] items-end gap-2 md:gap-3">
+          {chartData.map((item, index) => {
+            const height = Math.max(
+              12,
+              (item.value / maxValue) * 100,
+            );
+
+            const isActive = activeIndex === index;
+
+            return (
+              <button
+                key={`${item.date}-${item.value}`}
+                type="button"
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(null)}
+                onFocus={() => setActiveIndex(index)}
+                onBlur={() => setActiveIndex(null)}
+                className="group relative flex h-full flex-1 items-end outline-none"
+                aria-label={`${item.day} ${item.date} Ιουλίου, ${item.value} taps`}
+              >
+                <span
+                  className={`block w-full origin-bottom rounded-t-[5px] transition-all duration-300 ${
+                    isActive
+                      ? "bg-[#DC2727]"
+                      : "bg-[#222] group-hover:bg-[#DC2727]"
+                  }`}
+                  style={{
+                    height: `${height}%`,
+                    transform: isActive ? "scaleY(1.03)" : "scaleY(1)",
+                  }}
+                />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 grid grid-cols-14 gap-2 md:gap-3">
+          {chartData.map((item, index) => {
+            const isSaturday = item.day === "Σάβ";
+            const isSunday = item.day === "Κυρ";
+            const isActive = activeIndex === index;
+
+            return (
+              <button
+                key={`${item.day}-${item.date}`}
+                type="button"
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(null)}
+                onFocus={() => setActiveIndex(index)}
+                onBlur={() => setActiveIndex(null)}
+                className="flex min-w-0 flex-col items-center gap-1 outline-none"
+              >
+                <span
+                  className={`text-[9px] font-bold uppercase tracking-[0.08em] transition-colors ${
+                    isActive
+                      ? "text-[#DC2727]"
+                      : isSunday
+                        ? "text-[#DC2727]/70"
+                        : "text-[#222]/30"
+                  }`}
+                >
+                  {item.day}
+                </span>
+
+                <span
+                  className={`grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold transition-all duration-300 ${
+                    isActive
+                      ? "bg-[#DC2727] text-white"
+                      : isSunday
+                        ? "bg-[#DC2727]/10 text-[#DC2727]"
+                        : isSaturday
+                          ? "bg-black/5 text-[#222]/55"
+                          : "text-[#222]/55"
+                  }`}
+                >
+                  {item.date}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
