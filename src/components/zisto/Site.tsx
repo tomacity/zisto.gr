@@ -4,6 +4,7 @@ import {
   useState,
   type ReactNode,
   type CSSProperties,
+  type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -198,14 +199,24 @@ function Nav() {
             </div>
           </nav>
 
-          <div className="hidden justify-end md:flex">
+          <div className="hidden items-center justify-end gap-3 md:flex">
+            <a
+              href="/login"
+              className="group relative px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#222]/65 transition-colors hover:text-[#222]"
+            >
+              Σύνδεση
+              <span className="absolute inset-x-3 bottom-0 h-[2px] origin-right scale-x-0 bg-[#DC2727] transition-transform duration-500 group-hover:origin-left group-hover:scale-x-100" />
+            </a>
+          
             <Magnetic strength={0.25}>
               <a
                 href="#contact"
                 className="group inline-flex items-center gap-2 rounded-full bg-[#222] px-5 py-2.5 text-[12px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#DC2727]"
               >
                 Ξεκίνα
-                <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+                <span className="transition-transform duration-300 group-hover:translate-x-1">
+                  →
+                </span>
               </a>
             </Magnetic>
           </div>
@@ -261,7 +272,15 @@ function Nav() {
               </li>
             ))}
           </ul>
-          <div className="mt-14">
+          <div className="mt-14 flex flex-wrap gap-3">
+            <a
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="inline-flex items-center gap-3 rounded-full border border-white/20 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white"
+            >
+              Σύνδεση
+            </a>
+          
             <a
               href="#contact"
               onClick={() => setOpen(false)}
@@ -1244,9 +1263,673 @@ function Footer() {
 }
 
 /* ================================================================== */
+/*  LOGIN PAGE                                                        */
+/* ================================================================== */
+
+function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+
+    window.setTimeout(() => {
+      window.location.href = "/dashboard";
+    }, 650);
+  };
+
+  return (
+    <main className="relative min-h-screen overflow-hidden bg-white font-sans text-[#222]">
+      {/* Background grid */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, #222 1px, transparent 1px), linear-gradient(to bottom, #222 1px, transparent 1px)",
+          backgroundSize: "72px 72px",
+          maskImage:
+            "radial-gradient(ellipse at center, black 30%, transparent 78%)",
+        }}
+      />
+
+      {/* Red glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full blur-3xl"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(220,39,39,0.20), transparent 68%)",
+        }}
+      />
+
+      <header className="relative z-10 mx-auto flex h-20 w-full max-w-[1400px] items-center justify-between px-5 md:px-10">
+        <a href="/" aria-label="Επιστροφή στην αρχική">
+          <img
+            src={WORDMARK}
+            alt="Zisto"
+            className="h-7 w-auto"
+            draggable={false}
+          />
+        </a>
+
+        <a
+          href="/"
+          className="group inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#222]/60 transition-colors hover:text-[#222]"
+        >
+          <span className="transition-transform duration-300 group-hover:-translate-x-1">
+            ←
+          </span>
+          Αρχική
+        </a>
+      </header>
+
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-80px)] w-full max-w-[1400px] grid-cols-1 items-center gap-16 px-5 pb-16 pt-8 md:px-10 lg:grid-cols-12">
+        <section className="lg:col-span-7">
+          <Reveal delay={60}>
+            <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-[#222]/60 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#DC2727]" />
+              Client portal
+            </div>
+          </Reveal>
+
+          <h1 className="mt-8 font-black leading-[0.84] tracking-[-0.05em]">
+            <Reveal
+              delay={140}
+              as="span"
+              className="block text-[16vw] sm:text-[12vw] lg:text-[8vw] xl:text-[8rem]"
+            >
+              Η επιχείρησή
+            </Reveal>
+
+            <Reveal
+              delay={260}
+              as="span"
+              className="block text-[16vw] text-[#DC2727] sm:text-[12vw] lg:text-[8vw] xl:text-[8rem]"
+            >
+              σου.
+            </Reveal>
+
+            <Reveal
+              delay={380}
+              as="span"
+              className="block text-[16vw] sm:text-[12vw] lg:text-[8vw] xl:text-[8rem]"
+            >
+              Με μια ματιά.
+            </Reveal>
+          </h1>
+
+          <Reveal delay={500}>
+            <p className="mt-8 max-w-xl text-[15px] leading-relaxed text-[#222]/60 md:text-[17px]">
+              Δες τα taps, τα ανοίγματα του μενού και τις επισκέψεις προς
+              αξιολόγηση — χωρίς περίπλοκες αναφορές και άχρηστα δεδομένα.
+            </p>
+          </Reveal>
+        </section>
+
+        <Reveal delay={300} className="lg:col-span-5">
+          <section className="relative overflow-hidden rounded-[28px] border border-black/10 bg-white p-6 shadow-[0_40px_100px_-35px_rgba(34,34,34,0.28)] md:p-9">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute right-0 top-0 h-40 w-40 -translate-y-1/2 translate-x-1/2 rounded-full bg-[#DC2727]/15 blur-3xl"
+            />
+
+            <div className="relative">
+              <img
+                src={MONOGRAM}
+                alt=""
+                className="h-12 w-auto"
+                draggable={false}
+              />
+
+              <p className="mt-8 text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
+                Καλώς ήρθες πίσω
+              </p>
+
+              <h2 className="mt-3 text-[38px] font-black leading-[0.94] tracking-[-0.04em]">
+                Μπες στο
+                <br />
+                dashboard σου.
+              </h2>
+
+              <form onSubmit={handleSubmit} className="mt-10">
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/45">
+                    Email
+                  </span>
+
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@business.gr"
+                    className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 text-[16px] font-medium text-[#222] outline-none transition-colors placeholder:text-[#222]/25 focus:border-[#DC2727]"
+                  />
+                </label>
+
+                <label className="mt-8 block">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/45">
+                    Κωδικός
+                  </span>
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 pr-20 text-[16px] font-medium text-[#222] outline-none transition-colors placeholder:text-[#222]/25 focus:border-[#DC2727]"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="absolute bottom-4 right-0 text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/45 transition-colors hover:text-[#DC2727]"
+                    >
+                      {showPassword ? "Απόκρυψη" : "Εμφάνιση"}
+                    </button>
+                  </div>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="group mt-10 flex w-full items-center justify-between rounded-full bg-[#222] px-6 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-white transition-all duration-300 hover:bg-[#DC2727] disabled:cursor-wait disabled:opacity-60"
+                >
+                  <span>{loading ? "Γίνεται σύνδεση..." : "Σύνδεση"}</span>
+                  <span className="transition-transform duration-300 group-hover:translate-x-1">
+                    →
+                  </span>
+                </button>
+
+                <p className="mt-5 text-center text-[11px] leading-relaxed text-[#222]/40">
+                  Demo έκδοση — χρησιμοποίησε οποιοδήποτε email και κωδικό.
+                </p>
+              </form>
+            </div>
+          </section>
+        </Reveal>
+      </div>
+    </main>
+  );
+}
+
+/* ================================================================== */
+/*  DASHBOARD DATA                                                    */
+/* ================================================================== */
+
+const DASHBOARD_METRICS = [
+  {
+    label: "Συνολικές επισκέψεις",
+    value: "1.248",
+    change: "+18%",
+    note: "από τον προηγούμενο μήνα",
+  },
+  {
+    label: "Ανοίγματα μενού",
+    value: "892",
+    change: "+24%",
+    note: "71,5% των επισκέψεων",
+  },
+  {
+    label: "Review clicks",
+    value: "146",
+    change: "+12%",
+    note: "11,7% των επισκέψεων",
+  },
+  {
+    label: "Review rate",
+    value: "16,4%",
+    change: "+2,8%",
+    note: "από τον προηγούμενο μήνα",
+  },
+];
+
+const CHART_VALUES = [
+  38, 54, 42, 69, 48, 76, 91, 64, 82, 105, 78, 118, 96, 132,
+];
+
+const RECENT_ACTIVITY = [
+  { time: "15:42", action: "Άνοιγμα μενού", source: "NFC card" },
+  { time: "15:38", action: "Review click", source: "Google" },
+  { time: "15:31", action: "Άνοιγμα μενού", source: "QR code" },
+  { time: "15:19", action: "Άνοιγμα μενού", source: "NFC card" },
+  { time: "15:07", action: "Review click", source: "Google" },
+];
+
+/* ================================================================== */
+/*  DASHBOARD COMPONENTS                                              */
+/* ================================================================== */
+
+function DashboardMetric({
+  label,
+  value,
+  change,
+  note,
+  index,
+}: {
+  label: string;
+  value: string;
+  change: string;
+  note: string;
+  index: number;
+}) {
+  return (
+    <article
+      className={`relative min-h-[260px] overflow-hidden rounded-[20px] border p-6 md:p-8 ${
+        index === 0
+          ? "border-[#222] bg-[#222] text-white"
+          : "border-black/10 bg-white text-[#222]"
+      }`}
+    >
+      {index === 0 && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full blur-3xl"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(220,39,39,0.55), transparent 66%)",
+          }}
+        />
+      )}
+
+      <div className="relative flex h-full flex-col justify-between">
+        <div className="flex items-start justify-between gap-4">
+          <p
+            className={`text-[10px] font-bold uppercase tracking-[0.22em] ${
+              index === 0 ? "text-white/55" : "text-[#222]/45"
+            }`}
+          >
+            {label}
+          </p>
+
+          <span
+            className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+              index === 0
+                ? "bg-[#DC2727] text-white"
+                : "bg-[#DC2727]/10 text-[#DC2727]"
+            }`}
+          >
+            {change}
+          </span>
+        </div>
+
+        <div className="mt-14">
+          <p className="text-[15vw] font-black leading-none tracking-[-0.06em] sm:text-[10vw] md:text-[6vw] lg:text-[4.2vw]">
+            {value}
+          </p>
+
+          <p
+            className={`mt-4 text-[11px] leading-relaxed ${
+              index === 0 ? "text-white/45" : "text-[#222]/40"
+            }`}
+          >
+            {note}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function DashboardChart() {
+  const maxValue = Math.max(...CHART_VALUES);
+
+  return (
+    <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#DC2727]">
+            Δραστηριότητα
+          </p>
+          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em] md:text-[38px]">
+            Τελευταίες 14 ημέρες
+          </h2>
+        </div>
+
+        <div className="text-right">
+          <p className="text-[32px] font-black tracking-[-0.04em]">1.248</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#222]/40">
+            συνολικά taps
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-12 flex h-[260px] items-end gap-2 md:gap-3">
+        {CHART_VALUES.map((value, index) => {
+          const height = Math.max(12, (value / maxValue) * 100);
+
+          return (
+            <div
+              key={`${value}-${index}`}
+              className="group relative flex h-full flex-1 items-end"
+            >
+              <div
+                className="w-full origin-bottom rounded-t-[5px] bg-[#222] transition-all duration-300 hover:bg-[#DC2727]"
+                style={{ height: `${height}%` }}
+              />
+
+              <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 rounded bg-[#222] px-2 py-1 text-[9px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {value}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex justify-between text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/30">
+        <span>12 Ιουλ</span>
+        <span>25 Ιουλ</span>
+      </div>
+    </section>
+  );
+}
+
+function BusinessHealth() {
+  return (
+    <section className="relative overflow-hidden rounded-[20px] bg-[#DC2727] p-6 text-white md:p-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-28 -right-28 h-72 w-72 rounded-full border-[50px] border-white/10"
+      />
+
+      <div className="relative">
+        <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/60">
+          Business health
+        </p>
+
+        <div className="mt-6 flex items-end gap-3">
+          <span className="text-[84px] font-black leading-none tracking-[-0.07em]">
+            89
+          </span>
+          <span className="mb-2 text-[20px] font-bold text-white/45">/100</span>
+        </div>
+
+        <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-white/75">
+          Η εμπειρία λειτουργεί σωστά και τα review clicks αυξάνονται.
+        </p>
+
+        <div className="mt-8 flex flex-col gap-3 text-[12px] font-semibold">
+          <p className="flex items-center gap-3">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] text-[#DC2727]">
+              ✓
+            </span>
+            NFC card online
+          </p>
+
+          <p className="flex items-center gap-3">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] text-[#DC2727]">
+              ✓
+            </span>
+            Smart link online
+          </p>
+
+          <p className="flex items-center gap-3">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] text-[#DC2727]">
+              ✓
+            </span>
+            Μενού διαθέσιμο
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RecentActivity() {
+  return (
+    <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#DC2727]">
+            Live feed
+          </p>
+          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+            Πρόσφατη δραστηριότητα
+          </h2>
+        </div>
+
+        <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[#DC2727]" />
+          Live
+        </span>
+      </div>
+
+      <div className="mt-8">
+        {RECENT_ACTIVITY.map((item, index) => (
+          <div
+            key={`${item.time}-${item.action}`}
+            className={`grid grid-cols-[60px_1fr_auto] items-center gap-4 py-4 ${
+              index !== 0 ? "border-t border-black/8" : ""
+            }`}
+          >
+            <span className="font-mono text-[11px] font-bold text-[#222]/35">
+              {item.time}
+            </span>
+
+            <span className="text-[13px] font-bold text-[#222]">
+              {item.action}
+            </span>
+
+            <span className="text-right text-[10px] text-[#222]/35">
+              {item.source}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ================================================================== */
+/*  DASHBOARD PAGE                                                    */
+/* ================================================================== */
+
+function DashboardPage() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
+    <main className="min-h-screen bg-[#F6F6F4] font-sans text-[#222]">
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-[#222] p-6 text-white transition-transform duration-500 lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <a href="/">
+            <img
+              src={WORDMARKWHITE}
+              alt="Zisto"
+              className="h-8 w-auto"
+              draggable={false}
+            />
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-white lg:hidden"
+            aria-label="Κλείσιμο μενού"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-12 rounded-[16px] border border-white/10 bg-white/[0.04] p-4">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">
+            Επιχείρηση
+          </p>
+
+          <div className="mt-4 flex items-center gap-3">
+            <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#DC2727] text-[15px] font-black">
+              Μ
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-bold">
+                Το Τσιπουράδικο
+              </p>
+              <p className="mt-1 text-[10px] text-white/40">Σύρος, Ελλάδα</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="mt-10 flex flex-col gap-2">
+          {[
+            ["▦", "Επισκόπηση", true],
+            ["↗", "Analytics", false],
+            ["★", "Αξιολογήσεις", false],
+            ["☰", "Μενού", false],
+            ["⌁", "NFC κάρτες", false],
+            ["⚙", "Ρυθμίσεις", false],
+          ].map(([icon, label, active]) => (
+            <button
+              key={String(label)}
+              type="button"
+              className={`flex w-full items-center gap-4 rounded-[12px] px-4 py-3.5 text-left text-[12px] font-bold transition-colors ${
+                active
+                  ? "bg-[#DC2727] text-white"
+                  : "text-white/50 hover:bg-white/[0.06] hover:text-white"
+              }`}
+            >
+              <span className="w-4 text-center">{icon}</span>
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="mt-auto">
+          <a
+            href="/"
+            className="flex items-center gap-3 border-t border-white/10 pt-6 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 transition-colors hover:text-white"
+          >
+            ← Επιστροφή στο site
+          </a>
+        </div>
+      </aside>
+
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Κλείσιμο overlay"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm lg:hidden"
+        />
+      )}
+
+      {/* Main content */}
+      <div className="min-h-screen lg:pl-[280px]">
+        <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-black/5 bg-[#F6F6F4]/85 px-5 backdrop-blur-xl md:px-8 lg:px-10">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white lg:hidden"
+            aria-label="Άνοιγμα μενού"
+          >
+            ☰
+          </button>
+
+          <p className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35 sm:block">
+            Σάββατο, 25 Ιουλίου 2026
+          </p>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p className="text-[11px] font-bold">Μυρσίνη</p>
+              <p className="text-[9px] uppercase tracking-[0.15em] text-[#222]/35">
+                Owner
+              </p>
+            </div>
+
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-[#222] text-[12px] font-black text-white">
+              Μ
+            </div>
+          </div>
+        </header>
+
+        <div className="mx-auto w-full max-w-[1600px] px-5 py-10 md:px-8 lg:px-10 lg:py-14">
+          <section className="flex flex-wrap items-end justify-between gap-8">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
+                Dashboard
+              </p>
+
+              <h1 className="mt-4 max-w-[12ch] text-[12vw] font-black leading-[0.86] tracking-[-0.055em] sm:text-[8vw] lg:text-[5.8vw] xl:text-[5.8rem]">
+                Καλησπέρα,
+                <br />
+                <span className="text-[#DC2727]">Μυρσίνη.</span>
+              </h1>
+            </div>
+
+            <div className="max-w-sm">
+              <p className="text-[14px] leading-relaxed text-[#222]/55">
+                Η δραστηριότητα αυξήθηκε κατά{" "}
+                <strong className="text-[#222]">18%</strong> αυτόν τον μήνα.
+                Τα περισσότερα taps έγιναν μεταξύ 20:00 και 22:00.
+              </p>
+            </div>
+          </section>
+
+          <section className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {DASHBOARD_METRICS.map((metric, index) => (
+              <DashboardMetric
+                key={metric.label}
+                {...metric}
+                index={index}
+              />
+            ))}
+          </section>
+
+          <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
+            <div className="xl:col-span-8">
+              <DashboardChart />
+            </div>
+
+            <div className="xl:col-span-4">
+              <BusinessHealth />
+            </div>
+          </section>
+
+          <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
+            <div className="xl:col-span-7">
+              <RecentActivity />
+            </div>
+
+            <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#DC2727]">
+                Review opportunity
+              </p>
+
+              <h2 className="mt-3 text-[28px] font-black leading-[0.95] tracking-[-0.04em] md:text-[38px]">
+                746 επισκέπτες δεν πάτησαν review.
+              </h2>
+
+              <p className="mt-5 max-w-md text-[13px] leading-relaxed text-[#222]/50">
+                Αυτό δεν σημαίνει ότι χάθηκαν 746 αξιολογήσεις. Δείχνει όμως
+                πόσες ευκαιρίες υπάρχουν να βελτιωθεί η διαδρομή του πελάτη.
+              </p>
+
+              <button
+                type="button"
+                className="group mt-10 inline-flex items-center gap-3 rounded-full bg-[#222] px-6 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#DC2727]"
+              >
+                Βελτίωσε το review rate
+                <span className="transition-transform group-hover:translate-x-1">
+                  →
+                </span>
+              </button>
+            </section>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/* ================================================================== */
 /*  ROOT                                                              */
 /* ================================================================== */
-export function ZistoSite() {
+function LandingPage() {
   return (
     <div className="bg-white font-sans text-[#222] antialiased">
       <Nav />
@@ -1258,4 +1941,21 @@ export function ZistoSite() {
       <Footer />
     </div>
   );
+}
+
+export function ZistoSite() {
+  const pathname =
+    typeof window !== "undefined"
+      ? window.location.pathname.replace(/\/+$/, "") || "/"
+      : "/";
+
+  if (pathname === "/login") {
+    return <LoginPage />;
+  }
+
+  if (pathname === "/dashboard") {
+    return <DashboardPage />;
+  }
+
+  return <LandingPage />;
 }
