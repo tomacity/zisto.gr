@@ -11,8 +11,28 @@ function setCorsHeaders(req, res) {
 
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
   res.setHeader("Cache-Control", "no-store");
+}
+
+async function supabaseRequest({
+  supabaseUrl,
+  supabaseSecretKey,
+  path,
+  method = "GET",
+  headers = {},
+}) {
+  return fetch(`${supabaseUrl}${path}`, {
+    method,
+    headers: {
+      apikey: supabaseSecretKey,
+      "Content-Type": "application/json",
+      ...headers,
+    },
+  });
 }
 
 export default async function handler(req, res) {
@@ -37,44 +57,134 @@ export default async function handler(req, res) {
     });
   }
 
-  const businessId = req.query.business_id;
+  const authorization = req.headers.authorization ?? "";
 
-  if (!businessId) {
-    return res.status(400).json({
-      error: "business_id is required",
+  const accessToken = authorization.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : null;
+
+  if (!accessToken) {
+    return res.status(401).json({
+      error: "Authentication required",
     });
   }
 
   try {
-    const query = new URLSearchParams({
+    const userResponse = await supabaseRequest({
+      supabaseUrl,
+      supabaseSecretKey,
+      path: "/auth/v1/user",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      return res.status(401).json({
+        error: "Invalid or expired session",
+      });
+    }
+
+    const user = await userResponse.json();
+
+    const membershipQuery = new URLSearchParams({
+      user_id: `eq.${user.id}`,
+      select: "business_id,role",
+      limit: "1",
+    });
+
+    const membershipResponse = await supabaseRequest({
+      supabaseUrl,
+      supabaseSecretKey,
+      path: `/rest/v1/business_members?${membershipQuery.toString()}`,
+    });
+
+    if (!membershipResponse.ok) {
+      const errorText = await membershipResponse.text();
+
+      console.error("Membership query failed:", errorText);
+
+      return res.status(500).json({
+        error: "Failed to load membership",
+      });
+    }
+
+    const memberships = await membershipResponse.json();
+
+    const membership = memberships[0];
+
+    if (!membership) {
+      return res.status(403).json({
+        error: "This user is not assigned to a business",
+      });
+    }
+
+    const businessId = membership.business_id;
+
+    const businessQuery = new URLSearchParams({
+      id: `eq.${businessId}`,
+      select: "name",
+      limit: "1",
+    });
+
+    const locationQuery = new URLSearchParams({
       business_id: `eq.${businessId}`,
-      select: "event_name,source,session_id,metadata,created_at",
+      select: "name",
+      order: "created_at.asc",
+      limit: "1",
+    });
+
+    const eventsQuery = new URLSearchParams({
+      business_id: `eq.${businessId}`,
+      select:
+        "event_name,source,session_id,metadata,created_at",
       order: "created_at.desc",
       limit: "10000",
     });
 
-    const supabaseResponse = await fetch(
-      `${supabaseUrl}/rest/v1/events?${query.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          apikey: supabaseSecretKey,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!supabaseResponse.ok) {
-      const errorText = await supabaseResponse.text();
-
-      console.error("Supabase analytics query failed:", errorText);
+    const [
+      businessResponse,
+      locationResponse,
+      eventsResponse,
+    ] = await Promise.all([
+      supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path: `/rest/v1/businesses?${businessQuery.toString()}`,
+      }),
+      supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path: `/rest/v1/locations?${locationQuery.toString()}`,
+      }),
+      supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path: `/rest/v1/events?${eventsQuery.toString()}`,
+      }),
+    ]);
+        if (
+      !businessResponse.ok ||
+      !locationResponse.ok ||
+      !eventsResponse.ok
+    ) {
+      console.error("Analytics data query failed", {
+        business: await businessResponse.text(),
+        location: await locationResponse.text(),
+        events: await eventsResponse.text(),
+      });
 
       return res.status(500).json({
         error: "Failed to load analytics",
       });
     }
 
-    const events = await supabaseResponse.json();
+    const [businesses, locations, events] =
+      await Promise.all([
+        businessResponse.json(),
+        locationResponse.json(),
+        eventsResponse.json(),
+      ]);
 
     const now = new Date();
 
@@ -92,19 +202,24 @@ export default async function handler(req, res) {
     );
 
     const todayEvents = events.filter(
-      (event) => new Date(event.created_at) >= startOfToday
+      (event) =>
+        new Date(event.created_at) >= startOfToday
     );
 
     const weekEvents = events.filter(
-      (event) => new Date(event.created_at) >= startOfWeek
+      (event) =>
+        new Date(event.created_at) >= startOfWeek
     );
 
     const monthEvents = events.filter(
-      (event) => new Date(event.created_at) >= startOfMonth
+      (event) =>
+        new Date(event.created_at) >= startOfMonth
     );
 
     const countEvent = (list, eventName) =>
-      list.filter((event) => event.event_name === eventName).length;
+      list.filter(
+        (event) => event.event_name === eventName
+      ).length;
 
     const uniqueSessions = (list) =>
       new Set(
@@ -113,92 +228,199 @@ export default async function handler(req, res) {
           .filter(Boolean)
       ).size;
 
-    const pageViewsToday = countEvent(todayEvents, "page_view");
-    const menuOpensToday = countEvent(todayEvents, "menu_open");
-    const reviewClicksToday = countEvent(todayEvents, "review_click");
+    const pageViewsToday = countEvent(
+      todayEvents,
+      "page_view"
+    );
+
+    const menuOpensToday = countEvent(
+      todayEvents,
+      "menu_open"
+    );
+
+    const reviewClicksToday = countEvent(
+      todayEvents,
+      "review_click"
+    );
 
     const reviewConversionRate =
       pageViewsToday > 0
         ? Number(
-            ((reviewClicksToday / pageViewsToday) * 100).toFixed(1)
+            (
+              (reviewClicksToday /
+                pageViewsToday) *
+              100
+            ).toFixed(1)
           )
         : 0;
 
     const menuConversionRate =
       pageViewsToday > 0
         ? Number(
-            ((menuOpensToday / pageViewsToday) * 100).toFixed(1)
+            (
+              (menuOpensToday /
+                pageViewsToday) *
+              100
+            ).toFixed(1)
           )
         : 0;
 
-    const sourceCounts = events.reduce((accumulator, event) => {
-      const source = event.source || "unknown";
+    const sourceCounts = events.reduce(
+      (accumulator, event) => {
+        const source =
+          event.source || "unknown";
 
-      accumulator[source] =
-        (accumulator[source] || 0) + 1;
+        accumulator[source] =
+          (accumulator[source] || 0) + 1;
 
-      return accumulator;
-    }, {});
+        return accumulator;
+      },
+      {}
+    );
 
     const dailyActivity = [];
 
-    for (let offset = 6; offset >= 0; offset -= 1) {
+    for (
+      let offset = 6;
+      offset >= 0;
+      offset -= 1
+    ) {
       const day = new Date(now);
-      day.setDate(now.getDate() - offset);
+
+      day.setDate(
+        now.getDate() - offset
+      );
+
       day.setHours(0, 0, 0, 0);
 
       const nextDay = new Date(day);
-      nextDay.setDate(day.getDate() + 1);
 
-      const dayEvents = events.filter((event) => {
-        const createdAt = new Date(event.created_at);
+      nextDay.setDate(
+        day.getDate() + 1
+      );
 
-        return createdAt >= day && createdAt < nextDay;
-      });
+      const dayEvents = events.filter(
+        (event) => {
+          const createdAt = new Date(
+            event.created_at
+          );
+
+          return (
+            createdAt >= day &&
+            createdAt < nextDay
+          );
+        }
+      );
 
       dailyActivity.push({
-        date: day.toISOString().slice(0, 10),
-        page_views: countEvent(dayEvents, "page_view"),
-        menu_opens: countEvent(dayEvents, "menu_open"),
-        review_clicks: countEvent(dayEvents, "review_click"),
+        date: day
+          .toISOString()
+          .slice(0, 10),
+
+        page_views: countEvent(
+          dayEvents,
+          "page_view"
+        ),
+
+        menu_opens: countEvent(
+          dayEvents,
+          "menu_open"
+        ),
+
+        review_clicks: countEvent(
+          dayEvents,
+          "review_click"
+        ),
       });
     }
-
-    return res.status(200).json({
+        return res.status(200).json({
       business_id: businessId,
 
+      membership_role: membership.role,
+
+      business: {
+        name:
+          businesses[0]?.name ??
+          "Η επιχείρησή σου",
+
+        location_name:
+          locations[0]?.name ??
+          null,
+      },
+
       totals: {
-        page_views_today: pageViewsToday,
-        page_views_week: countEvent(weekEvents, "page_view"),
-        page_views_month: countEvent(monthEvents, "page_view"),
+        page_views_today:
+          pageViewsToday,
 
-        unique_visitors_today: uniqueSessions(todayEvents),
-        unique_visitors_week: uniqueSessions(weekEvents),
-        unique_visitors_month: uniqueSessions(monthEvents),
+        page_views_week:
+          countEvent(
+            weekEvents,
+            "page_view"
+          ),
 
-        menu_opens_today: menuOpensToday,
-        review_clicks_today: reviewClicksToday,
+        page_views_month:
+          countEvent(
+            monthEvents,
+            "page_view"
+          ),
 
-        menu_conversion_rate: menuConversionRate,
-        review_conversion_rate: reviewConversionRate,
+        unique_visitors_today:
+          uniqueSessions(
+            todayEvents
+          ),
+
+        unique_visitors_week:
+          uniqueSessions(
+            weekEvents
+          ),
+
+        unique_visitors_month:
+          uniqueSessions(
+            monthEvents
+          ),
+
+        menu_opens_today:
+          menuOpensToday,
+
+        review_clicks_today:
+          reviewClicksToday,
+
+        menu_conversion_rate:
+          menuConversionRate,
+
+        review_conversion_rate:
+          reviewConversionRate,
       },
 
       sources: {
-        nfc: sourceCounts.nfc || 0,
-        qr: sourceCounts.qr || 0,
-        direct: sourceCounts.direct || 0,
-        unknown: sourceCounts.unknown || 0,
+        nfc:
+          sourceCounts.nfc || 0,
+
+        qr:
+          sourceCounts.qr || 0,
+
+        direct:
+          sourceCounts.direct || 0,
+
+        unknown:
+          sourceCounts.unknown || 0,
       },
 
-      daily_activity: dailyActivity,
+      daily_activity:
+        dailyActivity,
 
-      recent_activity: events.slice(0, 10),
+      recent_activity:
+        events.slice(0, 10),
     });
   } catch (error) {
-    console.error("Analytics API error:", error);
+    console.error(
+      "Analytics API error:",
+      error
+    );
 
     return res.status(500).json({
-      error: "Internal server error",
+      error:
+        "Internal server error",
     });
   }
 }
