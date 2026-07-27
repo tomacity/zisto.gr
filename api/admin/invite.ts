@@ -23,7 +23,6 @@ const {
   SUPABASE_SERVICE_ROLE_KEY,
   VITE_SUPABASE_PUBLISHABLE_KEY,
   RESEND_API_KEY,
-  ZISTO_ADMIN_EMAILS,
   APP_URL,
 } = process.env;
 
@@ -36,8 +35,7 @@ const SUPABASE_PUBLIC_KEY = VITE_SUPABASE_PUBLISHABLE_KEY;
     !SUPABASE_URL ||
     !SUPABASE_PUBLIC_KEY ||
     !SUPABASE_ADMIN_KEY ||
-    !RESEND_API_KEY ||
-    !ZISTO_ADMIN_EMAILS
+    !RESEND_API_KEY
   ) {
     return response.status(500).json({
       error: "Missing server environment variables",
@@ -109,13 +107,24 @@ const SUPABASE_PUBLIC_KEY = VITE_SUPABASE_PUBLISHABLE_KEY;
       });
     }
 
-    const adminEmails = ZISTO_ADMIN_EMAILS
-      .split(",")
-      .map((value) => value.trim().toLowerCase());
-
-    if (!adminEmails.includes(requestingUser.email.toLowerCase())) {
+    const { data: zistoAdmin, error: adminCheckError } =
+      await adminClient
+        .from("zisto_admins")
+        .select("user_id")
+        .eq("user_id", requestingUser.id)
+        .maybeSingle();
+    
+    if (adminCheckError) {
+      console.error("Admin verification failed:", adminCheckError);
+    
+      return response.status(500).json({
+        error: "Could not verify admin access",
+      });
+    }
+    
+    if (!zistoAdmin) {
       return response.status(403).json({
-        error: "Admin access required",
+        error: "Zisto admin access required",
       });
     }
 
