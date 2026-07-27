@@ -17,19 +17,25 @@ export default async function handler(request: any, response: any) {
     });
   }
 
-  const {
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY,
-    RESEND_API_KEY,
-    ZISTO_ADMIN_EMAILS,
-    APP_URL,
-  } = process.env;
+const {
+  SUPABASE_URL,
+  SUPABASE_SECRET_KEY,
+  SUPABASE_SERVICE_ROLE_KEY,
+  VITE_SUPABASE_PUBLISHABLE_KEY,
+  RESEND_API_KEY,
+  ZISTO_ADMIN_EMAILS,
+  APP_URL,
+} = process.env;
+
+const SUPABASE_ADMIN_KEY =
+  SUPABASE_SECRET_KEY ?? SUPABASE_SERVICE_ROLE_KEY;
+
+const SUPABASE_PUBLIC_KEY = VITE_SUPABASE_PUBLISHABLE_KEY;
 
   if (
     !SUPABASE_URL ||
-    !SUPABASE_ANON_KEY ||
-    !SUPABASE_SERVICE_ROLE_KEY ||
+    !SUPABASE_PUBLIC_KEY ||
+    !SUPABASE_ADMIN_KEY ||
     !RESEND_API_KEY ||
     !ZISTO_ADMIN_EMAILS
   ) {
@@ -82,7 +88,7 @@ export default async function handler(request: any, response: any) {
 
   const adminClient = createClient(
     SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_ADMIN_KEY,
     {
       auth: {
         persistSession: false,
