@@ -8,13 +8,26 @@ type AdminTab =
   | "invitations"
   | "invite";
 
+type Business = {
+  id: string;
+  name: string;
+  slug: string;
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [error, setError] = useState("");
   const [activeAdminTab, setActiveAdminTab] =
-    useState<AdminTab>("home");
+  useState<AdminTab>("home");
+  
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [businessesLoading, setBusinessesLoading] = useState(false);
+  const [businessesError, setBusinessesError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -97,6 +110,80 @@ export function AdminPage() {
     await supabase.auth.signOut();
     window.location.hash = "/login";
   }
+
+  useEffect(() => {
+  if (!isAdmin || activeAdminTab !== "businesses") {
+    return;
+  }
+
+  let active = true;
+
+  async function loadBusinesses() {
+    try {
+      setBusinessesLoading(true);
+      setBusinessesError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch("/api/admin/businesses", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Could not load businesses",
+        );
+      }
+
+      if (active) {
+        setBusinesses(result.businesses ?? []);
+      }
+    } catch (loadError) {
+      console.error("Businesses loading failed:", loadError);
+
+      if (active) {
+        setBusinessesError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Δεν ήταν δυνατή η φόρτωση των επιχειρήσεων.",
+        );
+      }
+    } finally {
+      if (active) {
+        setBusinessesLoading(false);
+      }
+    }
+  }
+
+  loadBusinesses();
+
+  return () => {
+    active = false;
+  };
+}, [isAdmin, activeAdminTab]);
 
   if (loading) {
     return (
@@ -263,10 +350,13 @@ export function AdminPage() {
               </button>
             </div>
 
-            <div className="mt-8">
-              {activeAdminTab === "businesses" && (
-                <BusinessesPlaceholder />
-              )}
+            {activeAdminTab === "businesses" && (
+              <BusinessesPanel
+                businesses={businesses}
+                loading={businessesLoading}
+                error={businessesError}
+              />
+            )}
 
               {activeAdminTab === "clients" && (
                 <AdminPlaceholder
@@ -346,30 +436,147 @@ function AdminCard({
   );
 }
 
-function BusinessesPlaceholder() {
+function BusinessesPanel({
+  businesses,
+  loading,
+  error,
+}: {
+  businesses: Business[];
+  loading: boolean;
+  error: string;
+}) {
+  if (loading) {
+    return (
+      <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
+        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
+
+        <p className="mt-4 text-sm font-medium text-[#666]">
+          Φόρτωση επιχειρήσεων...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+          Loading error
+        </p>
+
+        <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
+          Δεν φορτώθηκαν οι επιχειρήσεις
+        </h3>
+
+        <p className="mt-3 text-sm text-red-700">
+          {error}
+        </p>
+      </div>
+    );
+  }
+
+  if (businesses.length === 0) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
+        <h3 className="text-2xl font-black tracking-[-0.03em]">
+          Δεν υπάρχει επιχείρηση
+        </h3>
+
+        <p className="mt-3 text-sm text-[#666]">
+          Δεν βρέθηκε κάποια εγγραφή στον πίνακα businesses.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
-      <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-        Businesses
-      </p>
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Live businesses
+          </p>
 
-      <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
-        Διαχείριση επιχειρήσεων
-      </h3>
+          <p className="mt-2 text-sm text-[#666]">
+            {businesses.length} ενεργή επιχείρηση
+          </p>
+        </div>
 
-      <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-[#666]">
-        Στο επόμενο βήμα θα προσθέσουμε την πραγματική
-        λίστα επιχειρήσεων και το κουμπί δημιουργίας νέου
-        business.
-      </p>
+        <button
+          type="button"
+          disabled
+          className="cursor-not-allowed rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white opacity-40"
+        >
+          + Νέα Επιχείρηση
+        </button>
+      </div>
 
-      <button
-        type="button"
-        disabled
-        className="mt-7 cursor-not-allowed rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white opacity-50"
-      >
-        + Νέα Επιχείρηση
-      </button>
+      <div className="grid gap-5">
+        {businesses.map((business) => (
+          <article
+            key={business.id}
+            className="overflow-hidden rounded-[28px] border border-black/10 bg-white"
+          >
+            <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-green-700">
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    Active
+                  </span>
+
+                  <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 font-mono text-[10px] font-bold text-[#666]">
+                    /{business.slug}
+                  </span>
+                </div>
+
+                <h3 className="mt-5 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
+                  {business.name}
+                </h3>
+
+                <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+                  <div className="rounded-2xl bg-[#F7F5F1] p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
+                      Timezone
+                    </p>
+
+                    <p className="mt-2 font-semibold">
+                      {business.timezone}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#F7F5F1] p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
+                      Analytics
+                    </p>
+
+                    <p className="mt-2 flex items-center gap-2 font-semibold">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-[#DC2727]" />
+                      Live
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = "/dashboard";
+                }}
+                className="w-full rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
+              >
+                Άνοιγμα Dashboard →
+              </button>
+            </div>
+
+            <div className="border-t border-black/8 bg-[#F7F5F1] px-6 py-4 sm:px-8">
+              <p className="font-mono text-[10px] text-[#999]">
+                Business ID: {business.id}
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
