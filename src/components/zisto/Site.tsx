@@ -1268,16 +1268,11 @@ function Footer() {
 /* ================================================================== */
 
 function LoginPage() {
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [authNotice, setAuthNotice] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -1293,43 +1288,6 @@ function LoginPage() {
     try {
       setLoading(true);
       setLoginError(null);
-      setAuthNotice(null);
-
-      if (authMode === "signup") {
-        if (password.length < 8) {
-          throw new Error("Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.");
-        }
-
-        if (password !== confirmPassword) {
-          throw new Error("Οι κωδικοί δεν ταιριάζουν.");
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/#/login`,
-            data: {
-              full_name: fullName.trim(),
-              business_name: businessName.trim(),
-            },
-          },
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        if (data.session) {
-          window.location.hash = "/dashboard";
-          return;
-        }
-
-        setAuthNotice(
-          "Ο λογαριασμός δημιουργήθηκε. Έλεγξε το email σου για επιβεβαίωση. Μετά τη σύνδεση, το αίτημά σου θα περιμένει έγκριση από το Zisto.",
-        );
-        return;
-      }
 
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -1342,12 +1300,8 @@ function LoginPage() {
 
       window.location.hash = "/dashboard";
     } catch (error) {
-      console.error("Authentication failed:", error);
-      setLoginError(
-        error instanceof Error
-          ? error.message
-          : "Δεν ήταν δυνατή η ολοκλήρωση της διαδικασίας.",
-      );
+      console.error("Login failed:", error);
+      setLoginError("Το email ή ο κωδικός δεν είναι σωστός.");
     } finally {
       setLoading(false);
     }
@@ -1414,7 +1368,7 @@ function LoginPage() {
               as="span"
               className="block text-[16vw] sm:text-[12vw] lg:text-[8vw] xl:text-[8rem]"
             >
-              Η επιχείρησή
+              Welcome
             </Reveal>
 
             <Reveal
@@ -1422,7 +1376,7 @@ function LoginPage() {
               as="span"
               className="block text-[16vw] text-[#DC2727] sm:text-[12vw] lg:text-[8vw] xl:text-[8rem]"
             >
-              σου.
+              back.
             </Reveal>
 
             <Reveal
@@ -1430,14 +1384,14 @@ function LoginPage() {
               as="span"
               className="block text-[16vw] sm:text-[12vw] lg:text-[8vw] xl:text-[8rem]"
             >
-              Με μια ματιά.
+              Συνέχισε.
             </Reveal>
           </h1>
 
           <Reveal delay={500}>
             <p className="mt-8 max-w-xl text-[15px] leading-relaxed text-[#222]/60 md:text-[17px]">
-              Δες τα taps, τα ανοίγματα του μενού και τις επισκέψεις προς
-              αξιολόγηση — χωρίς περίπλοκες αναφορές και άχρηστα δεδομένα.
+              Συνδέσου για να δεις τα πραγματικά δεδομένα, τις κάρτες και την
+              απόδοση της επιχείρησής σου.
             </p>
           </Reveal>
         </section>
@@ -1468,43 +1422,7 @@ function LoginPage() {
               </h2>
 
               <form onSubmit={handleSubmit} className="mt-10">
-                <div className="mb-8 grid grid-cols-2 rounded-full bg-[#F4F4F2] p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode("signin");
-                      setLoginError(null);
-                      setAuthNotice(null);
-                    }}
-                    className={`rounded-full px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
-                      authMode === "signin"
-                        ? "bg-[#222] text-white"
-                        : "text-[#222]/45"
-                    }`}
-                  >
-                    Σύνδεση
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode("signup");
-                      setLoginError(null);
-                      setAuthNotice(null);
-                    }}
-                    className={`rounded-full px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
-                      authMode === "signup"
-                        ? "bg-[#DC2727] text-white"
-                        : "text-[#222]/45"
-                    }`}
-                  >
-                    Εγγραφή
-                  </button>
-                </div>
-
-                {authMode === "signup" && (
-                  <div className="mb-7 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <label className="block">
+                <label className="block">
                       <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45">
                         Ονοματεπώνυμο
                       </span>
@@ -1576,43 +1494,12 @@ function LoginPage() {
                   </div>
                 </label>
 
-                {authMode === "signup" && (
-                  <label className="mt-7 block">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45">
-                      Επιβεβαίωση κωδικού
-                    </span>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
-                      required
-                      autoComplete="new-password"
-                      placeholder="••••••••"
-                      className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 pb-4 text-[15px] font-semibold outline-none transition-colors placeholder:text-[#222]/20 focus:border-[#DC2727]"
-                    />
-                  </label>
-                )}
-
-                {authNotice && (
-                  <p className="mt-6 rounded-[12px] bg-green-50 px-4 py-4 text-[12px] font-semibold leading-relaxed text-green-800">
-                    {authNotice}
-                  </p>
-                )}
-
                 <button
                   type="submit"
                   disabled={loading}
                   className="group mt-10 flex w-full items-center justify-between rounded-full bg-[#222] px-6 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-white transition-all duration-300 hover:bg-[#DC2727] disabled:cursor-wait disabled:opacity-60"
                 >
-                  <span>
-                    {loading
-                      ? authMode === "signup"
-                        ? "Δημιουργία λογαριασμού..."
-                        : "Γίνεται σύνδεση..."
-                      : authMode === "signup"
-                        ? "Δημιουργία λογαριασμού"
-                        : "Σύνδεση"}
-                  </span>
+                  <span>{loading ? "Γίνεται σύνδεση..." : "Σύνδεση"}</span>
                   <span className="transition-transform duration-300 group-hover:translate-x-1">
                     →
                   </span>
@@ -1624,15 +1511,246 @@ function LoginPage() {
                   </p>
                 )}
 
-                <p className="mt-5 text-center text-[11px] leading-relaxed text-[#222]/40">
-                  Χρησιμοποίησε τα στοιχεία σύνδεσης που σου έδωσε το Zisto.
-                </p>
+                <div className="mt-7 border-t border-black/8 pt-6 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Νέος πελάτης;
+                  </p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-[#222]/45">
+                    Η πρόσβαση δημιουργείται μόνο μέσω προσωπικής πρόσκλησης
+                    από το Zisto.
+                  </p>
+                </div>
               </form>
             </div>
           </section>
         </Reveal>
       </div>
 
+    </main>
+  );
+}
+
+/* ================================================================== */
+/*  INVITATION SETUP PAGE                                             */
+/* ================================================================== */
+
+function InvitationSetupPage() {
+  const [fullName, setFullName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function initializeInvitation() {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          throw error;
+        }
+
+        if (!session) {
+          throw new Error(
+            "Η πρόσκληση δεν είναι έγκυρη ή έχει λήξει. Ζήτησε νέα πρόσκληση από το Zisto.",
+          );
+        }
+
+        if (active) {
+          setFullName(
+            typeof session.user.user_metadata?.full_name === "string"
+              ? session.user.user_metadata.full_name
+              : "",
+          );
+          setSessionReady(true);
+        }
+      } catch (error) {
+        if (active) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η επιβεβαίωση της πρόσκλησης.",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    initializeInvitation();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleInvitationSetup = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+
+    try {
+      setSaving(true);
+      setErrorMessage(null);
+
+      if (password.length < 8) {
+        throw new Error(
+          "Ο κωδικός πρέπει να περιέχει τουλάχιστον 8 χαρακτήρες.",
+        );
+      }
+
+      if (password !== confirmPassword) {
+        throw new Error("Οι δύο κωδικοί δεν ταιριάζουν.");
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password,
+        data: {
+          full_name: fullName.trim(),
+          onboarding_completed: true,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      window.history.replaceState({}, "", window.location.origin);
+      window.location.hash = "/dashboard";
+    } catch (error) {
+      console.error("Invitation setup failed:", error);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η ολοκλήρωση της πρόσκλησης.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#F6F6F4] px-5 py-12 font-sans text-[#222]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-36 -top-36 h-[520px] w-[520px] rounded-full bg-[#DC2727]/15 blur-3xl"
+      />
+
+      <section className="relative w-full max-w-[620px] rounded-[28px] border border-black/10 bg-white p-7 shadow-[0_40px_100px_-35px_rgba(34,34,34,0.28)] md:p-11">
+        <img
+          src={WORDMARK}
+          alt="Zisto"
+          className="h-7 w-auto"
+          draggable={false}
+        />
+
+        <p className="mt-10 text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
+          Accept invitation
+        </p>
+
+        <h1 className="mt-4 text-[44px] font-black leading-[0.9] tracking-[-0.045em] md:text-[62px]">
+          Καλώς ήρθες
+          <br />
+          στο Zisto.
+        </h1>
+
+        <p className="mt-6 max-w-lg text-[14px] leading-relaxed text-[#222]/55">
+          Ολοκλήρωσε το προφίλ σου και δημιούργησε τον προσωπικό σου κωδικό.
+        </p>
+
+        {loading && (
+          <div className="mt-10 h-24 animate-pulse rounded-[16px] bg-[#F3F3F1]" />
+        )}
+
+        {!loading && errorMessage && !sessionReady && (
+          <div className="mt-9 rounded-[14px] border border-red-200 bg-red-50 p-5 text-[13px] font-semibold leading-relaxed text-red-700">
+            {errorMessage}
+          </div>
+        )}
+
+        {!loading && sessionReady && (
+          <form onSubmit={handleInvitationSetup} className="mt-10">
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#222]/45">
+                Ονοματεπώνυμο
+              </span>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                required
+                autoComplete="name"
+                className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 text-[16px] font-semibold outline-none focus:border-[#DC2727]"
+              />
+            </label>
+
+            <label className="mt-8 block">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#222]/45">
+                Νέος κωδικός
+              </span>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  autoComplete="new-password"
+                  placeholder="Τουλάχιστον 8 χαρακτήρες"
+                  className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 pr-24 text-[16px] font-semibold outline-none placeholder:text-[#222]/20 focus:border-[#DC2727]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  className="absolute bottom-4 right-0 text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40"
+                >
+                  {showPassword ? "Απόκρυψη" : "Εμφάνιση"}
+                </button>
+              </div>
+            </label>
+
+            <label className="mt-8 block">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#222]/45">
+                Επιβεβαίωση κωδικού
+              </span>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                required
+                autoComplete="new-password"
+                className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 text-[16px] font-semibold outline-none focus:border-[#DC2727]"
+              />
+            </label>
+
+            {errorMessage && (
+              <p className="mt-6 rounded-[12px] bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-700">
+                {errorMessage}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="group mt-10 flex w-full items-center justify-between rounded-full bg-[#222] px-6 py-4 text-[11px] font-bold uppercase tracking-[0.18em] text-white transition hover:bg-[#DC2727] disabled:opacity-60"
+            >
+              <span>
+                {saving ? "Ολοκλήρωση..." : "Ολοκλήρωση λογαριασμού"}
+              </span>
+              <span>→</span>
+            </button>
+          </form>
+        )}
+      </section>
     </main>
   );
 }
@@ -2931,6 +3049,14 @@ function LandingPage() {
 }
 
 export function ZistoSite() {
+  const isInvitationRoute = () => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return new URLSearchParams(window.location.search).get("invite") === "1";
+  };
+
   const getRoute = () => {
     if (typeof window === "undefined") {
       return "/";
@@ -2953,6 +3079,10 @@ export function ZistoSite() {
       window.removeEventListener("hashchange", handleHashChange);
     };
   }, []);
+
+  if (isInvitationRoute()) {
+    return <InvitationSetupPage />;
+  }
 
   if (route === "/login") {
     return <LoginPage />;
