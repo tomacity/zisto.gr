@@ -1457,44 +1457,90 @@ function LoginPage() {
 /*  DASHBOARD DATA                                                    */
 /* ================================================================== */
 
-const DASHBOARD_METRICS = [
-  {
-    label: "Συνολικές επισκέψεις",
-    value: "1.248",
-    change: "+18%",
-    note: "από τον προηγούμενο μήνα",
-  },
-  {
-    label: "Ανοίγματα μενού",
-    value: "892",
-    change: "+24%",
-    note: "71,5% των επισκέψεων",
-  },
-  {
-    label: "Review clicks",
-    value: "146",
-    change: "-12%",
-    note: "11,7% των επισκέψεων",
-  },
-  {
-    label: "Review rate",
-    value: "16,4%",
-    change: "+2,8%",
-    note: "από τον προηγούμενο μήνα",
-  },
-];
+const BUSINESS_ID = "021c48d4-fccc-4ccb-b37c-d42c2e341aa0";
 
-const CHART_VALUES = [
-  38, 54, 42, 69, 48, 76, 91, 64, 82, 105, 78, 118, 96, 132,
-];
+type AnalyticsEvent = {
+  event_name: string;
+  source: string;
+  session_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
 
-const RECENT_ACTIVITY = [
-  { time: "15:42", action: "Άνοιγμα μενού", source: "NFC card" },
-  { time: "15:38", action: "Review click", source: "Google" },
-  { time: "15:31", action: "Άνοιγμα μενού", source: "QR code" },
-  { time: "15:19", action: "Άνοιγμα μενού", source: "NFC card" },
-  { time: "15:07", action: "Review click", source: "Google" },
-];
+type DailyActivity = {
+  date: string;
+  page_views: number;
+  menu_opens: number;
+  review_clicks: number;
+};
+
+type AnalyticsResponse = {
+  business_id: string;
+  totals: {
+    page_views_today: number;
+    page_views_week: number;
+    page_views_month: number;
+    unique_visitors_today: number;
+    unique_visitors_week: number;
+    unique_visitors_month: number;
+    menu_opens_today: number;
+    review_clicks_today: number;
+    menu_conversion_rate: number;
+    review_conversion_rate: number;
+  };
+  sources: {
+    nfc: number;
+    qr: number;
+    direct: number;
+    unknown: number;
+  };
+  daily_activity: DailyActivity[];
+  recent_activity: AnalyticsEvent[];
+};
+
+async function fetchAnalytics(): Promise<AnalyticsResponse> {
+  const response = await fetch(
+    `/api/analytics?business_id=${encodeURIComponent(BUSINESS_ID)}`,
+    {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Analytics request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+const numberFormatter = new Intl.NumberFormat("el-GR");
+const percentFormatter = new Intl.NumberFormat("el-GR", {
+  maximumFractionDigits: 1,
+});
+
+function formatEventName(eventName: string) {
+  const names: Record<string, string> = {
+    page_view: "Επίσκεψη στη σελίδα",
+    menu_open: "Άνοιγμα μενού",
+    review_click: "Review click",
+    wifi_open: "Άνοιγμα Wi-Fi",
+    social_open: "Άνοιγμα social",
+  };
+
+  return names[eventName] ?? eventName;
+}
+
+function formatSource(source: string) {
+  const sources: Record<string, string> = {
+    nfc: "NFC",
+    qr: "QR code",
+    direct: "Direct",
+    unknown: "Άγνωστο",
+  };
+
+  return sources[source] ?? source;
+}
 
 /* ================================================================== */
 /*  DASHBOARD COMPONENTS                                              */
@@ -1603,27 +1649,28 @@ function DashboardMetric({
   );
 }
 
-function DashboardChart() {
+function DashboardChart({ data }: { data: DailyActivity[] }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const chartData = [
-    { day: "Σάβ", date: "12", value: 38, menu: 24, reviews: 6 },
-    { day: "Κυρ", date: "13", value: 54, menu: 35, reviews: 9 },
-    { day: "Δευ", date: "14", value: 42, menu: 29, reviews: 5 },
-    { day: "Τρι", date: "15", value: 69, menu: 47, reviews: 11 },
-    { day: "Τετ", date: "16", value: 48, menu: 31, reviews: 7 },
-    { day: "Πεμ", date: "17", value: 76, menu: 52, reviews: 13 },
-    { day: "Παρ", date: "18", value: 91, menu: 63, reviews: 15 },
-    { day: "Σάβ", date: "19", value: 64, menu: 44, reviews: 10 },
-    { day: "Κυρ", date: "20", value: 82, menu: 56, reviews: 14 },
-    { day: "Δευ", date: "21", value: 105, menu: 72, reviews: 18 },
-    { day: "Τρι", date: "22", value: 78, menu: 51, reviews: 12 },
-    { day: "Τετ", date: "23", value: 118, menu: 81, reviews: 21 },
-    { day: "Πεμ", date: "24", value: 96, menu: 67, reviews: 16 },
-    { day: "Παρ", date: "25", value: 132, menu: 91, reviews: 24 },
-  ];
+  const dayFormatter = new Intl.DateTimeFormat("el-GR", {
+    weekday: "short",
+  });
 
-  const maxValue = Math.max(...chartData.map((item) => item.value));
+  const chartData = data.map((item) => {
+    const date = new Date(`${item.date}T12:00:00`);
+
+    return {
+      isoDate: item.date,
+      day: dayFormatter.format(date).replace(".", ""),
+      date: String(date.getDate()),
+      value: item.page_views,
+      menu: item.menu_opens,
+      reviews: item.review_clicks,
+    };
+  });
+
+  const maxValue = Math.max(1, ...chartData.map((item) => item.value));
+  const totalViews = chartData.reduce((sum, item) => sum + item.value, 0);
   const activeItem =
     activeIndex !== null ? chartData[activeIndex] : null;
 
@@ -1636,17 +1683,17 @@ function DashboardChart() {
           </p>
 
           <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em] md:text-[38px]">
-            Τελευταίες 14 ημέρες
+            Τελευταίες 7 ημέρες
           </h2>
         </div>
 
         <div className="text-right">
           <p className="text-[32px] font-black tracking-[-0.04em]">
-            1.248
+            {numberFormatter.format(totalViews)}
           </p>
 
           <p className="text-[10px] uppercase tracking-[0.2em] text-[#222]/40">
-            συνολικά taps
+            επισκέψεις
           </p>
         </div>
       </div>
@@ -1654,18 +1701,21 @@ function DashboardChart() {
       <div className="relative mt-12">
         {activeItem && (
           <div
-            className="pointer-events-none absolute top-0 z-20 w-[150px] -translate-x-1/2 rounded-[12px] bg-[#222] p-3 text-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.6)]"
+            className="pointer-events-none absolute top-0 z-20 w-[160px] -translate-x-1/2 rounded-[12px] bg-[#222] p-3 text-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.6)]"
             style={{
-              left: `${((activeIndex ?? 0) + 0.5) / chartData.length * 100}%`,
+              left: `${(((activeIndex ?? 0) + 0.5) / chartData.length) * 100}%`,
               transform: "translate(-50%, -115%)",
             }}
           >
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
-              {activeItem.day}, {activeItem.date} Ιουλίου
+              {new Intl.DateTimeFormat("el-GR", {
+                day: "numeric",
+                month: "short",
+              }).format(new Date(`${activeItem.isoDate}T12:00:00`))}
             </p>
 
             <p className="mt-2 text-[18px] font-black">
-              {activeItem.value} taps
+              {activeItem.value} επισκέψεις
             </p>
 
             <div className="mt-3 space-y-1 text-[10px] text-white/65">
@@ -1676,9 +1726,7 @@ function DashboardChart() {
 
               <p className="flex justify-between gap-4">
                 <span>Review clicks</span>
-                <strong className="text-white">
-                  {activeItem.reviews}
-                </strong>
+                <strong className="text-white">{activeItem.reviews}</strong>
               </p>
             </div>
           </div>
@@ -1686,23 +1734,20 @@ function DashboardChart() {
 
         <div className="flex h-[260px] items-end gap-2 md:gap-3">
           {chartData.map((item, index) => {
-            const height = Math.max(
-              12,
-              (item.value / maxValue) * 100,
-            );
-
+            const height =
+              item.value === 0 ? 3 : Math.max(12, (item.value / maxValue) * 100);
             const isActive = activeIndex === index;
 
             return (
               <button
-                key={`${item.date}-${item.value}`}
+                key={item.isoDate}
                 type="button"
                 onMouseEnter={() => setActiveIndex(index)}
                 onMouseLeave={() => setActiveIndex(null)}
                 onFocus={() => setActiveIndex(index)}
                 onBlur={() => setActiveIndex(null)}
                 className="group relative flex h-full flex-1 items-end outline-none"
-                aria-label={`${item.day} ${item.date} Ιουλίου, ${item.value} taps`}
+                aria-label={`${item.isoDate}, ${item.value} επισκέψεις`}
               >
                 <span
                   className={`block w-full origin-bottom rounded-t-[5px] transition-all duration-300 ${
@@ -1712,6 +1757,7 @@ function DashboardChart() {
                   }`}
                   style={{
                     height: `${height}%`,
+                    opacity: item.value === 0 ? 0.12 : 1,
                     transform: isActive ? "scaleY(1.03)" : "scaleY(1)",
                   }}
                 />
@@ -1720,15 +1766,18 @@ function DashboardChart() {
           })}
         </div>
 
-        <div className="mt-5 grid grid-cols-14 gap-2 md:gap-3">
+        <div
+          className="mt-5 grid gap-2 md:gap-3"
+          style={{
+            gridTemplateColumns: `repeat(${Math.max(chartData.length, 1)}, minmax(0, 1fr))`,
+          }}
+        >
           {chartData.map((item, index) => {
-            const isSaturday = item.day === "Σάβ";
-            const isSunday = item.day === "Κυρ";
             const isActive = activeIndex === index;
 
             return (
               <button
-                key={`${item.day}-${item.date}`}
+                key={`${item.isoDate}-label`}
                 type="button"
                 onMouseEnter={() => setActiveIndex(index)}
                 onMouseLeave={() => setActiveIndex(null)}
@@ -1738,11 +1787,7 @@ function DashboardChart() {
               >
                 <span
                   className={`text-[9px] font-bold uppercase tracking-[0.08em] transition-colors ${
-                    isActive
-                      ? "text-[#DC2727]"
-                      : isSunday
-                        ? "text-[#DC2727]/70"
-                        : "text-[#222]/30"
+                    isActive ? "text-[#DC2727]" : "text-[#222]/30"
                   }`}
                 >
                   {item.day}
@@ -1752,11 +1797,7 @@ function DashboardChart() {
                   className={`grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold transition-all duration-300 ${
                     isActive
                       ? "bg-[#DC2727] text-white"
-                      : isSunday
-                        ? "bg-[#DC2727]/10 text-[#DC2727]"
-                        : isSaturday
-                          ? "bg-black/5 text-[#222]/55"
-                          : "text-[#222]/55"
+                      : "text-[#222]/55"
                   }`}
                 >
                   {item.date}
@@ -1821,7 +1862,7 @@ function BusinessHealth() {
   );
 }
 
-function RecentActivity() {
+function RecentActivity({ events }: { events: AnalyticsEvent[] }) {
   return (
     <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8">
       <div className="flex items-center justify-between">
@@ -1841,26 +1882,37 @@ function RecentActivity() {
       </div>
 
       <div className="mt-8">
-        {RECENT_ACTIVITY.map((item, index) => (
-          <div
-            key={`${item.time}-${item.action}`}
-            className={`grid grid-cols-[60px_1fr_auto] items-center gap-4 py-4 ${
-              index !== 0 ? "border-t border-black/8" : ""
-            }`}
-          >
-            <span className="font-mono text-[11px] font-bold text-[#222]/35">
-              {item.time}
-            </span>
+        {events.length === 0 ? (
+          <p className="py-8 text-[13px] text-[#222]/40">
+            Δεν υπάρχει ακόμη δραστηριότητα.
+          </p>
+        ) : (
+          events.map((item, index) => (
+            <div
+              key={`${item.created_at}-${item.event_name}-${index}`}
+              className={`grid grid-cols-[60px_1fr_auto] items-center gap-4 py-4 ${
+                index !== 0 ? "border-t border-black/8" : ""
+              }`}
+            >
+              <span className="font-mono text-[11px] font-bold text-[#222]/35">
+                {new Intl.DateTimeFormat("el-GR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                  timeZone: "Europe/Athens",
+                }).format(new Date(item.created_at))}
+              </span>
 
-            <span className="text-[13px] font-bold text-[#222]">
-              {item.action}
-            </span>
+              <span className="text-[13px] font-bold text-[#222]">
+                {formatEventName(item.event_name)}
+              </span>
 
-            <span className="text-right text-[10px] text-[#222]/35">
-              {item.source}
-            </span>
-          </div>
-        ))}
+              <span className="text-right text-[10px] text-[#222]/35">
+                {formatSource(item.source)}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );
@@ -1872,6 +1924,91 @@ function RecentActivity() {
 
 function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAnalytics() {
+      try {
+        setAnalyticsLoading(true);
+        setAnalyticsError(null);
+
+        const data = await fetchAnalytics();
+
+        if (active) {
+          setAnalytics(data);
+        }
+      } catch (error) {
+        console.error(error);
+
+        if (active) {
+          setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
+        }
+      } finally {
+        if (active) {
+          setAnalyticsLoading(false);
+        }
+      }
+    }
+
+    loadAnalytics();
+
+    const refreshTimer = window.setInterval(loadAnalytics, 60_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
+    };
+  }, []);
+
+  const dashboardMetrics = analytics
+    ? [
+        {
+          label: "Επισκέψεις μήνα",
+          value: numberFormatter.format(analytics.totals.page_views_month),
+          change: "Live",
+          note: `${numberFormatter.format(analytics.totals.unique_visitors_month)} μοναδικοί επισκέπτες`,
+        },
+        {
+          label: "Ανοίγματα μενού σήμερα",
+          value: numberFormatter.format(analytics.totals.menu_opens_today),
+          change: "Live",
+          note: `${percentFormatter.format(analytics.totals.menu_conversion_rate)}% των σημερινών επισκέψεων`,
+        },
+        {
+          label: "Review clicks σήμερα",
+          value: numberFormatter.format(analytics.totals.review_clicks_today),
+          change: "Live",
+          note: `${percentFormatter.format(analytics.totals.review_conversion_rate)}% των σημερινών επισκέψεων`,
+        },
+        {
+          label: "Μοναδικοί σήμερα",
+          value: numberFormatter.format(analytics.totals.unique_visitors_today),
+          change: "Live",
+          note: `${numberFormatter.format(analytics.totals.page_views_today)} συνολικές επισκέψεις σήμερα`,
+        },
+      ]
+    : [];
+
+  const sevenDayViews =
+    analytics?.daily_activity.reduce(
+      (sum, item) => sum + item.page_views,
+      0,
+    ) ?? 0;
+
+  const sevenDayReviewClicks =
+    analytics?.daily_activity.reduce(
+      (sum, item) => sum + item.review_clicks,
+      0,
+    ) ?? 0;
+
+  const reviewOpportunity = Math.max(
+    0,
+    sevenDayViews - sevenDayReviewClicks,
+  );
 
   return (
     <main className="min-h-screen bg-[#F6F6F4] font-sans text-[#222]">
@@ -1976,7 +2113,13 @@ function DashboardPage() {
           </button>
 
           <p className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35 sm:block">
-            Σάββατο, 25 Ιουλίου 2026
+            {new Intl.DateTimeFormat("el-GR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              timeZone: "Europe/Athens",
+            }).format(new Date())}
           </p>
 
           <div className="flex items-center gap-3">
@@ -2009,26 +2152,49 @@ function DashboardPage() {
 
             <div className="max-w-sm">
               <p className="text-[14px] leading-relaxed text-[#222]/55">
-                Η δραστηριότητα αυξήθηκε κατά{" "}
-                <strong className="text-[#222]">18%</strong> αυτόν τον μήνα.
-                Τα περισσότερα taps έγιναν μεταξύ 20:00 και 22:00.
+                Τα δεδομένα ενημερώνονται αυτόματα από το smart link.
+                {analytics && (
+                  <>
+                    {" "}Αυτόν τον μήνα καταγράφηκαν{" "}
+                    <strong className="text-[#222]">
+                      {numberFormatter.format(analytics.totals.page_views_month)}
+                    </strong>{" "}
+                    επισκέψεις.
+                  </>
+                )}
               </p>
             </div>
           </section>
 
           <section className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {DASHBOARD_METRICS.map((metric, index) => (
-              <DashboardMetric
-                key={metric.label}
-                {...metric}
-                index={index}
-              />
-            ))}
+            {analyticsLoading &&
+              Array.from({ length: 4 }, (_, index) => (
+                <div
+                  key={index}
+                  className="min-h-[260px] animate-pulse rounded-[20px] border border-black/5 bg-white"
+                />
+              ))}
+
+            {analyticsError && (
+              <div className="rounded-[20px] border border-red-200 bg-red-50 p-6 text-sm text-red-700 sm:col-span-2 xl:col-span-4">
+                {analyticsError}
+              </div>
+            )}
+
+            {!analyticsLoading &&
+              !analyticsError &&
+              dashboardMetrics.map((metric, index) => (
+                <DashboardMetric
+                  key={metric.label}
+                  {...metric}
+                  index={index}
+                />
+              ))}
           </section>
 
           <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
             <div className="xl:col-span-8">
-              <DashboardChart />
+              <DashboardChart data={analytics?.daily_activity ?? []} />
             </div>
 
             <div className="xl:col-span-4">
@@ -2038,7 +2204,7 @@ function DashboardPage() {
 
           <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
             <div className="xl:col-span-7">
-              <RecentActivity />
+              <RecentActivity events={analytics?.recent_activity ?? []} />
             </div>
 
             <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-5">
@@ -2047,12 +2213,13 @@ function DashboardPage() {
               </p>
 
               <h2 className="mt-3 text-[28px] font-black leading-[0.95] tracking-[-0.04em] md:text-[38px]">
-                746 επισκέπτες δεν πάτησαν review.
+                {numberFormatter.format(reviewOpportunity)} επισκέψεις χωρίς review click.
               </h2>
 
               <p className="mt-5 max-w-md text-[13px] leading-relaxed text-[#222]/50">
-                Αυτό δεν σημαίνει ότι χάθηκαν 746 αξιολογήσεις. Δείχνει όμως
-                πόσες ευκαιρίες υπάρχουν να βελτιωθεί η διαδρομή του πελάτη.
+                Η μέτρηση αφορά τις τελευταίες 7 ημέρες. Δεν σημαίνει ότι κάθε
+                επίσκεψη θα γινόταν αξιολόγηση, αλλά δείχνει το περιθώριο βελτίωσης
+                της διαδρομής προς το Google Review.
               </p>
 
               <button
