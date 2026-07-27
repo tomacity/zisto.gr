@@ -3014,6 +3014,74 @@ function LandingPage() {
   );
 }
 
+function AdminPage() {
+  return (
+    <main className="min-h-screen bg-[#F7F5F1] px-10 py-10">
+      <div className="mx-auto max-w-7xl">
+
+        <div className="mb-12">
+          <p className="text-sm uppercase tracking-[0.35em] text-[#DC2727]">
+            Zisto Admin
+          </p>
+
+          <h1 className="mt-3 text-6xl font-black tracking-[-0.06em]">
+            Platform Dashboard
+          </h1>
+
+          <p className="mt-5 max-w-xl text-[#666]">
+            Διαχείριση όλων των επιχειρήσεων, clients και invitations.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-4 gap-6">
+
+          <button className="rounded-3xl border bg-white p-8 text-left hover:border-[#DC2727]">
+            <h2 className="text-xl font-bold">
+              Επιχειρήσεις
+            </h2>
+
+            <p className="mt-2 text-sm text-[#666]">
+              Διαχείριση όλων των businesses
+            </p>
+          </button>
+
+          <button className="rounded-3xl border bg-white p-8 text-left hover:border-[#DC2727]">
+            <h2 className="text-xl font-bold">
+              Clients
+            </h2>
+
+            <p className="mt-2 text-sm text-[#666]">
+              Όλοι οι χρήστες
+            </p>
+          </button>
+
+          <button className="rounded-3xl border bg-white p-8 text-left hover:border-[#DC2727]">
+            <h2 className="text-xl font-bold">
+              Invitations
+            </h2>
+
+            <p className="mt-2 text-sm text-[#666]">
+              Pending invitations
+            </p>
+          </button>
+
+          <button className="rounded-3xl border bg-[#222] p-8 text-left text-white hover:bg-[#DC2727]">
+            <h2 className="text-xl font-bold">
+              + Invite Client
+            </h2>
+
+            <p className="mt-2 text-sm opacity-80">
+              Δημιουργία νέου client
+            </p>
+          </button>
+
+        </div>
+
+      </div>
+    </main>
+  );
+}
+
 export function ZistoSite() {
   const isInvitationRoute = () => {
     if (typeof window === "undefined") {
@@ -3056,6 +3124,10 @@ export function ZistoSite() {
 
   if (route === "/dashboard") {
     return <DashboardPage />;
+  }
+  
+  if (route === "/admin") {
+  return <AdminPage />;
   }
 
   return <LandingPage />;
