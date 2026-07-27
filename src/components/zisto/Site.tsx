@@ -1811,7 +1811,70 @@ function DashboardChart({ data }: { data: DailyActivity[] }) {
   );
 }
 
-function BusinessHealth() {
+function BusinessHealth({
+  analytics,
+}: {
+  analytics: AnalyticsResponse | null;
+}) {
+  const sevenDayMenuOpens =
+    analytics?.daily_activity.reduce(
+      (sum, item) => sum + item.menu_opens,
+      0,
+    ) ?? 0;
+
+  const sevenDayReviewClicks =
+    analytics?.daily_activity.reduce(
+      (sum, item) => sum + item.review_clicks,
+      0,
+    ) ?? 0;
+
+  const smartLinkOnline = (analytics?.totals.page_views_month ?? 0) > 0;
+  const menuActive = sevenDayMenuOpens > 0;
+  const trackingActive = (analytics?.totals.unique_visitors_month ?? 0) > 0;
+  const nfcOrQrActive =
+    ((analytics?.sources.nfc ?? 0) + (analytics?.sources.qr ?? 0)) > 0;
+
+  const reviewRate = analytics?.totals.review_conversion_rate ?? 0;
+
+  const healthScore = Math.min(
+    100,
+    (smartLinkOnline ? 30 : 0) +
+      (menuActive ? 25 : 0) +
+      (trackingActive ? 20 : 0) +
+      (nfcOrQrActive ? 15 : (analytics?.sources.direct ?? 0) > 0 ? 5 : 0) +
+      Math.min(10, Math.round(reviewRate)),
+  );
+
+  const healthMessage =
+    healthScore >= 85
+      ? "Η ψηφιακή εμπειρία λειτουργεί πολύ καλά."
+      : healthScore >= 65
+        ? "Η βασική εμπειρία λειτουργεί σωστά. Υπάρχει περιθώριο βελτίωσης."
+        : "Χρειάζονται περισσότερα δεδομένα ή ενεργοποίηση επιπλέον καναλιών.";
+
+  const statusItems = [
+    {
+      label: "Smart link online",
+      active: smartLinkOnline,
+    },
+    {
+      label: "Μενού ενεργό",
+      active: menuActive,
+    },
+    {
+      label: "Analytics tracking",
+      active: trackingActive,
+    },
+    {
+      label: "NFC / QR traffic",
+      active: nfcOrQrActive,
+    },
+    {
+      label: `${sevenDayReviewClicks} review clicks / 7 ημέρες`,
+      active: sevenDayReviewClicks > 0,
+    },
+  ];
+
   return (
     <section className="relative overflow-hidden rounded-[20px] bg-[#DC2727] p-6 text-white md:p-8">
       <div
@@ -1826,36 +1889,32 @@ function BusinessHealth() {
 
         <div className="mt-6 flex items-end gap-3">
           <span className="text-[84px] font-black leading-none tracking-[-0.07em]">
-            89
+            {healthScore}
           </span>
           <span className="mb-2 text-[20px] font-bold text-white/45">/100</span>
         </div>
 
         <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-white/75">
-          Η εμπειρία λειτουργεί σωστά και τα review clicks αυξάνονται.
+          {healthMessage}
         </p>
 
         <div className="mt-8 flex flex-col gap-3 text-[12px] font-semibold">
-          <p className="flex items-center gap-3">
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] text-[#DC2727]">
-              ✓
-            </span>
-            NFC card online
-          </p>
-
-          <p className="flex items-center gap-3">
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] text-[#DC2727]">
-              ✓
-            </span>
-            Smart link online
-          </p>
-
-          <p className="flex items-center gap-3">
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] text-[#DC2727]">
-              ✓
-            </span>
-            Μενού διαθέσιμο
-          </p>
+          {statusItems.map((item) => (
+            <p key={item.label} className="flex items-center gap-3">
+              <span
+                className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${
+                  item.active
+                    ? "bg-white text-[#DC2727]"
+                    : "border border-white/30 text-white/55"
+                }`}
+              >
+                {item.active ? "✓" : "–"}
+              </span>
+              <span className={item.active ? "text-white" : "text-white/55"}>
+                {item.label}
+              </span>
+            </p>
+          ))}
         </div>
       </div>
     </section>
@@ -1922,8 +1981,112 @@ function RecentActivity({ events }: { events: AnalyticsEvent[] }) {
 /*  DASHBOARD PAGE                                                    */
 /* ================================================================== */
 
+function DashboardTabPlaceholder({
+  tab,
+  analytics,
+}: {
+  tab: Exclude<DashboardTab, "overview">;
+  analytics: AnalyticsResponse | null;
+}) {
+  const content: Record<
+    Exclude<DashboardTab, "overview">,
+    { eyebrow: string; title: string; description: string }
+  > = {
+    analytics: {
+      eyebrow: "Analytics",
+      title: "Αναλυτικά δεδομένα",
+      description:
+        "Εδώ θα μπουν φίλτρα ημερομηνιών, σύγκριση NFC με QR, ώρες αιχμής και αναλυτικά conversion rates.",
+    },
+    reviews: {
+      eyebrow: "Αξιολογήσεις",
+      title: "Review performance",
+      description:
+        "Εδώ θα εμφανίζονται τα review clicks, το review rate και οι ευκαιρίες βελτίωσης.",
+    },
+    menu: {
+      eyebrow: "Μενού",
+      title: "Απόδοση ψηφιακού μενού",
+      description:
+        "Εδώ θα εμφανίζονται τα ανοίγματα μενού, οι δημοφιλείς κατηγορίες και η δραστηριότητα του menu.",
+    },
+    nfc: {
+      eyebrow: "NFC κάρτες",
+      title: "Διαχείριση καρτών",
+      description:
+        "Εδώ θα προστεθούν οι κάρτες, η κατάστασή τους και τα taps ανά κάρτα ή τοποθεσία.",
+    },
+    settings: {
+      eyebrow: "Ρυθμίσεις",
+      title: "Ρυθμίσεις επιχείρησης",
+      description:
+        "Εδώ θα διαχειρίζεσαι στοιχεία επιχείρησης, smart links, integrations και λογαριασμό.",
+    },
+  };
+
+  const selected = content[tab];
+
+  return (
+    <section className="rounded-[24px] border border-black/10 bg-white p-8 md:p-12">
+      <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
+        {selected.eyebrow}
+      </p>
+
+      <h1 className="mt-5 max-w-[14ch] text-[11vw] font-black leading-[0.9] tracking-[-0.05em] sm:text-[7vw] lg:text-[4.8vw]">
+        {selected.title}
+      </h1>
+
+      <p className="mt-7 max-w-2xl text-[15px] leading-relaxed text-[#222]/55">
+        {selected.description}
+      </p>
+
+      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+            Επισκέψεις μήνα
+          </p>
+          <p className="mt-3 text-[34px] font-black">
+            {numberFormatter.format(analytics?.totals.page_views_month ?? 0)}
+          </p>
+        </div>
+
+        <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+            Menu opens σήμερα
+          </p>
+          <p className="mt-3 text-[34px] font-black">
+            {numberFormatter.format(analytics?.totals.menu_opens_today ?? 0)}
+          </p>
+        </div>
+
+        <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+            Review clicks σήμερα
+          </p>
+          <p className="mt-3 text-[34px] font-black">
+            {numberFormatter.format(analytics?.totals.review_clicks_today ?? 0)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-10 inline-flex rounded-full bg-[#222] px-5 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white">
+        Η πλήρης ενότητα έρχεται στο επόμενο στάδιο
+      </div>
+    </section>
+  );
+}
+
+type DashboardTab =
+  | "overview"
+  | "analytics"
+  | "reviews"
+  | "menu"
+  | "nfc"
+  | "settings";
+
 function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
@@ -2059,26 +2222,35 @@ function DashboardPage() {
 
         <nav className="mt-10 flex flex-col gap-2">
           {[
-            ["▦", "Επισκόπηση", true],
-            ["↗", "Analytics", false],
-            ["★", "Αξιολογήσεις", false],
-            ["☰", "Μενού", false],
-            ["⌁", "NFC κάρτες", false],
-            ["⚙", "Ρυθμίσεις", false],
-          ].map(([icon, label, active]) => (
-            <button
-              key={String(label)}
-              type="button"
-              className={`flex w-full items-center gap-4 rounded-[12px] px-4 py-3.5 text-left text-[12px] font-bold transition-colors ${
-                active
-                  ? "bg-[#DC2727] text-white"
-                  : "text-white/50 hover:bg-white/[0.06] hover:text-white"
-              }`}
-            >
-              <span className="w-4 text-center">{icon}</span>
-              {label}
-            </button>
-          ))}
+            { id: "overview" as const, icon: "▦", label: "Επισκόπηση" },
+            { id: "analytics" as const, icon: "↗", label: "Analytics" },
+            { id: "reviews" as const, icon: "★", label: "Αξιολογήσεις" },
+            { id: "menu" as const, icon: "☰", label: "Μενού" },
+            { id: "nfc" as const, icon: "⌁", label: "NFC κάρτες" },
+            { id: "settings" as const, icon: "⚙", label: "Ρυθμίσεις" },
+          ].map((item) => {
+            const isActive = activeTab === item.id;
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setSidebarOpen(false);
+                }}
+                className={`flex w-full items-center gap-4 rounded-[12px] px-4 py-3.5 text-left text-[12px] font-bold transition-colors ${
+                  isActive
+                    ? "bg-[#DC2727] text-white"
+                    : "text-white/50 hover:bg-white/[0.06] hover:text-white"
+                }`}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <span className="w-4 text-center">{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="mt-auto">
@@ -2137,6 +2309,8 @@ function DashboardPage() {
         </header>
 
         <div className="mx-auto w-full max-w-[1600px] px-5 py-10 md:px-8 lg:px-10 lg:py-14">
+          {activeTab === "overview" ? (
+            <>
           <section className="flex flex-wrap items-end justify-between gap-8">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
@@ -2198,7 +2372,7 @@ function DashboardPage() {
             </div>
 
             <div className="xl:col-span-4">
-              <BusinessHealth />
+              <BusinessHealth analytics={analytics} />
             </div>
           </section>
 
@@ -2233,6 +2407,10 @@ function DashboardPage() {
               </button>
             </section>
           </section>
+            </>
+          ) : (
+            <DashboardTabPlaceholder tab={activeTab} analytics={analytics} />
+          )}
         </div>
       </div>
     </main>
