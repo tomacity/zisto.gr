@@ -1268,11 +1268,16 @@ function Footer() {
 /* ================================================================== */
 
 function LoginPage() {
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -1288,6 +1293,43 @@ function LoginPage() {
     try {
       setLoading(true);
       setLoginError(null);
+      setAuthNotice(null);
+
+      if (authMode === "signup") {
+        if (password.length < 8) {
+          throw new Error("Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.");
+        }
+
+        if (password !== confirmPassword) {
+          throw new Error("Οι κωδικοί δεν ταιριάζουν.");
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/#/login`,
+            data: {
+              full_name: fullName.trim(),
+              business_name: businessName.trim(),
+            },
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data.session) {
+          window.location.hash = "/dashboard";
+          return;
+        }
+
+        setAuthNotice(
+          "Ο λογαριασμός δημιουργήθηκε. Έλεγξε το email σου για επιβεβαίωση. Μετά τη σύνδεση, το αίτημά σου θα περιμένει έγκριση από το Zisto.",
+        );
+        return;
+      }
 
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -1300,8 +1342,12 @@ function LoginPage() {
 
       window.location.hash = "/dashboard";
     } catch (error) {
-      console.error("Login failed:", error);
-      setLoginError("Το email ή ο κωδικός δεν είναι σωστός.");
+      console.error("Authentication failed:", error);
+      setLoginError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η ολοκλήρωση της διαδικασίας.",
+      );
     } finally {
       setLoading(false);
     }
@@ -1422,6 +1468,72 @@ function LoginPage() {
               </h2>
 
               <form onSubmit={handleSubmit} className="mt-10">
+                <div className="mb-8 grid grid-cols-2 rounded-full bg-[#F4F4F2] p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("signin");
+                      setLoginError(null);
+                      setAuthNotice(null);
+                    }}
+                    className={`rounded-full px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
+                      authMode === "signin"
+                        ? "bg-[#222] text-white"
+                        : "text-[#222]/45"
+                    }`}
+                  >
+                    Σύνδεση
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("signup");
+                      setLoginError(null);
+                      setAuthNotice(null);
+                    }}
+                    className={`rounded-full px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] transition ${
+                      authMode === "signup"
+                        ? "bg-[#DC2727] text-white"
+                        : "text-[#222]/45"
+                    }`}
+                  >
+                    Εγγραφή
+                  </button>
+                </div>
+
+                {authMode === "signup" && (
+                  <div className="mb-7 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45">
+                        Ονοματεπώνυμο
+                      </span>
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(event) => setFullName(event.target.value)}
+                        required
+                        autoComplete="name"
+                        placeholder="Γιώργος Παπαεμμανουήλ"
+                        className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 pb-4 text-[15px] font-semibold outline-none transition-colors placeholder:text-[#222]/20 focus:border-[#DC2727]"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45">
+                        Επιχείρηση
+                      </span>
+                      <input
+                        type="text"
+                        value={businessName}
+                        onChange={(event) => setBusinessName(event.target.value)}
+                        required
+                        placeholder="Όνομα επιχείρησης"
+                        className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 pb-4 text-[15px] font-semibold outline-none transition-colors placeholder:text-[#222]/20 focus:border-[#DC2727]"
+                      />
+                    </label>
+                  </div>
+                )}
                 <label className="block">
                   <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/45">
                     Email
@@ -1464,12 +1576,43 @@ function LoginPage() {
                   </div>
                 </label>
 
+                {authMode === "signup" && (
+                  <label className="mt-7 block">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45">
+                      Επιβεβαίωση κωδικού
+                    </span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      required
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 pb-4 text-[15px] font-semibold outline-none transition-colors placeholder:text-[#222]/20 focus:border-[#DC2727]"
+                    />
+                  </label>
+                )}
+
+                {authNotice && (
+                  <p className="mt-6 rounded-[12px] bg-green-50 px-4 py-4 text-[12px] font-semibold leading-relaxed text-green-800">
+                    {authNotice}
+                  </p>
+                )}
+
                 <button
                   type="submit"
                   disabled={loading}
                   className="group mt-10 flex w-full items-center justify-between rounded-full bg-[#222] px-6 py-4 text-[12px] font-bold uppercase tracking-[0.18em] text-white transition-all duration-300 hover:bg-[#DC2727] disabled:cursor-wait disabled:opacity-60"
                 >
-                  <span>{loading ? "Γίνεται σύνδεση..." : "Σύνδεση"}</span>
+                  <span>
+                    {loading
+                      ? authMode === "signup"
+                        ? "Δημιουργία λογαριασμού..."
+                        : "Γίνεται σύνδεση..."
+                      : authMode === "signup"
+                        ? "Δημιουργία λογαριασμού"
+                        : "Σύνδεση"}
+                  </span>
                   <span className="transition-transform duration-300 group-hover:translate-x-1">
                     →
                   </span>
@@ -1489,6 +1632,48 @@ function LoginPage() {
           </section>
         </Reveal>
       </div>
+
+      {showTutorial && analytics && (
+        <DashboardTutorial
+          step={tutorialStep}
+          onNext={async () => {
+            if (tutorialStep < 2) {
+              setTutorialStep((value) => value + 1);
+              return;
+            }
+
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+
+            if (session) {
+              window.localStorage.setItem(
+                `zisto_tutorial_${session.user.id}`,
+                "completed",
+              );
+            }
+
+            setShowTutorial(false);
+          }}
+          onBack={() =>
+            setTutorialStep((value) => Math.max(0, value - 1))
+          }
+          onSkip={async () => {
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+
+            if (session) {
+              window.localStorage.setItem(
+                `zisto_tutorial_${session.user.id}`,
+                "completed",
+              );
+            }
+
+            setShowTutorial(false);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -1541,6 +1726,15 @@ type AnalyticsResponse = {
   recent_activity: AnalyticsEvent[];
 };
 
+class AnalyticsRequestError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function fetchAnalytics(
   accessToken: string,
 ): Promise<AnalyticsResponse> {
@@ -1559,7 +1753,16 @@ async function fetchAnalytics(
   }
 
   if (!response.ok) {
-    throw new Error(`Analytics request failed: ${response.status}`);
+    let message = `Analytics request failed: ${response.status}`;
+
+    try {
+      const payload = await response.json();
+      message = payload.error ?? message;
+    } catch {
+      // Keep the fallback message.
+    }
+
+    throw new AnalyticsRequestError(response.status, message);
   }
 
   return response.json();
@@ -2127,6 +2330,167 @@ function DashboardTabPlaceholder({
   );
 }
 
+function PendingApproval({
+  email,
+  onSignOut,
+}: {
+  email: string;
+  onSignOut: () => Promise<void>;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-[24px] border border-black/10 bg-white p-8 md:p-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#DC2727]/10 blur-3xl"
+      />
+
+      <div className="relative max-w-3xl">
+        <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
+          Account review
+        </p>
+
+        <h1 className="mt-5 text-[11vw] font-black leading-[0.88] tracking-[-0.055em] sm:text-[7vw] lg:text-[5.4vw]">
+          Ο λογαριασμός σου δημιουργήθηκε.
+        </h1>
+
+        <p className="mt-7 max-w-2xl text-[15px] leading-relaxed text-[#222]/55">
+          Το αίτημα για το <strong className="text-[#222]">Zisto dashboard</strong>{" "}
+          περιμένει έγκριση και σύνδεση με την επιχείρησή σου. Μόλις εγκριθεί,
+          θα εμφανιστούν αυτόματα τα πραγματικά στατιστικά.
+        </p>
+
+        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            ["01", "Εγγραφή", "Ο λογαριασμός δημιουργήθηκε."],
+            ["02", "Έγκριση Zisto", "Συνδέουμε τον χρήστη με την επιχείρηση."],
+            ["03", "Live analytics", "Ξεκλειδώνουν τα πραγματικά δεδομένα."],
+          ].map(([number, title, body], index) => (
+            <div
+              key={number}
+              className={`rounded-[18px] border p-5 ${
+                index === 0
+                  ? "border-green-200 bg-green-50"
+                  : index === 1
+                    ? "border-[#DC2727]/25 bg-[#DC2727]/5"
+                    : "border-black/8 bg-[#F6F6F4]"
+              }`}
+            >
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
+                {number}
+              </p>
+              <p className="mt-4 text-[16px] font-black">{title}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#222]/45">
+                {body}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-8 text-[11px] text-[#222]/40">
+          Συνδεδεμένο email: <strong>{email}</strong>
+        </p>
+
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="mt-8 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-white transition hover:bg-[#DC2727]"
+        >
+          Αποσύνδεση
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function DashboardTutorial({
+  step,
+  onNext,
+  onBack,
+  onSkip,
+}: {
+  step: number;
+  onNext: () => void | Promise<void>;
+  onBack: () => void;
+  onSkip: () => void | Promise<void>;
+}) {
+  const steps = [
+    {
+      eyebrow: "Βήμα 1 από 3",
+      title: "Καλωσήρθες στο Zisto.",
+      body: "Στην Επισκόπηση βλέπεις τις βασικές μετρήσεις της επιχείρησής σου σε πραγματικό χρόνο.",
+    },
+    {
+      eyebrow: "Βήμα 2 από 3",
+      title: "Κατανόησε τη διαδρομή.",
+      body: "Οι επισκέψεις, τα ανοίγματα μενού και τα review clicks δείχνουν τι κάνει ο πελάτης μετά το NFC ή το QR.",
+    },
+    {
+      eyebrow: "Βήμα 3 από 3",
+      title: "Βελτίωσε τα αποτελέσματα.",
+      body: "Χρησιμοποίησε τα Analytics και το Business Health για να εντοπίζεις ευκαιρίες και προβλήματα.",
+    },
+  ];
+
+  const current = steps[step];
+
+  return (
+    <div className="fixed inset-0 z-[200] grid place-items-center bg-black/55 p-5 backdrop-blur-sm">
+      <section className="w-full max-w-[620px] overflow-hidden rounded-[24px] bg-white shadow-2xl">
+        <div className="h-2 bg-[#DC2727]">
+          <div
+            className="h-full bg-[#222] transition-all duration-500"
+            style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+          />
+        </div>
+
+        <div className="p-8 md:p-12">
+          <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
+            {current.eyebrow}
+          </p>
+
+          <h2 className="mt-5 text-[40px] font-black leading-[0.9] tracking-[-0.045em] md:text-[58px]">
+            {current.title}
+          </h2>
+
+          <p className="mt-7 text-[15px] leading-relaxed text-[#222]/55">
+            {current.body}
+          </p>
+
+          <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={onSkip}
+              className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/40 hover:text-[#222]"
+            >
+              Παράλειψη
+            </button>
+
+            <div className="flex gap-3">
+              {step > 0 && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="rounded-full border border-black/10 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.16em]"
+                >
+                  Πίσω
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onNext}
+                className="rounded-full bg-[#222] px-6 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white hover:bg-[#DC2727]"
+              >
+                {step === steps.length - 1 ? "Ολοκλήρωση" : "Επόμενο"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 type DashboardTab =
   | "overview"
   | "analytics"
@@ -2140,6 +2504,9 @@ function DashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [userEmail, setUserEmail] = useState("");
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
@@ -2170,12 +2537,28 @@ function DashboardPage() {
 
           if (active) {
             setAnalytics(data);
+            setAwaitingApproval(false);
+
+            const tutorialKey = `zisto_tutorial_${session.user.id}`;
+
+            if (!window.localStorage.getItem(tutorialKey)) {
+              setShowTutorial(true);
+              setTutorialStep(0);
+            }
           }
         } catch (error) {
           console.error(error);
 
           if (active) {
-            setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
+            if (
+              error instanceof AnalyticsRequestError &&
+              error.status === 403
+            ) {
+              setAwaitingApproval(true);
+              setAnalyticsError(null);
+            } else {
+              setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
+            }
           }
         } finally {
           if (active) {
@@ -2414,7 +2797,15 @@ function DashboardPage() {
         </header>
 
         <div className="mx-auto w-full max-w-[1600px] px-5 py-10 md:px-8 lg:px-10 lg:py-14">
-          {activeTab === "overview" ? (
+          {awaitingApproval ? (
+            <PendingApproval
+              email={userEmail}
+              onSignOut={async () => {
+                await supabase.auth.signOut();
+                window.location.hash = "/login";
+              }}
+            />
+          ) : activeTab === "overview" ? (
             <>
           <section className="flex flex-wrap items-end justify-between gap-8">
             <div>
