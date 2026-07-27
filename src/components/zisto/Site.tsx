@@ -3023,6 +3023,9 @@ function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [error, setError] = useState("");
+  const [activeAdminTab, setActiveAdminTab] = useState<
+  "home" | "businesses" | "clients" | "invitations" | "invite"
+  >("home");
 
   useEffect(() => {
     let active = true;
@@ -3200,6 +3203,7 @@ function AdminPage() {
         <section className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
           <button
             type="button"
+            onClick={() => setActiveAdminTab("businesses")}
             className="group min-h-[210px] rounded-[28px] border border-black/10 bg-white p-7 text-left transition hover:-translate-y-1 hover:border-[#222] hover:shadow-lg"
           >
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#999]">
@@ -3221,6 +3225,7 @@ function AdminPage() {
 
           <button
             type="button"
+            onClick={() => setActiveAdminTab("clients")}
             className="group min-h-[210px] rounded-[28px] border border-black/10 bg-white p-7 text-left transition hover:-translate-y-1 hover:border-[#222] hover:shadow-lg"
           >
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#999]">
@@ -3242,6 +3247,7 @@ function AdminPage() {
 
           <button
             type="button"
+            onClick={() => setActiveAdminTab("invitations")}
             className="group min-h-[210px] rounded-[28px] border border-black/10 bg-white p-7 text-left transition hover:-translate-y-1 hover:border-[#222] hover:shadow-lg"
           >
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#999]">
@@ -3263,6 +3269,7 @@ function AdminPage() {
 
           <button
             type="button"
+            onClick={() => setActiveAdminTab("invite")}
             className="group min-h-[210px] rounded-[28px] bg-[#222] p-7 text-left text-white transition hover:-translate-y-1 hover:bg-[#DC2727] hover:shadow-lg"
           >
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/50">
@@ -3282,6 +3289,60 @@ function AdminPage() {
             </p>
           </button>
         </section>
+
+        {activeAdminTab !== "home" && (
+        <section className="mt-10 rounded-[32px] border border-black/10 bg-white p-8">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Admin workspace
+              </p>
+      
+              <h2 className="mt-3 text-3xl font-black tracking-[-0.04em]">
+                {activeAdminTab === "businesses" && "Επιχειρήσεις"}
+                {activeAdminTab === "clients" && "Clients"}
+                {activeAdminTab === "invitations" && "Προσκλήσεις"}
+                {activeAdminTab === "invite" && "Πρόσκληση Client"}
+              </h2>
+            </div>
+      
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab("home")}
+              className="rounded-2xl border border-black/10 px-4 py-3 text-sm font-bold transition hover:border-[#222]"
+            >
+              Κλείσιμο
+            </button>
+          </div>
+      
+          <div className="mt-8">
+            {activeAdminTab === "businesses" && (
+              <p className="text-[#666]">
+                Εδώ θα εμφανίζονται όλες οι επιχειρήσεις.
+              </p>
+            )}
+      
+            {activeAdminTab === "clients" && (
+              <p className="text-[#666]">
+                Εδώ θα εμφανίζονται όλοι οι clients.
+              </p>
+            )}
+      
+            {activeAdminTab === "invitations" && (
+              <p className="text-[#666]">
+                Εδώ θα εμφανίζονται οι προσκλήσεις.
+              </p>
+            )}
+      
+            {activeAdminTab === "invite" && (
+              <p className="text-[#666]">
+                Εδώ θα μπει η φόρμα αποστολής πρόσκλησης.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+        
       </div>
     </main>
   );
