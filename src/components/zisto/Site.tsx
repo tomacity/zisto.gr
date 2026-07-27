@@ -1633,47 +1633,6 @@ function LoginPage() {
         </Reveal>
       </div>
 
-      {showTutorial && analytics && (
-        <DashboardTutorial
-          step={tutorialStep}
-          onNext={async () => {
-            if (tutorialStep < 2) {
-              setTutorialStep((value) => value + 1);
-              return;
-            }
-
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
-
-            if (session) {
-              window.localStorage.setItem(
-                `zisto_tutorial_${session.user.id}`,
-                "completed",
-              );
-            }
-
-            setShowTutorial(false);
-          }}
-          onBack={() =>
-            setTutorialStep((value) => Math.max(0, value - 1))
-          }
-          onSkip={async () => {
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
-
-            if (session) {
-              window.localStorage.setItem(
-                `zisto_tutorial_${session.user.id}`,
-                "completed",
-              );
-            }
-
-            setShowTutorial(false);
-          }}
-        />
-      )}
     </main>
   );
 }
@@ -2909,6 +2868,47 @@ function DashboardPage() {
           )}
         </div>
       </div>
+      {showTutorial && analytics && (
+        <DashboardTutorial
+          step={tutorialStep}
+          onNext={async () => {
+            if (tutorialStep < 2) {
+              setTutorialStep((value) => value + 1);
+              return;
+            }
+
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+
+            if (session) {
+              window.localStorage.setItem(
+                `zisto_tutorial_${session.user.id}`,
+                "completed",
+              );
+            }
+
+            setShowTutorial(false);
+          }}
+          onBack={() =>
+            setTutorialStep((value) => Math.max(0, value - 1))
+          }
+          onSkip={async () => {
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+
+            if (session) {
+              window.localStorage.setItem(
+                `zisto_tutorial_${session.user.id}`,
+                "completed",
+              );
+            }
+
+            setShowTutorial(false);
+          }}
+        />
+      )}
     </main>
   );
 }
