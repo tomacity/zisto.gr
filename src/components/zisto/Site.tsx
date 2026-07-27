@@ -7,7 +7,7 @@ import {
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { supabase } from "./lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 const WORDMARK = "/images/zisto-wordmark.png";
 const WORDMARKWHITE = "/images/zisto-wormark-white.png";
