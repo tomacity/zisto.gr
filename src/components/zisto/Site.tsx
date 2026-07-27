@@ -7,6 +7,7 @@ import {
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { supabase } from "./lib/supabase";
 
 const WORDMARK = "/images/zisto-wordmark.png";
 const WORDMARKWHITE = "/images/zisto-wormark-white.png";
@@ -1269,14 +1270,41 @@ function Footer() {
 function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        window.location.hash = "/dashboard";
+      }
+    });
+  }, []);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLoading(true);
 
-    window.setTimeout(() => {
+    try {
+      setLoading(true);
+      setLoginError(null);
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
       window.location.hash = "/dashboard";
-    }, 650);
+    } catch (error) {
+      console.error("Login failed:", error);
+      setLoginError("Το email ή ο κωδικός δεν είναι σωστός.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1401,7 +1429,10 @@ function LoginPage() {
 
                   <input
                     type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
                     required
+                    autoComplete="email"
                     placeholder="name@business.gr"
                     className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 text-[16px] font-medium text-[#222] outline-none transition-colors placeholder:text-[#222]/25 focus:border-[#DC2727]"
                   />
@@ -1415,7 +1446,10 @@ function LoginPage() {
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
                       required
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 pr-20 text-[16px] font-medium text-[#222] outline-none transition-colors placeholder:text-[#222]/25 focus:border-[#DC2727]"
                     />
@@ -1441,8 +1475,14 @@ function LoginPage() {
                   </span>
                 </button>
 
+                {loginError && (
+                  <p className="mt-5 rounded-[10px] bg-red-50 px-4 py-3 text-center text-[12px] font-semibold text-red-700">
+                    {loginError}
+                  </p>
+                )}
+
                 <p className="mt-5 text-center text-[11px] leading-relaxed text-[#222]/40">
-                  Demo έκδοση — χρησιμοποίησε οποιοδήποτε email και κωδικό.
+                  Χρησιμοποίησε τα στοιχεία σύνδεσης που σου έδωσε το Zisto.
                 </p>
               </form>
             </div>
@@ -1456,8 +1496,6 @@ function LoginPage() {
 /* ================================================================== */
 /*  DASHBOARD DATA                                                    */
 /* ================================================================== */
-
-const BUSINESS_ID = "021c48d4-fccc-4ccb-b37c-d42c2e341aa0";
 
 type AnalyticsEvent = {
   event_name: string;
@@ -1476,6 +1514,11 @@ type DailyActivity = {
 
 type AnalyticsResponse = {
   business_id: string;
+  membership_role: "owner" | "manager" | "staff";
+  business: {
+    name: string;
+    location_name: string | null;
+  };
   totals: {
     page_views_today: number;
     page_views_week: number;
@@ -1498,14 +1541,22 @@ type AnalyticsResponse = {
   recent_activity: AnalyticsEvent[];
 };
 
-async function fetchAnalytics(): Promise<AnalyticsResponse> {
-  const response = await fetch(
-    `/api/analytics?business_id=${encodeURIComponent(BUSINESS_ID)}`,
-    {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
+async function fetchAnalytics(
+  accessToken: string,
+): Promise<AnalyticsResponse> {
+  const response = await fetch("/api/analytics", {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
     },
-  );
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    await supabase.auth.signOut();
+    window.location.hash = "/login";
+    throw new Error("Session expired");
+  }
 
   if (!response.ok) {
     throw new Error(`Analytics request failed: ${response.status}`);
@@ -2088,42 +2139,73 @@ function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
+  const [userEmail, setUserEmail] = useState("");
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    let refreshTimer: number | null = null;
 
-    async function loadAnalytics() {
-      try {
-        setAnalyticsLoading(true);
-        setAnalyticsError(null);
+    async function loadProtectedDashboard() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        const data = await fetchAnalytics();
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
 
-        if (active) {
-          setAnalytics(data);
-        }
-      } catch (error) {
-        console.error(error);
+      if (active) {
+        setUserEmail(session.user.email ?? "");
+      }
 
-        if (active) {
-          setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
-        }
-      } finally {
-        if (active) {
-          setAnalyticsLoading(false);
+      async function loadAnalytics() {
+        try {
+          setAnalyticsLoading(true);
+          setAnalyticsError(null);
+
+          const data = await fetchAnalytics(session.access_token);
+
+          if (active) {
+            setAnalytics(data);
+          }
+        } catch (error) {
+          console.error(error);
+
+          if (active) {
+            setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
+          }
+        } finally {
+          if (active) {
+            setAnalyticsLoading(false);
+          }
         }
       }
+
+      await loadAnalytics();
+
+      refreshTimer = window.setInterval(loadAnalytics, 60_000);
     }
 
-    loadAnalytics();
+    loadProtectedDashboard();
 
-    const refreshTimer = window.setInterval(loadAnalytics, 60_000);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        window.location.hash = "/login";
+      }
+    });
 
     return () => {
       active = false;
-      window.clearInterval(refreshTimer);
+      subscription.unsubscribe();
+
+      if (refreshTimer !== null) {
+        window.clearInterval(refreshTimer);
+      }
     };
   }, []);
 
@@ -2173,6 +2255,18 @@ function DashboardPage() {
     sevenDayViews - sevenDayReviewClicks,
   );
 
+  const clientDisplayName =
+    userEmail.split("@")[0]?.trim() || "Πελάτης";
+
+  const clientInitial =
+    clientDisplayName.charAt(0).toLocaleUpperCase("el-GR") || "Z";
+
+  const businessName =
+    analytics?.business.name ?? "Η επιχείρησή σου";
+
+  const businessLocation =
+    analytics?.business.location_name ?? "Zisto client";
+
   return (
     <main className="min-h-screen bg-[#F6F6F4] font-sans text-[#222]">
       {/* Sidebar */}
@@ -2208,14 +2302,14 @@ function DashboardPage() {
 
           <div className="mt-4 flex items-center gap-3">
             <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#DC2727] text-[15px] font-black">
-              Μ
+              {clientInitial}
             </div>
 
             <div className="min-w-0">
               <p className="truncate text-[13px] font-bold">
-                Το Τσιπουράδικο της Μυρσήνης
+                {businessName}
               </p>
-              <p className="mt-1 text-[10px] text-white/40">Σύρος, Ελλάδα</p>
+              <p className="mt-1 text-[10px] text-white/40">{businessLocation}</p>
             </div>
           </div>
         </div>
@@ -2253,10 +2347,21 @@ function DashboardPage() {
           })}
         </nav>
 
-        <div className="mt-auto">
+        <div className="mt-auto space-y-4">
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.hash = "/login";
+            }}
+            className="flex w-full items-center gap-3 border-t border-white/10 pt-6 text-left text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 transition-colors hover:text-white"
+          >
+            ↪ Αποσύνδεση
+          </button>
+
           <a
             href="/"
-            className="flex items-center gap-3 border-t border-white/10 pt-6 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 transition-colors hover:text-white"
+            className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 transition-colors hover:text-white"
           >
             ← Επιστροφή στο site
           </a>
@@ -2296,14 +2401,14 @@ function DashboardPage() {
 
           <div className="flex items-center gap-3">
             <div className="hidden text-right sm:block">
-              <p className="text-[11px] font-bold">Μυρσίνη</p>
+              <p className="max-w-[150px] truncate text-[11px] font-bold">{clientDisplayName}</p>
               <p className="text-[9px] uppercase tracking-[0.15em] text-[#222]/35">
-                Owner
+                {analytics?.membership_role ?? "client"}
               </p>
             </div>
 
             <div className="grid h-10 w-10 place-items-center rounded-full bg-[#222] text-[12px] font-black text-white">
-              Μ
+              {clientInitial}
             </div>
           </div>
         </header>
@@ -2320,7 +2425,7 @@ function DashboardPage() {
               <h1 className="mt-4 max-w-[12ch] text-[12vw] font-black leading-[0.86] tracking-[-0.055em] sm:text-[8vw] lg:text-[5.8vw] xl:text-[5.8rem]">
                 Καλησπέρα,
                 <br />
-                <span className="text-[#DC2727]">Μυρσίνη.</span>
+                <span className="text-[#DC2727]">{clientDisplayName}.</span>
               </h1>
             </div>
 
