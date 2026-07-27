@@ -1420,43 +1420,13 @@ function LoginPage() {
                 <br />
                 dashboard σου.
               </h2>
-
+              
               <form onSubmit={handleSubmit} className="mt-10">
-                <label className="block">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45">
-                        Ονοματεπώνυμο
-                      </span>
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(event) => setFullName(event.target.value)}
-                        required
-                        autoComplete="name"
-                        placeholder="Γιώργος Παπαεμμανουήλ"
-                        className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 pb-4 text-[15px] font-semibold outline-none transition-colors placeholder:text-[#222]/20 focus:border-[#DC2727]"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45">
-                        Επιχείρηση
-                      </span>
-                      <input
-                        type="text"
-                        value={businessName}
-                        onChange={(event) => setBusinessName(event.target.value)}
-                        required
-                        placeholder="Όνομα επιχείρησης"
-                        className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 pb-4 text-[15px] font-semibold outline-none transition-colors placeholder:text-[#222]/20 focus:border-[#DC2727]"
-                      />
-                    </label>
-                  </div>
-                )}
                 <label className="block">
                   <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/45">
                     Email
                   </span>
-
+              
                   <input
                     type="email"
                     value={email}
@@ -1467,12 +1437,12 @@ function LoginPage() {
                     className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 text-[16px] font-medium text-[#222] outline-none transition-colors placeholder:text-[#222]/25 focus:border-[#DC2727]"
                   />
                 </label>
-
+              
                 <label className="mt-8 block">
                   <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/45">
                     Κωδικός
                   </span>
-
+              
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
@@ -1483,7 +1453,7 @@ function LoginPage() {
                       placeholder="••••••••"
                       className="mt-3 w-full border-0 border-b border-black/15 bg-transparent px-0 py-4 pr-20 text-[16px] font-medium text-[#222] outline-none transition-colors placeholder:text-[#222]/25 focus:border-[#DC2727]"
                     />
-
+              
                     <button
                       type="button"
                       onClick={() => setShowPassword((value) => !value)}
@@ -1493,7 +1463,7 @@ function LoginPage() {
                     </button>
                   </div>
                 </label>
-
+              
                 <button
                   type="submit"
                   disabled={loading}
@@ -1504,20 +1474,16 @@ function LoginPage() {
                     →
                   </span>
                 </button>
-
+              
                 {loginError && (
                   <p className="mt-5 rounded-[10px] bg-red-50 px-4 py-3 text-center text-[12px] font-semibold text-red-700">
                     {loginError}
                   </p>
                 )}
-
+              
                 <div className="mt-7 border-t border-black/8 pt-6 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-                    Νέος πελάτης;
-                  </p>
                   <p className="mt-2 text-[11px] leading-relaxed text-[#222]/45">
-                    Η πρόσβαση δημιουργείται μόνο μέσω προσωπικής πρόσκλησης
-                    από το Zisto.
+                    Η πρόσβαση δημιουργείται μόνο μέσω προσωπικής πρόσκλησης από το Zisto.
                   </p>
                 </div>
               </form>
