@@ -153,8 +153,6 @@ const isAdmin = admins.length > 0;
       businessId = membership.business_id;
     }
 
-    const businessId = membership.business_id;
-
     const businessQuery = new URLSearchParams({
       id: `eq.${businessId}`,
       select: "name",
