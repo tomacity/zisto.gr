@@ -18,7 +18,28 @@ type Business = {
   updated_at: string;
 };
 
+type Client = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: "owner" | "manager" | "staff";
+  business_id: string;
+  business: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  invited_at: string | null;
+  email_confirmed_at: string | null;
+  status: "active" | "invited";
+};
+
 export function AdminPage() {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientsError, setClientsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
@@ -186,6 +207,81 @@ export function AdminPage() {
   };
 }, [isAdmin, activeAdminTab]);
 
+useEffect(() => {
+  if (!isAdmin || activeAdminTab !== "clients") {
+    return;
+  }
+
+  let active = true;
+
+  async function loadClients() {
+    try {
+      setClientsLoading(true);
+      setClientsError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch("/api/admin/clients", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: "no-store",
+      });
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Could not load clients",
+        );
+      }
+
+      if (active) {
+        setClients(result.clients ?? []);
+      }
+    } catch (error) {
+      console.error("Clients loading failed:", error);
+
+      if (active) {
+        setClientsError(
+          error instanceof Error
+            ? error.message
+            : "Δεν ήταν δυνατή η φόρτωση των clients.",
+        );
+      }
+    } finally {
+      if (active) {
+        setClientsLoading(false);
+      }
+    }
+  }
+
+  loadClients();
+
+  return () => {
+    active = false;
+  };
+}, [isAdmin, activeAdminTab]);
+  
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F7F5F1] px-6">
@@ -360,9 +456,10 @@ export function AdminPage() {
             )}
 
               {activeAdminTab === "clients" && (
-                <AdminPlaceholder
-                  title="Δεν υπάρχουν ακόμη clients"
-                  description="Οι clients που θα προσκαλείς θα εμφανίζονται εδώ."
+                <ClientsPanel
+                  clients={clients}
+                  loading={clientsLoading}
+                  error={clientsError}
                 />
               )}
 
@@ -576,6 +673,210 @@ function BusinessesPanel({
           </article>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ClientsPanel({
+  clients,
+  loading,
+  error,
+}: {
+  clients: Client[];
+  loading: boolean;
+  error: string;
+}) {
+  if (loading) {
+    return (
+      <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
+        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
+
+        <p className="mt-4 text-sm font-medium text-[#666]">
+          Φόρτωση clients...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+          Loading error
+        </p>
+
+        <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
+          Δεν φορτώθηκαν οι clients
+        </h3>
+
+        <p className="mt-3 text-sm text-red-700">
+          {error}
+        </p>
+      </div>
+    );
+  }
+
+  if (clients.length === 0) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
+        <h3 className="text-2xl font-black tracking-[-0.03em]">
+          Δεν υπάρχουν clients
+        </h3>
+
+        <p className="mt-3 text-sm text-[#666]">
+          Οι clients που προσκαλείς θα εμφανίζονται εδώ.
+        </p>
+      </div>
+    );
+  }
+
+  const activeClients = clients.filter(
+    (client) => client.status === "active",
+  ).length;
+
+  const invitedClients = clients.filter(
+    (client) => client.status === "invited",
+  ).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <ClientSummaryCard
+          label="Σύνολο clients"
+          value={clients.length}
+        />
+
+        <ClientSummaryCard
+          label="Ενεργοί"
+          value={activeClients}
+        />
+
+        <ClientSummaryCard
+          label="Invited"
+          value={invitedClients}
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
+        <div className="hidden grid-cols-[1.5fr_1.2fr_0.7fr_0.7fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] lg:grid">
+          <span>Client</span>
+          <span>Επιχείρηση</span>
+          <span>Ρόλος</span>
+          <span>Status</span>
+        </div>
+
+        <div className="divide-y divide-black/8">
+          {clients.map((client) => {
+            const displayName =
+              client.full_name.trim() ||
+              client.email.split("@")[0] ||
+              "Client";
+
+            const initials = displayName
+              .split(" ")
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((part) => part.charAt(0).toUpperCase())
+              .join("");
+
+            return (
+              <article
+                key={`${client.id}-${client.business_id}`}
+                className="grid gap-5 px-6 py-6 lg:grid-cols-[1.5fr_1.2fr_0.7fr_0.7fr] lg:items-center"
+              >
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-full bg-[#222] text-sm font-black text-white">
+                    {initials || "C"}
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="truncate font-black">
+                      {displayName}
+                    </p>
+
+                    <p className="mt-1 truncate text-sm text-[#666]">
+                      {client.email}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] lg:hidden">
+                    Επιχείρηση
+                  </p>
+
+                  <p className="mt-1 font-semibold lg:mt-0">
+                    {client.business?.name ??
+                      "Άγνωστη επιχείρηση"}
+                  </p>
+
+                  {client.business?.slug && (
+                    <p className="mt-1 font-mono text-[10px] text-[#999]">
+                      /{client.business.slug}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] lg:hidden">
+                    Ρόλος
+                  </p>
+
+                  <span className="mt-2 inline-flex rounded-full bg-[#F7F5F1] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#555] lg:mt-0">
+                    {client.role}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] lg:hidden">
+                    Status
+                  </p>
+
+                  <span
+                    className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] lg:mt-0 ${
+                      client.status === "active"
+                        ? "bg-green-50 text-green-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        client.status === "active"
+                          ? "bg-green-500"
+                          : "bg-amber-500"
+                      }`}
+                    />
+
+                    {client.status === "active"
+                      ? "Active"
+                      : "Invited"}
+                  </span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientSummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-6">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#888]">
+        {label}
+      </p>
+
+      <p className="mt-4 text-4xl font-black tracking-[-0.05em]">
+        {value}
+      </p>
     </div>
   );
 }
