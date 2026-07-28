@@ -1275,13 +1275,52 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        window.location.hash = "/dashboard";
+    useEffect(() => {
+      let active = true;
+    
+      async function checkExistingSession() {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+    
+        if (!active || !session) {
+          return;
+        }
+    
+        await redirectLoggedInUser(session.access_token);
       }
-    });
-  }, []);
+    
+      checkExistingSession();
+    
+      return () => {
+        active = false;
+      };
+    }, []);
+
+    async function redirectLoggedInUser(accessToken: string) {
+    try {
+      const response = await fetch("/api/admin/me", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: "no-store",
+      });
+  
+      const result = await response.json();
+  
+      if (response.ok && result.isAdmin) {
+        window.location.hash = "/admin";
+        return;
+      }
+  
+      window.location.hash = "/dashboard";
+    } catch (error) {
+      console.error("Role check failed:", error);
+  
+      window.location.hash = "/dashboard";
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1290,16 +1329,24 @@ function LoginPage() {
       setLoading(true);
       setLoginError(null);
 
-      const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } =
+      await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-
-      if (error) {
-        throw error;
-      }
-
-      window.location.hash = "/dashboard";
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (!data.session) {
+      throw new Error("No session returned after login");
+    }
+    
+    await redirectLoggedInUser(
+      data.session.access_token,
+    );
+      
     } catch (error) {
       console.error("Login failed:", error);
       setLoginError("Το email ή ο κωδικός δεν είναι σωστός.");
