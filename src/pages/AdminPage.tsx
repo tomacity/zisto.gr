@@ -36,10 +36,49 @@ type Client = {
   status: "active" | "invited";
 };
 
+type Invitation = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: "owner" | "manager" | "staff";
+  status:
+    | "pending"
+    | "accepted"
+    | "expired"
+    | "failed"
+    | "cancelled";
+  email_id: string | null;
+  error_message: string | null;
+  expires_at: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  business_id: string;
+  businesses:
+    | {
+        id: string;
+        name: string;
+        slug: string;
+      }
+    | {
+        id: string;
+        name: string;
+        slug: string;
+      }[]
+    | null;
+};
+
 export function AdminPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState("");
+  const [invitations, setInvitations] =
+  useState<Invitation[]>([]);
+
+const [invitationsLoading, setInvitationsLoading] =
+  useState(false);
+
+const [invitationsError, setInvitationsError] =
+  useState("");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
@@ -275,6 +314,89 @@ useEffect(() => {
     }
   }
 
+  useEffect(() => {
+  if (!isAdmin || activeAdminTab !== "invitations") {
+    return;
+  }
+
+  let active = true;
+
+  async function loadInvitations() {
+    try {
+      setInvitationsLoading(true);
+      setInvitationsError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/invitations",
+        {
+          method: "GET",
+          headers: {
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          cache: "no-store",
+        },
+      );
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Could not load invitations",
+        );
+      }
+
+      if (active) {
+        setInvitations(result.invitations ?? []);
+      }
+    } catch (error) {
+      console.error(
+        "Invitations loading failed:",
+        error,
+      );
+
+      if (active) {
+        setInvitationsError(
+          error instanceof Error
+            ? error.message
+            : "Δεν ήταν δυνατή η φόρτωση των προσκλήσεων.",
+        );
+      }
+    } finally {
+      if (active) {
+        setInvitationsLoading(false);
+      }
+    }
+  }
+
+  loadInvitations();
+
+  return () => {
+    active = false;
+  };
+}, [isAdmin, activeAdminTab]);
+
   loadClients();
 
   return () => {
@@ -464,9 +586,10 @@ useEffect(() => {
               )}
 
               {activeAdminTab === "invitations" && (
-                <AdminPlaceholder
-                  title="Δεν υπάρχουν ακόμη προσκλήσεις"
-                  description="Εδώ θα βλέπεις την κατάσταση κάθε invitation."
+                <InvitationsPanel
+                  invitations={invitations}
+                  loading={invitationsLoading}
+                  error={invitationsError}
                 />
               )}
 
@@ -877,6 +1000,220 @@ function ClientSummaryCard({
       <p className="mt-4 text-4xl font-black tracking-[-0.05em]">
         {value}
       </p>
+    </div>
+  );
+}
+
+function InvitationsPanel({
+  invitations,
+  loading,
+  error,
+}: {
+  invitations: Invitation[];
+  loading: boolean;
+  error: string;
+}) {
+  if (loading) {
+    return (
+      <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
+        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
+
+        <p className="mt-4 text-sm font-medium text-[#666]">
+          Φόρτωση προσκλήσεων...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+          Loading error
+        </p>
+
+        <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
+          Δεν φορτώθηκαν οι προσκλήσεις
+        </h3>
+
+        <p className="mt-3 text-sm text-red-700">
+          {error}
+        </p>
+      </div>
+    );
+  }
+
+  if (invitations.length === 0) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
+        <h3 className="text-2xl font-black tracking-[-0.03em]">
+          Δεν υπάρχουν προσκλήσεις
+        </h3>
+
+        <p className="mt-3 text-sm text-[#666]">
+          Οι νέες προσκλήσεις θα εμφανίζονται εδώ.
+        </p>
+      </div>
+    );
+  }
+
+  const pendingCount = invitations.filter(
+    (invitation) => invitation.status === "pending",
+  ).length;
+
+  const acceptedCount = invitations.filter(
+    (invitation) => invitation.status === "accepted",
+  ).length;
+
+  const failedCount = invitations.filter(
+    (invitation) => invitation.status === "failed",
+  ).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <ClientSummaryCard
+          label="Pending"
+          value={pendingCount}
+        />
+
+        <ClientSummaryCard
+          label="Accepted"
+          value={acceptedCount}
+        />
+
+        <ClientSummaryCard
+          label="Failed"
+          value={failedCount}
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
+        <div className="hidden grid-cols-[1.4fr_1.2fr_0.7fr_0.8fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
+          <span>Παραλήπτης</span>
+          <span>Επιχείρηση</span>
+          <span>Ρόλος</span>
+          <span>Status</span>
+          <span>Ημερομηνία</span>
+        </div>
+
+        <div className="divide-y divide-black/8">
+          {invitations.map((invitation) => {
+            const businessRelation =
+              Array.isArray(invitation.businesses)
+                ? invitation.businesses[0] ?? null
+                : invitation.businesses;
+
+            const displayName =
+              invitation.full_name?.trim() ||
+              invitation.email.split("@")[0] ||
+              "Client";
+
+            const createdDate = new Intl.DateTimeFormat(
+              "el-GR",
+              {
+                dateStyle: "medium",
+                timeStyle: "short",
+              },
+            ).format(new Date(invitation.created_at));
+
+            return (
+              <article
+                key={invitation.id}
+                className="grid gap-5 px-6 py-6 xl:grid-cols-[1.4fr_1.2fr_0.7fr_0.8fr_0.9fr] xl:items-center"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-black">
+                    {displayName}
+                  </p>
+
+                  <p className="mt-1 truncate text-sm text-[#666]">
+                    {invitation.email}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
+                    Επιχείρηση
+                  </p>
+
+                  <p className="mt-1 font-semibold xl:mt-0">
+                    {businessRelation?.name ??
+                      "Άγνωστη επιχείρηση"}
+                  </p>
+
+                  {businessRelation?.slug && (
+                    <p className="mt-1 font-mono text-[10px] text-[#999]">
+                      /{businessRelation.slug}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
+                    Ρόλος
+                  </p>
+
+                  <span className="mt-2 inline-flex rounded-full bg-[#F7F5F1] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#555] xl:mt-0">
+                    {invitation.role}
+                  </span>
+                </div>
+
+                <InvitationStatusBadge
+                  status={invitation.status}
+                />
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
+                    Ημερομηνία
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold xl:mt-0">
+                    {createdDate}
+                  </p>
+                </div>
+
+                {invitation.error_message && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 xl:col-span-5">
+                    {invitation.error_message}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InvitationStatusBadge({
+  status,
+}: {
+  status: Invitation["status"];
+}) {
+  const styles: Record<
+    Invitation["status"],
+    string
+  > = {
+    pending: "bg-amber-50 text-amber-700",
+    accepted: "bg-green-50 text-green-700",
+    expired: "bg-slate-100 text-slate-600",
+    failed: "bg-red-50 text-red-700",
+    cancelled: "bg-slate-100 text-slate-600",
+  };
+
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
+        Status
+      </p>
+
+      <span
+        className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] xl:mt-0 ${styles[status]}`}
+      >
+        {status}
+      </span>
     </div>
   );
 }
