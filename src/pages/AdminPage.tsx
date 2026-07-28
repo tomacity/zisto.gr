@@ -560,7 +560,7 @@ function BusinessesPanel({
               <button
                 type="button"
                 onClick={() => {
-                  window.location.hash = "/dashboard";
+                  window.location.hash = `/dashboard?business=${business.id}`;
                 }}
                 className="w-full rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
               >
