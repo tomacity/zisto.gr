@@ -2647,7 +2647,7 @@ function DashboardPage({
         window.clearInterval(refreshTimer);
       }
     };
-  }, []);
+  }, [businessId]);
 
   const dashboardMetrics = analytics
     ? [
