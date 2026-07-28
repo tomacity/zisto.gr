@@ -314,7 +314,14 @@ useEffect(() => {
     }
   }
 
-  useEffect(() => {
+  loadClients();
+
+  return () => {
+    active = false;
+  };
+}, [isAdmin, activeAdminTab]);
+
+useEffect(() => {
   if (!isAdmin || activeAdminTab !== "invitations") {
     return;
   }
@@ -345,8 +352,7 @@ useEffect(() => {
         {
           method: "GET",
           headers: {
-            Authorization:
-              `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           cache: "no-store",
         },
@@ -391,13 +397,6 @@ useEffect(() => {
   }
 
   loadInvitations();
-
-  return () => {
-    active = false;
-  };
-}, [isAdmin, activeAdminTab]);
-
-  loadClients();
 
   return () => {
     active = false;
