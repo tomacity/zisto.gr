@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { InviteClientPanel } from "../components/admin/InviteClientPanel";
 
 type AdminTab =
   | "home"
@@ -373,9 +374,8 @@ export function AdminPage() {
               )}
 
               {activeAdminTab === "invite" && (
-                <AdminPlaceholder
-                  title="Invite Client"
-                  description="Η πραγματική φόρμα πρόσκλησης θα προστεθεί αφού δημιουργήσουμε τη διαχείριση επιχειρήσεων."
+                <InviteClientPanel
+                  businesses={businesses}
                 />
               )}
           </section>
