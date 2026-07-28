@@ -1781,8 +1781,14 @@ class AnalyticsRequestError extends Error {
 
 async function fetchAnalytics(
   accessToken: string,
+  businessId?: string | null,
 ): Promise<AnalyticsResponse> {
-  const response = await fetch("/api/analytics", {
+  const query = businessId
+    ? `?business_id=${encodeURIComponent(businessId)}`
+    : "";
+
+  const response = await fetch(`/api/analytics${query}`, {
+    
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${accessToken}`,
@@ -2543,7 +2549,11 @@ type DashboardTab =
   | "nfc"
   | "settings";
 
-function DashboardPage() {
+function DashboardPage({
+  businessId,
+}: {
+  businessId?: string | null;
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
@@ -2577,7 +2587,10 @@ function DashboardPage() {
           setAnalyticsLoading(true);
           setAnalyticsError(null);
 
-          const data = await fetchAnalytics(session.access_token);
+          const data = await fetchAnalytics(
+            session.access_token,
+            businessId,
+          );
 
           if (active) {
             setAnalytics(data);
@@ -3024,19 +3037,35 @@ export function ZistoSite() {
     return new URLSearchParams(window.location.search).get("invite") === "1";
   };
 
-  const getRoute = () => {
-    if (typeof window === "undefined") {
-      return "/";
-    }
+  const getHashLocation = () => {
+  if (typeof window === "undefined") {
+    return {
+      pathname: "/",
+      searchParams: new URLSearchParams(),
+    };
+  }
 
-    return window.location.hash.replace("#", "") || "/";
+  const rawHash =
+    window.location.hash.replace(/^#/, "") || "/";
+
+  const [pathname, search = ""] = rawHash.split("?");
+
+  return {
+    pathname,
+    searchParams: new URLSearchParams(search),
   };
+};
 
-  const [route, setRoute] = useState(getRoute);
+  const [hashLocation, setHashLocation] =
+  useState(getHashLocation);
+
+const route = hashLocation.pathname;
+const selectedBusinessId =
+  hashLocation.searchParams.get("business");
 
   useEffect(() => {
     const handleHashChange = () => {
-      setRoute(getRoute());
+      setHashLocation(getHashLocation());
       window.scrollTo(0, 0);
     };
 
@@ -3056,7 +3085,11 @@ export function ZistoSite() {
   }
 
   if (route === "/dashboard") {
-    return <DashboardPage />;
+    return (
+      <DashboardPage
+        businessId={selectedBusinessId}
+      />
+    );
   }
   
   if (route === "/admin") {
