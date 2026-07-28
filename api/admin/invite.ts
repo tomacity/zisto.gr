@@ -195,6 +195,33 @@ export default async function handler(
 
     const businessName = business.name;
 
+    const {
+      data: invitationRecord,
+      error: invitationRecordError,
+    } = await adminClient
+      .from("invitations")
+      .insert({
+        email,
+        full_name: fullName,
+        business_id: businessId,
+        invited_by: requestingUser.id,
+        role,
+        status: "pending",
+      })
+      .select("id")
+      .single();
+    
+    if (invitationRecordError || !invitationRecord) {
+      console.error(
+        "Invitation record creation failed:",
+        invitationRecordError,
+      );
+    
+      return response.status(500).json({
+        error: "Could not create invitation record",
+      });
+    }
+
     const baseUrl = (
       APP_URL ?? "https://zisto.app"
     ).replace(/\/$/, "");
@@ -223,7 +250,15 @@ export default async function handler(
         "Supabase invitation failed:",
         inviteError,
       );
-
+    
+      await adminClient
+        .from("invitations")
+        .update({
+          status: "failed",
+          error_message: inviteError.message,
+        })
+        .eq("id", invitationRecord.id);
+    
       return response.status(500).json({
         error: inviteError.message,
       });
@@ -234,10 +269,25 @@ export default async function handler(
       inviteData.properties?.action_link;
 
     if (!invitedUserId || !invitationLink) {
+      await adminClient
+        .from("invitations")
+        .update({
+          status: "failed",
+          error_message: "Incomplete invitation data",
+        })
+        .eq("id", invitationRecord.id);
+    
       return response.status(500).json({
         error: "Incomplete invitation data",
       });
     }
+    
+    await adminClient
+      .from("invitations")
+      .update({
+        invited_user_id: invitedUserId,
+      })
+      .eq("id", invitationRecord.id);
 
     const {
       error: membershipError,
@@ -254,11 +304,20 @@ export default async function handler(
         "Membership creation failed:",
         membershipError,
       );
-
+    
+      await adminClient
+        .from("invitations")
+        .update({
+          status: "failed",
+          error_message:
+            "Could not create business membership",
+        })
+        .eq("id", invitationRecord.id);
+    
       await adminClient.auth.admin.deleteUser(
         invitedUserId,
       );
-
+    
       return response.status(500).json({
         error: "Could not create business membership",
       });
@@ -311,26 +370,37 @@ export default async function handler(
     );
 
     const emailResult = await emailResponse.json();
-
+    
     if (!emailResponse.ok) {
       console.error(
         "Resend invitation failed:",
         emailResult,
       );
-
-      /*
-       * Ο χρήστης και το membership έχουν ήδη
-       * δημιουργηθεί. Επιστρέφουμε σαφές error
-       * για να γνωρίζουμε ότι απέτυχε μόνο το email.
-       */
+    
+      await adminClient
+        .from("invitations")
+        .update({
+          status: "failed",
+          error_message: "Invitation email failed",
+        })
+        .eq("id", invitationRecord.id);
+    
       return response.status(502).json({
         error: "User created, but email failed",
         details: emailResult,
       });
     }
+    
+    await adminClient
+      .from("invitations")
+      .update({
+        email_id: emailResult.id ?? null,
+      })
+      .eq("id", invitationRecord.id);
 
     return response.status(201).json({
       success: true,
+      invitationId: invitationRecord.id,
       userId: invitedUserId,
       emailId: emailResult.id ?? null,
       business: {
