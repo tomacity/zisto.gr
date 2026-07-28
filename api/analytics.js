@@ -63,6 +63,11 @@ export default async function handler(req, res) {
     ? authorization.slice(7)
     : null;
 
+  const requestedBusinessId =
+  typeof req.query.business_id === "string"
+    ? req.query.business_id
+    : null;
+
   if (!accessToken) {
     return res.status(401).json({
       error: "Authentication required",
@@ -86,6 +91,27 @@ export default async function handler(req, res) {
     }
 
     const user = await userResponse.json();
+
+    const adminQuery = new URLSearchParams({
+  user_id: `eq.${user.id}`,
+  select: "user_id",
+  limit: "1",
+});
+
+const adminResponse = await supabaseRequest({
+  supabaseUrl,
+  supabaseSecretKey,
+  path: `/rest/v1/zisto_admins?${adminQuery.toString()}`,
+});
+
+if (!adminResponse.ok) {
+  return res.status(500).json({
+    error: "Failed to verify admin",
+  });
+}
+
+const admins = await adminResponse.json();
+const isAdmin = admins.length > 0;
 
     const membershipQuery = new URLSearchParams({
       user_id: `eq.${user.id}`,
@@ -112,11 +138,19 @@ export default async function handler(req, res) {
     const memberships = await membershipResponse.json();
 
     const membership = memberships[0];
-
-    if (!membership) {
-      return res.status(403).json({
-        error: "This user is not assigned to a business",
-      });
+    
+    let businessId;
+    
+    if (isAdmin && requestedBusinessId) {
+      businessId = requestedBusinessId;
+    } else {
+      if (!membership) {
+        return res.status(403).json({
+          error: "This user is not assigned to a business",
+        });
+      }
+    
+      businessId = membership.business_id;
     }
 
     const businessId = membership.business_id;
