@@ -1,5 +1,7 @@
 const ALLOWED_ORIGINS = new Set([
   "https://zistogr.vercel.app",
+  "https://zisto.app",
+  "https://www.zisto.app",
 ]);
 
 function setCorsHeaders(req, res) {
@@ -13,7 +15,7 @@ function setCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
+    "Content-Type, Authorization",
   );
   res.setHeader("Cache-Control", "no-store");
 }
@@ -29,6 +31,7 @@ async function supabaseRequest({
     method,
     headers: {
       apikey: supabaseSecretKey,
+      Authorization: `Bearer ${supabaseSecretKey}`,
       "Content-Type": "application/json",
       ...headers,
     },
@@ -64,9 +67,9 @@ export default async function handler(req, res) {
     : null;
 
   const requestedBusinessId =
-  typeof req.query.business_id === "string"
-    ? req.query.business_id
-    : null;
+    typeof req.query.business_id === "string"
+      ? req.query.business_id
+      : null;
 
   if (!accessToken) {
     return res.status(401).json({
@@ -93,25 +96,29 @@ export default async function handler(req, res) {
     const user = await userResponse.json();
 
     const adminQuery = new URLSearchParams({
-  user_id: `eq.${user.id}`,
-  select: "user_id",
-  limit: "1",
-});
+      user_id: `eq.${user.id}`,
+      select: "user_id",
+      limit: "1",
+    });
 
-const adminResponse = await supabaseRequest({
-  supabaseUrl,
-  supabaseSecretKey,
-  path: `/rest/v1/zisto_admins?${adminQuery.toString()}`,
-});
+    const adminResponse = await supabaseRequest({
+      supabaseUrl,
+      supabaseSecretKey,
+      path: `/rest/v1/zisto_admins?${adminQuery.toString()}`,
+    });
 
-if (!adminResponse.ok) {
-  return res.status(500).json({
-    error: "Failed to verify admin",
-  });
-}
+    if (!adminResponse.ok) {
+      const errorText = await adminResponse.text();
 
-const admins = await adminResponse.json();
-const isAdmin = admins.length > 0;
+      console.error("Admin query failed:", errorText);
+
+      return res.status(500).json({
+        error: "Failed to verify admin",
+      });
+    }
+
+    const admins = await adminResponse.json();
+    const isAdmin = admins.length > 0;
 
     const membershipQuery = new URLSearchParams({
       user_id: `eq.${user.id}`,
@@ -136,11 +143,10 @@ const isAdmin = admins.length > 0;
     }
 
     const memberships = await membershipResponse.json();
+    const membership = memberships[0] ?? null;
 
-    const membership = memberships[0];
-    
     let businessId;
-    
+
     if (isAdmin && requestedBusinessId) {
       businessId = requestedBusinessId;
     } else {
@@ -149,13 +155,13 @@ const isAdmin = admins.length > 0;
           error: "This user is not assigned to a business",
         });
       }
-    
+
       businessId = membership.business_id;
     }
 
     const businessQuery = new URLSearchParams({
       id: `eq.${businessId}`,
-      select: "name",
+      select: "id,name,slug,timezone",
       limit: "1",
     });
 
@@ -195,7 +201,8 @@ const isAdmin = admins.length > 0;
         path: `/rest/v1/events?${eventsQuery.toString()}`,
       }),
     ]);
-        if (
+
+    if (
       !businessResponse.ok ||
       !locationResponse.ok ||
       !eventsResponse.ok
@@ -218,6 +225,14 @@ const isAdmin = admins.length > 0;
         eventsResponse.json(),
       ]);
 
+    const business = businesses[0];
+
+    if (!business) {
+      return res.status(404).json({
+        error: "Business not found",
+      });
+    }
+
     const now = new Date();
 
     const startOfToday = new Date(now);
@@ -230,59 +245,55 @@ const isAdmin = admins.length > 0;
     const startOfMonth = new Date(
       now.getFullYear(),
       now.getMonth(),
-      1
+      1,
     );
 
     const todayEvents = events.filter(
-      (event) =>
-        new Date(event.created_at) >= startOfToday
+      (event) => new Date(event.created_at) >= startOfToday,
     );
 
     const weekEvents = events.filter(
-      (event) =>
-        new Date(event.created_at) >= startOfWeek
+      (event) => new Date(event.created_at) >= startOfWeek,
     );
 
     const monthEvents = events.filter(
-      (event) =>
-        new Date(event.created_at) >= startOfMonth
+      (event) => new Date(event.created_at) >= startOfMonth,
     );
 
     const countEvent = (list, eventName) =>
       list.filter(
-        (event) => event.event_name === eventName
+        (event) => event.event_name === eventName,
       ).length;
 
     const uniqueSessions = (list) =>
       new Set(
         list
           .map((event) => event.session_id)
-          .filter(Boolean)
+          .filter(Boolean),
       ).size;
 
     const pageViewsToday = countEvent(
       todayEvents,
-      "page_view"
+      "page_view",
     );
 
     const menuOpensToday = countEvent(
       todayEvents,
-      "menu_open"
+      "menu_open",
     );
 
     const reviewClicksToday = countEvent(
       todayEvents,
-      "review_click"
+      "review_click",
     );
 
     const reviewConversionRate =
       pageViewsToday > 0
         ? Number(
             (
-              (reviewClicksToday /
-                pageViewsToday) *
+              (reviewClicksToday / pageViewsToday) *
               100
-            ).toFixed(1)
+            ).toFixed(1),
           )
         : 0;
 
@@ -290,129 +301,98 @@ const isAdmin = admins.length > 0;
       pageViewsToday > 0
         ? Number(
             (
-              (menuOpensToday /
-                pageViewsToday) *
+              (menuOpensToday / pageViewsToday) *
               100
-            ).toFixed(1)
+            ).toFixed(1),
           )
         : 0;
 
     const sourceCounts = events.reduce(
       (accumulator, event) => {
-        const source =
-          event.source || "unknown";
+        const source = event.source || "unknown";
 
         accumulator[source] =
           (accumulator[source] || 0) + 1;
 
         return accumulator;
       },
-      {}
+      {},
     );
 
     const dailyActivity = [];
 
-    for (
-      let offset = 6;
-      offset >= 0;
-      offset -= 1
-    ) {
+    for (let offset = 6; offset >= 0; offset -= 1) {
       const day = new Date(now);
 
-      day.setDate(
-        now.getDate() - offset
-      );
-
+      day.setDate(now.getDate() - offset);
       day.setHours(0, 0, 0, 0);
 
       const nextDay = new Date(day);
+      nextDay.setDate(day.getDate() + 1);
 
-      nextDay.setDate(
-        day.getDate() + 1
-      );
+      const dayEvents = events.filter((event) => {
+        const createdAt = new Date(event.created_at);
 
-      const dayEvents = events.filter(
-        (event) => {
-          const createdAt = new Date(
-            event.created_at
-          );
-
-          return (
-            createdAt >= day &&
-            createdAt < nextDay
-          );
-        }
-      );
+        return createdAt >= day && createdAt < nextDay;
+      });
 
       dailyActivity.push({
-        date: day
-          .toISOString()
-          .slice(0, 10),
+        date: day.toISOString().slice(0, 10),
 
         page_views: countEvent(
           dayEvents,
-          "page_view"
+          "page_view",
         ),
 
         menu_opens: countEvent(
           dayEvents,
-          "menu_open"
+          "menu_open",
         ),
 
         review_clicks: countEvent(
           dayEvents,
-          "review_click"
+          "review_click",
         ),
       });
     }
-        return res.status(200).json({
+
+    return res.status(200).json({
       business_id: businessId,
 
-      membership_role: membership.role,
+      membership_role: isAdmin
+        ? "owner"
+        : membership.role,
 
       business: {
-        name:
-          businesses[0]?.name ??
-          "Η επιχείρησή σου",
+        name: business.name,
 
         location_name:
-          locations[0]?.name ??
-          null,
+          locations[0]?.name ?? null,
       },
 
       totals: {
-        page_views_today:
-          pageViewsToday,
+        page_views_today: pageViewsToday,
 
-        page_views_week:
-          countEvent(
-            weekEvents,
-            "page_view"
-          ),
+        page_views_week: countEvent(
+          weekEvents,
+          "page_view",
+        ),
 
-        page_views_month:
-          countEvent(
-            monthEvents,
-            "page_view"
-          ),
+        page_views_month: countEvent(
+          monthEvents,
+          "page_view",
+        ),
 
         unique_visitors_today:
-          uniqueSessions(
-            todayEvents
-          ),
+          uniqueSessions(todayEvents),
 
         unique_visitors_week:
-          uniqueSessions(
-            weekEvents
-          ),
+          uniqueSessions(weekEvents),
 
         unique_visitors_month:
-          uniqueSessions(
-            monthEvents
-          ),
+          uniqueSessions(monthEvents),
 
-        menu_opens_today:
-          menuOpensToday,
+        menu_opens_today: menuOpensToday,
 
         review_clicks_today:
           reviewClicksToday,
@@ -425,34 +405,21 @@ const isAdmin = admins.length > 0;
       },
 
       sources: {
-        nfc:
-          sourceCounts.nfc || 0,
-
-        qr:
-          sourceCounts.qr || 0,
-
-        direct:
-          sourceCounts.direct || 0,
-
-        unknown:
-          sourceCounts.unknown || 0,
+        nfc: sourceCounts.nfc || 0,
+        qr: sourceCounts.qr || 0,
+        direct: sourceCounts.direct || 0,
+        unknown: sourceCounts.unknown || 0,
       },
 
-      daily_activity:
-        dailyActivity,
+      daily_activity: dailyActivity,
 
-      recent_activity:
-        events.slice(0, 10),
+      recent_activity: events.slice(0, 10),
     });
   } catch (error) {
-    console.error(
-      "Analytics API error:",
-      error
-    );
+    console.error("Analytics API error:", error);
 
     return res.status(500).json({
-      error:
-        "Internal server error",
+      error: "Internal server error",
     });
   }
 }
