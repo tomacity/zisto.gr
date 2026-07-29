@@ -2788,6 +2788,16 @@ function InvitationsPanel({
     invitation: Invitation,
   ) => void;
 }) {
+
+  const [resendingId, setResendingId] =
+    useState<string | null>(null);
+  
+  const [resendError, setResendError] =
+    useState("");
+  
+  const [resendSuccess, setResendSuccess] =
+    useState("");
+  
   if (loading) {
     return (
       <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
@@ -2977,6 +2987,79 @@ function InvitationStatusBadge({
     failed: "bg-red-50 text-red-700",
     cancelled: "bg-slate-100 text-slate-600",
   };
+
+  async function resendInvitation(
+    invitation: Invitation,
+  ) {
+    try {
+      setResendingId(invitation.id);
+      setResendError("");
+      setResendSuccess("");
+  
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+  
+      if (sessionError) {
+        throw sessionError;
+      }
+  
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+  
+      const response = await fetch(
+        "/api/admin/resend-invitation",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            invitation_id: invitation.id,
+          }),
+        },
+      );
+  
+      const result = await response.json();
+  
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+  
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Could not resend invitation",
+        );
+      }
+  
+      onInvitationUpdated(result.invitation);
+  
+      setResendSuccess(
+        `Η πρόσκληση στάλθηκε ξανά στο ${invitation.email}.`,
+      );
+    } catch (resendInvitationError) {
+      console.error(
+        "Invitation resend failed:",
+        resendInvitationError,
+      );
+  
+      setResendError(
+        resendInvitationError instanceof Error
+          ? resendInvitationError.message
+          : "Δεν ήταν δυνατή η επαναποστολή της πρόσκλησης.",
+      );
+    } finally {
+      setResendingId(null);
+    }
+  }
 
   return (
     <div>
