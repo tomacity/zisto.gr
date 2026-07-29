@@ -574,6 +574,12 @@ useEffect(() => {
                 businesses={businesses}
                 loading={businessesLoading}
                 error={businessesError}
+                onBusinessCreated={(business) => {
+                  setBusinesses((currentBusinesses) => [
+                    business,
+                    ...currentBusinesses,
+                  ]);
+                }}
               />
             )}
 
@@ -687,14 +693,140 @@ function BusinessesPanel({
   businesses,
   loading,
   error,
+  onBusinessCreated,
 }: {
   businesses: Business[];
   loading: boolean;
   error: string;
+  onBusinessCreated: (business: Business) => void;
 }) {
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [timezone, setTimezone] = useState("Europe/Athens");
+  const [status, setStatus] =
+    useState<Business["status"]>("active");
+
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  function generateSlug(value: string) {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\u0370-\u03ff]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-+/g, "-");
+  }
+
+  function resetForm() {
+    setName("");
+    setSlug("");
+    setTimezone("Europe/Athens");
+    setStatus("active");
+    setFormError("");
+    setSuccessMessage("");
+  }
+
+  function closeCreateForm() {
+    resetForm();
+    setShowCreateForm(false);
+  }
+
+  async function createBusiness(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    try {
+      setSaving(true);
+      setFormError("");
+      setSuccessMessage("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch("/api/admin/businesses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          slug: slug.trim(),
+          timezone: timezone.trim(),
+          status,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Could not create business",
+        );
+      }
+
+      onBusinessCreated(result.business);
+
+      setSuccessMessage(
+        "Η επιχείρηση δημιουργήθηκε επιτυχώς.",
+      );
+
+      setName("");
+      setSlug("");
+      setTimezone("Europe/Athens");
+      setStatus("active");
+
+      window.setTimeout(() => {
+        setShowCreateForm(false);
+        setSuccessMessage("");
+      }, 900);
+    } catch (createError) {
+      console.error(
+        "Business creation failed:",
+        createError,
+      );
+
+      setFormError(
+        createError instanceof Error
+          ? createError.message
+          : "Δεν ήταν δυνατή η δημιουργία της επιχείρησης.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const activeBusinesses = businesses.filter(
+    (business) => business.status === "active",
+  ).length;
+
   if (loading) {
     return (
-      <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
+      <div className="mt-8 rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
         <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
 
         <p className="mt-4 text-sm font-medium text-[#666]">
@@ -706,7 +838,7 @@ function BusinessesPanel({
 
   if (error) {
     return (
-      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
+      <div className="mt-8 rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
           Loading error
         </p>
@@ -722,108 +854,314 @@ function BusinessesPanel({
     );
   }
 
-  if (businesses.length === 0) {
-    return (
-      <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
-        <h3 className="text-2xl font-black tracking-[-0.03em]">
-          Δεν υπάρχει επιχείρηση
-        </h3>
-
-        <p className="mt-3 text-sm text-[#666]">
-          Δεν βρέθηκε κάποια εγγραφή στον πίνακα businesses.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-5">
+    <div className="mt-8 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Live businesses
+            Businesses
           </p>
 
           <p className="mt-2 text-sm text-[#666]">
-            {businesses.length} ενεργή επιχείρηση
+            {businesses.length} συνολικά ·{" "}
+            {activeBusinesses} ενεργές
           </p>
         </div>
 
         <button
           type="button"
-          disabled
-          className="cursor-not-allowed rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white opacity-40"
+          onClick={() => {
+            setFormError("");
+            setSuccessMessage("");
+            setShowCreateForm((current) => !current);
+          }}
+          className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727]"
         >
-          + Νέα Επιχείρηση
+          {showCreateForm
+            ? "Κλείσιμο φόρμας"
+            : "+ Νέα Επιχείρηση"}
         </button>
       </div>
 
-      <div className="grid gap-5">
-        {businesses.map((business) => (
-          <article
-            key={business.id}
-            className="overflow-hidden rounded-[28px] border border-black/10 bg-white"
-          >
-            <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-green-700">
-                    <span className="h-2 w-2 rounded-full bg-green-500" />
-                    Active
-                  </span>
+      {showCreateForm && (
+        <form
+          onSubmit={createBusiness}
+          className="rounded-[28px] border border-black/10 bg-[#F7F5F1] p-6 sm:p-8"
+        >
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Create business
+            </p>
 
-                  <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 font-mono text-[10px] font-bold text-[#666]">
-                    /{business.slug}
-                  </span>
-                </div>
+            <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
+              Νέα Επιχείρηση
+            </h3>
 
-                <h3 className="mt-5 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
-                  {business.name}
-                </h3>
+            <p className="mt-2 text-sm leading-6 text-[#666]">
+              Δημιούργησε μία νέα επιχείρηση στο Zisto.
+              Ο client μπορεί να προστεθεί αργότερα μέσω
+              πρόσκλησης.
+            </p>
+          </div>
 
-                <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-                  <div className="rounded-2xl bg-[#F7F5F1] p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
-                      Timezone
-                    </p>
+          <div className="mt-7 grid gap-5 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Business name
+              </span>
 
-                    <p className="mt-2 font-semibold">
-                      {business.timezone}
-                    </p>
-                  </div>
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => {
+                  const nextName = event.target.value;
 
-                  <div className="rounded-2xl bg-[#F7F5F1] p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
-                      Analytics
-                    </p>
+                  setName(nextName);
 
-                    <p className="mt-2 flex items-center gap-2 font-semibold">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-[#DC2727]" />
-                      Live
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.hash = `/dashboard?business=${business.id}`;
+                  if (!slug) {
+                    setSlug(generateSlug(nextName));
+                  }
                 }}
-                className="w-full rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
-              >
-                Άνοιγμα Dashboard →
-              </button>
-            </div>
+                required
+                maxLength={120}
+                placeholder="π.χ. Το Τσιπουράδικο της Μυρσίνης"
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
+              />
+            </label>
 
-            <div className="border-t border-black/8 bg-[#F7F5F1] px-6 py-4 sm:px-8">
-              <p className="font-mono text-[10px] text-[#999]">
-                Business ID: {business.id}
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Slug
+              </span>
+
+              <div className="mt-2 flex overflow-hidden rounded-2xl border border-black/10 bg-white focus-within:border-[#222]">
+                <span className="flex items-center border-r border-black/10 bg-[#EFEDE8] px-4 font-mono text-sm text-[#888]">
+                  /
+                </span>
+
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(event) => {
+                    setSlug(
+                      generateSlug(event.target.value),
+                    );
+                  }}
+                  required
+                  maxLength={100}
+                  placeholder="business-slug"
+                  className="min-w-0 flex-1 bg-white px-4 py-4 font-mono text-sm outline-none"
+                />
+              </div>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Timezone
+              </span>
+
+              <select
+                value={timezone}
+                onChange={(event) =>
+                  setTimezone(event.target.value)
+                }
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+              >
+                <option value="Europe/Athens">
+                  Europe/Athens
+                </option>
+
+                <option value="Europe/London">
+                  Europe/London
+                </option>
+
+                <option value="Europe/Paris">
+                  Europe/Paris
+                </option>
+
+                <option value="America/New_York">
+                  America/New_York
+                </option>
+
+                <option value="America/Los_Angeles">
+                  America/Los_Angeles
+                </option>
+              </select>
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Status
+              </span>
+
+              <select
+                value={status}
+                onChange={(event) =>
+                  setStatus(
+                    event.target.value as Business["status"],
+                  )
+                }
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+          </div>
+
+          {formError && (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-700">
+                {formError}
               </p>
             </div>
-          </article>
-        ))}
-      </div>
+          )}
+
+          {successMessage && (
+            <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4">
+              <p className="text-sm font-semibold text-green-700">
+                {successMessage}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={closeCreateForm}
+              disabled={saving}
+              className="rounded-2xl border border-black/10 bg-white px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Ακύρωση
+            </button>
+
+            <button
+              type="submit"
+              disabled={
+                saving ||
+                !name.trim() ||
+                !slug.trim() ||
+                !timezone.trim()
+              }
+              className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {saving
+                ? "Δημιουργία..."
+                : "Δημιουργία Επιχείρησης"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {businesses.length === 0 ? (
+        <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
+          <h3 className="text-2xl font-black tracking-[-0.03em]">
+            Δεν υπάρχει επιχείρηση
+          </h3>
+
+          <p className="mt-3 text-sm text-[#666]">
+            Πάτησε «+ Νέα Επιχείρηση» για να δημιουργήσεις
+            την πρώτη επιχείρηση.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-5">
+          {businesses.map((business) => {
+            const isActive =
+              business.status === "active";
+
+            return (
+              <article
+                key={business.id}
+                className="overflow-hidden rounded-[28px] border border-black/10 bg-white"
+              >
+                <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                          isActive
+                            ? "bg-green-50 text-green-700"
+                            : "bg-black/5 text-[#777]"
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            isActive
+                              ? "bg-green-500"
+                              : "bg-[#999]"
+                          }`}
+                        />
+
+                        {isActive
+                          ? "Active"
+                          : "Inactive"}
+                      </span>
+
+                      <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 font-mono text-[10px] font-bold text-[#666]">
+                        /{business.slug}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-5 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
+                      {business.name}
+                    </h3>
+
+                    <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+                      <div className="rounded-2xl bg-[#F7F5F1] p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
+                          Timezone
+                        </p>
+
+                        <p className="mt-2 font-semibold">
+                          {business.timezone}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-[#F7F5F1] p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
+                          Analytics
+                        </p>
+
+                        <p className="mt-2 flex items-center gap-2 font-semibold">
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              isActive
+                                ? "animate-pulse bg-[#DC2727]"
+                                : "bg-[#999]"
+                            }`}
+                          />
+
+                          {isActive
+                            ? "Live"
+                            : "Paused"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.hash =
+                        `/dashboard?business=${business.id}`;
+                    }}
+                    className="w-full rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
+                  >
+                    Άνοιγμα Dashboard →
+                  </button>
+                </div>
+
+                <div className="border-t border-black/8 bg-[#F7F5F1] px-6 py-4 sm:px-8">
+                  <p className="font-mono text-[10px] text-[#999]">
+                    Business ID: {business.id}
+                  </p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
