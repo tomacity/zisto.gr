@@ -10,6 +10,49 @@ type AdminTab =
   | "invitations"
   | "invite";
 
+const ADMIN_TABS: {
+  id: AdminTab;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "home",
+    label: "Overview",
+    description:
+      "Κεντρική εικόνα και γρήγορη πρόσβαση σε όλες τις λειτουργίες του Zisto Admin.",
+  },
+  {
+    id: "businesses",
+    label: "Επιχειρήσεις",
+    description:
+      "Δημιουργία και διαχείριση όλων των businesses του Zisto.",
+  },
+  {
+    id: "projects",
+    label: "Projects",
+    description:
+      "Σύνδεση και διαχείριση ανεξάρτητων React και Vite projects.",
+  },
+  {
+    id: "clients",
+    label: "Clients",
+    description:
+      "Διαχείριση των clients και της πρόσβασής τους στις επιχειρήσεις.",
+  },
+  {
+    id: "invitations",
+    label: "Προσκλήσεις",
+    description:
+      "Έλεγχος ενεργών, ολοκληρωμένων και εκκρεμών προσκλήσεων.",
+  },
+  {
+    id: "invite",
+    label: "Invite Client",
+    description:
+      "Αποστολή νέας πρόσκλησης και σύνδεση client με επιχείρηση.",
+  },
+];
+
 type Business = {
   id: string;
   name: string;
@@ -591,232 +634,267 @@ useEffect(() => {
     );
   }
 
+  const activeTabDetails =
+  ADMIN_TABS.find(
+    (tab) => tab.id === activeAdminTab,
+  ) ?? ADMIN_TABS[0];
+
   return (
-    <main className="min-h-screen bg-[#F7F5F1] px-5 py-6 text-[#222] sm:px-8 lg:px-10">
-      <div className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-6 border-b border-black/10 pb-8 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab("home")}
-              className="text-left"
-            >
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#DC2727]">
-                Zisto Admin
+    <main className="min-h-screen bg-[#F7F5F1] text-[#222]">
+      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+        <AdminSidebar
+          activeTab={activeAdminTab}
+          adminEmail={adminEmail}
+          onTabChange={setActiveAdminTab}
+          onLogout={handleLogout}
+        />
+  
+        <section className="min-w-0 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+          <div className="mx-auto w-full max-w-[1250px]">
+            <header className="border-b border-black/10 pb-8">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Admin workspace
               </p>
-
-              <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] sm:text-5xl lg:text-6xl">
-                Platform Dashboard
+  
+              <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
+                {activeTabDetails.label}
               </h1>
-            </button>
-
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-[#666] sm:text-base">
-              Διαχείριση επιχειρήσεων, clients, invitations
-              και smart links.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden rounded-2xl border border-black/10 bg-white px-4 py-3 sm:block">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#999]">
-                Logged in as
+  
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-[#666] sm:text-base">
+                {activeTabDetails.description}
               </p>
-
-              <p className="mt-1 text-sm font-semibold">
-                {adminEmail}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-2xl border border-black/10 bg-white px-5 py-4 text-sm font-bold transition hover:border-[#222]"
-            >
-              Αποσύνδεση
-            </button>
-          </div>
-        </header>
-
-        <section className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-          <AdminCard
-            eyebrow="Management"
-            title="Επιχειρήσεις"
-            description="Δημιουργία και διαχείριση όλων των businesses του Zisto."
-            onClick={() => setActiveAdminTab("businesses")}
-          />
-
-          <AdminCard
-            eyebrow="Accounts"
-            title="Clients"
-            description="Όλοι οι πελάτες και οι επιχειρήσεις στις οποίες έχουν πρόσβαση."
-            onClick={() => setActiveAdminTab("clients")}
-          />
-
-          <AdminCard
-            eyebrow="Custom projects"
-            title="Projects"
-            description="Σύνδεση ανεξάρτητων React και Vite landing pages με το Zisto."
-            onClick={() => setActiveAdminTab("projects")}
-          />
-
-          <AdminCard
-            eyebrow="Invitations"
-            title="Προσκλήσεις"
-            description="Έλεγχος ενεργών, ολοκληρωμένων και εκκρεμών invitations."
-            onClick={() => setActiveAdminTab("invitations")}
-          />
-
-          <AdminCard
-            eyebrow="New client"
-            title="+ Invite Client"
-            description="Στείλε invitation email και σύνδεσε τον client με την επιχείρησή του."
-            onClick={() => setActiveAdminTab("invite")}
-            dark
-          />
-        </section>
-
-        {activeAdminTab !== "home" && (
-          <section className="mt-10 rounded-[32px] border border-black/10 bg-white p-6 sm:p-8">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                  Admin workspace
-                </p>
-
-                <h2 className="mt-3 text-3xl font-black tracking-[-0.04em]">
-                  {activeAdminTab === "businesses" &&
-                    "Επιχειρήσεις"}
-
-                  {activeAdminTab === "projects" &&
-                    "Connected Projects"}
-
-                  {activeAdminTab === "clients" &&
-                    "Clients"}
-
-                  {activeAdminTab === "invitations" &&
-                    "Προσκλήσεις"}
-
-                  {activeAdminTab === "invite" &&
-                    "Πρόσκληση Client"}
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setActiveAdminTab("home")}
-                className="rounded-2xl border border-black/10 px-4 py-3 text-sm font-bold transition hover:border-[#222]"
-              >
-                Κλείσιμο
-              </button>
-            </div>
-
-            {activeAdminTab === "businesses" && (
-            <BusinessesPanel
-              businesses={businesses}
-              loading={businessesLoading}
-              error={businessesError}
-              onBusinessCreated={(business) => {
-                setBusinesses((currentBusinesses) => [
-                  business,
-                  ...currentBusinesses,
-                ]);
-              }}
-              onBusinessUpdated={(updatedBusiness) => {
-                setBusinesses((currentBusinesses) =>
-                  currentBusinesses.map((business) =>
-                    business.id === updatedBusiness.id
-                      ? updatedBusiness
-                      : business,
-                  ),
-                );
-              }}
-              onBusinessDeleted={(businessId) => {
-                setBusinesses((currentBusinesses) =>
-                  currentBusinesses.filter(
-                    (business) => business.id !== businessId,
-                  ),
-                );
-              }}
-            />
-            )}
-
-            {activeAdminTab === "clients" && (
-              <ClientsPanel
-                clients={clients}
-                loading={clientsLoading}
-                error={clientsError}
-                onClientRoleChanged={(
-                  userId,
-                  businessId,
-                  role,
-                ) => {
-                  setClients((currentClients) =>
-                    currentClients.map((client) =>
-                      client.id === userId &&
-                      client.business_id === businessId
-                        ? {
-                            ...client,
-                            role,
-                          }
-                        : client,
-                    ),
-                  );
-                }}
-                onClientRemoved={(userId, businessId) => {
-                  setClients((currentClients) =>
-                    currentClients.filter(
-                      (client) =>
-                        !(
-                          client.id === userId &&
-                          client.business_id === businessId
-                        ),
-                    ),
-                  );
-                }}
-              />
-            )}
-
-            {activeAdminTab === "projects" && (
-              <ProjectsPanel
-                projects={projects}
-                businesses={businesses}
-                loading={projectsLoading}
-                error={projectsError}
-                onProjectCreated={(project) => {
-                  setProjects((currentProjects) => [
-                    project,
-                    ...currentProjects,
-                  ]);
-                }}
-              />
-            )}
-
-            {activeAdminTab === "invitations" && (
-              <InvitationsPanel
-                invitations={invitations}
-                loading={invitationsLoading}
-                error={invitationsError}
-                onInvitationUpdated={(updatedInvitation) => {
-                  setInvitations((currentInvitations) =>
-                    currentInvitations.map((invitation) =>
-                      invitation.id === updatedInvitation.id
-                        ? updatedInvitation
-                        : invitation,
-                    ),
-                  );
-                }}
-              />
-            )}
-
+            </header>
+  
+            <div className="mt-8">
+              {activeAdminTab === "home" && (
+                <AdminOverview
+                  businesses={businesses}
+                  clients={clients}
+                  invitations={invitations}
+                  projects={projects}
+                  onTabChange={setActiveAdminTab}
+                />
+              )}
+  
+              {activeAdminTab === "businesses" && (
+                <BusinessesPanel
+                  businesses={businesses}
+                  loading={businessesLoading}
+                  error={businessesError}
+                  onBusinessCreated={(business) => {
+                    setBusinesses((currentBusinesses) => [
+                      business,
+                      ...currentBusinesses,
+                    ]);
+                  }}
+                  onBusinessUpdated={(updatedBusiness) => {
+                    setBusinesses((currentBusinesses) =>
+                      currentBusinesses.map((business) =>
+                        business.id === updatedBusiness.id
+                          ? updatedBusiness
+                          : business,
+                      ),
+                    );
+                  }}
+                  onBusinessDeleted={(businessId) => {
+                    setBusinesses((currentBusinesses) =>
+                      currentBusinesses.filter(
+                        (business) =>
+                          business.id !== businessId,
+                      ),
+                    );
+                  }}
+                />
+              )}
+  
+              {activeAdminTab === "projects" && (
+                <ProjectsPanel
+                  projects={projects}
+                  businesses={businesses}
+                  loading={projectsLoading}
+                  error={projectsError}
+                  onProjectCreated={(project) => {
+                    setProjects((currentProjects) => [
+                      project,
+                      ...currentProjects,
+                    ]);
+                  }}
+                />
+              )}
+  
+              {activeAdminTab === "clients" && (
+                <ClientsPanel
+                  clients={clients}
+                  loading={clientsLoading}
+                  error={clientsError}
+                />
+              )}
+  
+              {activeAdminTab === "invitations" && (
+                <InvitationsPanel
+                  invitations={invitations}
+                  loading={invitationsLoading}
+                  error={invitationsError}
+                  onInvitationUpdated={(updatedInvitation) => {
+                    setInvitations((currentInvitations) =>
+                      currentInvitations.map((invitation) =>
+                        invitation.id ===
+                        updatedInvitation.id
+                          ? updatedInvitation
+                          : invitation,
+                      ),
+                    );
+                  }}
+                />
+              )}
+  
               {activeAdminTab === "invite" && (
                 <InviteClientPanel
                   businesses={businesses}
                 />
               )}
-          </section>
-        )}
+            </div>
+          </div>
+        </section>
       </div>
     </main>
+  );
+}
+
+function AdminSidebar({
+  activeTab,
+  adminEmail,
+  onTabChange,
+  onLogout,
+}: {
+  activeTab: AdminTab;
+  adminEmail: string;
+  onTabChange: (tab: AdminTab) => void;
+  onLogout: () => void;
+}) {
+  return (
+    <aside className="border-b border-black/10 bg-[#222] text-white lg:sticky lg:top-0 lg:h-screen lg:border-b-0">
+      <div className="flex h-full flex-col p-5 sm:p-7">
+        <div>
+          <a
+            href="https://zisto.app"
+            className="inline-flex"
+          >
+            <img
+              src="/images/zisto-wordmark.png"
+              alt="Zisto"
+              className="h-7 w-auto invert"
+            />
+          </a>
+
+          <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.24em] text-white/40">
+            Admin dashboard
+          </p>
+        </div>
+
+        <nav className="mt-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+          {ADMIN_TABS.map((tab) => {
+            const isActive =
+              activeTab === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() =>
+                  onTabChange(tab.id)
+                }
+                className={`flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left text-sm font-bold transition ${
+                  isActive
+                    ? "bg-white text-[#222]"
+                    : "text-white/65 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <span>{tab.label}</span>
+
+                <span
+                  className={
+                    isActive
+                      ? "text-[#DC2727]"
+                      : "text-white/25"
+                  }
+                >
+                  →
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mt-8 border-t border-white/10 pt-6 lg:mt-auto">
+          <p className="truncate text-xs font-semibold text-white/70">
+            {adminEmail}
+          </p>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="mt-4 w-full rounded-2xl border border-white/15 px-4 py-3 text-sm font-bold transition hover:bg-white hover:text-[#222]"
+          >
+            Αποσύνδεση
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function AdminOverview({
+  businesses,
+  clients,
+  invitations,
+  projects,
+  onTabChange,
+}: {
+  businesses: Business[];
+  clients: Client[];
+  invitations: Invitation[];
+  projects: ConnectedProject[];
+  onTabChange: (tab: AdminTab) => void;
+}) {
+  return (
+    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <AdminCard
+        eyebrow="Management"
+        title="Επιχειρήσεις"
+        description={`${businesses.length} συνολικά`}
+        onClick={() =>
+          onTabChange("businesses")
+        }
+      />
+
+      <AdminCard
+        eyebrow="Accounts"
+        title="Clients"
+        description={`${clients.length} συνολικά`}
+        onClick={() =>
+          onTabChange("clients")
+        }
+      />
+
+      <AdminCard
+        eyebrow="Custom projects"
+        title="Projects"
+        description={`${projects.length} συνολικά`}
+        onClick={() =>
+          onTabChange("projects")
+        }
+      />
+
+      <AdminCard
+        eyebrow="Invitations"
+        title="Προσκλήσεις"
+        description={`${invitations.length} συνολικά`}
+        onClick={() =>
+          onTabChange("invitations")
+        }
+      />
+    </div>
   );
 }
 
