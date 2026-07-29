@@ -2563,6 +2563,18 @@ function ClientsPanel({
         </div>
       )}
 
+      {resendSuccess && (
+        <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-700">
+          {resendSuccess}
+        </div>
+      )}
+      
+      {resendError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
+          {resendError}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
         <div className="hidden grid-cols-[1.4fr_1.1fr_0.65fr_0.7fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
           <span>Client</span>
@@ -2963,6 +2975,30 @@ function InvitationsPanel({
                     {invitation.error_message}
                   </div>
                 )}
+
+                <div className="flex justify-start xl:justify-end">
+                  {["pending", "expired", "failed"].includes(
+                    invitation.status,
+                  ) ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        resendInvitation(invitation)
+                      }
+                      disabled={resendingId !== null}
+                      className="w-full rounded-2xl border border-black/10 bg-white px-5 py-3 text-sm font-bold transition hover:border-[#222] hover:bg-[#F7F5F1] disabled:cursor-not-allowed disabled:opacity-50 xl:w-auto"
+                    >
+                      {resendingId === invitation.id
+                        ? "Αποστολή..."
+                        : "Επαναποστολή"}
+                    </button>
+                  ) : (
+                    <span className="text-xs font-semibold text-[#AAA]">
+                      —
+                    </span>
+                  )}
+                </div>
+                
               </article>
             );
           })}
