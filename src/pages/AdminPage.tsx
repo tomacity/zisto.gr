@@ -5,6 +5,7 @@ import { InviteClientPanel } from "../components/admin/InviteClientPanel";
 type AdminTab =
   | "home"
   | "businesses"
+  | "projects"
   | "clients"
   | "invitations"
   | "invite";
@@ -17,6 +18,30 @@ type Business = {
   status: "active" | "inactive";
   created_at: string;
   updated_at: string;
+};
+
+type ConnectedProject = {
+  id: string;
+  business_id: string;
+  name: string;
+  live_url: string;
+  github_url: string | null;
+  project_key: string;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+  businesses:
+    | {
+        id: string;
+        name: string;
+        slug: string;
+      }
+    | {
+        id: string;
+        name: string;
+        slug: string;
+      }[]
+    | null;
 };
 
 type Client = {
@@ -69,6 +94,14 @@ type Invitation = {
 };
 
 export function AdminPage() {
+  const [projects, setProjects] =
+    useState<ConnectedProject[]>([]);
+  
+  const [projectsLoading, setProjectsLoading] =
+    useState(false);
+  
+  const [projectsError, setProjectsError] =
+    useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState("");
@@ -90,6 +123,88 @@ const [invitationsError, setInvitationsError] =
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [businessesLoading, setBusinessesLoading] = useState(false);
   const [businessesError, setBusinessesError] = useState("");
+
+  useEffect(() => {
+    if (!isAdmin || activeAdminTab !== "projects") {
+      return;
+    }
+  
+    let active = true;
+  
+    async function loadProjects() {
+      try {
+        setProjectsLoading(true);
+        setProjectsError("");
+  
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+  
+        if (sessionError) {
+          throw sessionError;
+        }
+  
+        if (!session) {
+          window.location.hash = "/login";
+          return;
+        }
+  
+        const response = await fetch(
+          "/api/admin/projects",
+          {
+            method: "GET",
+            headers: {
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+          },
+        );
+  
+        const result = await response.json();
+  
+        if (response.status === 401) {
+          await supabase.auth.signOut();
+          window.location.hash = "/login";
+          return;
+        }
+  
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Could not load connected projects",
+          );
+        }
+  
+        if (active) {
+          setProjects(result.projects ?? []);
+        }
+      } catch (loadError) {
+        console.error(
+          "Connected projects loading failed:",
+          loadError,
+        );
+  
+        if (active) {
+          setProjectsError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Δεν ήταν δυνατή η φόρτωση των projects.",
+          );
+        }
+      } finally {
+        if (active) {
+          setProjectsLoading(false);
+        }
+      }
+    }
+  
+    loadProjects();
+  
+    return () => {
+      active = false;
+    };
+  }, [isAdmin, activeAdminTab]);
 
   useEffect(() => {
     let active = true;
@@ -506,7 +621,7 @@ useEffect(() => {
           </div>
         </header>
 
-        <section className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
           <AdminCard
             eyebrow="Management"
             title="Επιχειρήσεις"
@@ -519,6 +634,13 @@ useEffect(() => {
             title="Clients"
             description="Όλοι οι πελάτες και οι επιχειρήσεις στις οποίες έχουν πρόσβαση."
             onClick={() => setActiveAdminTab("clients")}
+          />
+
+          <AdminCard
+            eyebrow="Custom projects"
+            title="Projects"
+            description="Σύνδεση ανεξάρτητων React και Vite landing pages με το Zisto."
+            onClick={() => setActiveAdminTab("projects")}
           />
 
           <AdminCard
@@ -548,6 +670,9 @@ useEffect(() => {
                 <h2 className="mt-3 text-3xl font-black tracking-[-0.04em]">
                   {activeAdminTab === "businesses" &&
                     "Επιχειρήσεις"}
+
+                  {activeAdminTab === "projects" &&
+                    "Connected Projects"}
 
                   {activeAdminTab === "clients" &&
                     "Clients"}
@@ -631,6 +756,21 @@ useEffect(() => {
                         ),
                     ),
                   );
+                }}
+              />
+            )}
+
+            {activeAdminTab === "projects" && (
+              <ProjectsPanel
+                projects={projects}
+                businesses={businesses}
+                loading={projectsLoading}
+                error={projectsError}
+                onProjectCreated={(project) => {
+                  setProjects((currentProjects) => [
+                    project,
+                    ...currentProjects,
+                  ]);
                 }}
               />
             )}
@@ -1632,6 +1772,531 @@ async function updateBusiness(
         </div>
       )}
       
+    </div>
+  );
+}
+
+function ProjectsPanel({
+  projects,
+  businesses,
+  loading,
+  error,
+  onProjectCreated,
+}: {
+  projects: ConnectedProject[];
+  businesses: Business[];
+  loading: boolean;
+  error: string;
+  onProjectCreated: (
+    project: ConnectedProject,
+  ) => void;
+}) {
+  const [showCreateForm, setShowCreateForm] =
+    useState(false);
+
+  const [businessId, setBusinessId] =
+    useState("");
+
+  const [name, setName] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
+  const [githubUrl, setGithubUrl] = useState("");
+
+  const [status, setStatus] =
+    useState<ConnectedProject["status"]>(
+      "active",
+    );
+
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] =
+    useState("");
+
+  const [successMessage, setSuccessMessage] =
+    useState("");
+
+  function resetForm() {
+    setBusinessId("");
+    setName("");
+    setLiveUrl("");
+    setGithubUrl("");
+    setStatus("active");
+    setFormError("");
+    setSuccessMessage("");
+  }
+
+  function closeCreateForm() {
+    resetForm();
+    setShowCreateForm(false);
+  }
+
+  function getProjectBusiness(
+    project: ConnectedProject,
+  ) {
+    if (Array.isArray(project.businesses)) {
+      return project.businesses[0] ?? null;
+    }
+
+    return project.businesses;
+  }
+
+  async function createProject(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    try {
+      setSaving(true);
+      setFormError("");
+      setSuccessMessage("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/projects",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            business_id: businessId,
+            name: name.trim(),
+            live_url: liveUrl.trim(),
+            github_url: githubUrl.trim(),
+            status,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Could not connect custom project",
+        );
+      }
+
+      onProjectCreated(result.project);
+
+      setSuccessMessage(
+        "Το custom project συνδέθηκε επιτυχώς.",
+      );
+
+      setBusinessId("");
+      setName("");
+      setLiveUrl("");
+      setGithubUrl("");
+      setStatus("active");
+
+      window.setTimeout(() => {
+        setShowCreateForm(false);
+        setSuccessMessage("");
+      }, 900);
+    } catch (createError) {
+      console.error(
+        "Project creation failed:",
+        createError,
+      );
+
+      setFormError(
+        createError instanceof Error
+          ? createError.message
+          : "Δεν ήταν δυνατή η σύνδεση του project.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const activeProjects = projects.filter(
+    (project) => project.status === "active",
+  ).length;
+
+  if (loading) {
+    return (
+      <div className="mt-8 rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
+        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
+
+        <p className="mt-4 text-sm font-medium text-[#666]">
+          Φόρτωση connected projects...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-8 rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+          Loading error
+        </p>
+
+        <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
+          Δεν φορτώθηκαν τα projects
+        </h3>
+
+        <p className="mt-3 text-sm text-red-700">
+          {error}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Connected custom projects
+          </p>
+
+          <p className="mt-2 text-sm text-[#666]">
+            {projects.length} συνολικά ·{" "}
+            {activeProjects} ενεργά
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setFormError("");
+            setSuccessMessage("");
+            setShowCreateForm(
+              (current) => !current,
+            );
+          }}
+          className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727]"
+        >
+          {showCreateForm
+            ? "Κλείσιμο φόρμας"
+            : "+ Connect Project"}
+        </button>
+      </div>
+
+      {showCreateForm && (
+        <form
+          onSubmit={createProject}
+          className="rounded-[28px] border border-black/10 bg-[#F7F5F1] p-6 sm:p-8"
+        >
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Connect custom page
+            </p>
+
+            <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
+              Νέο Connected Project
+            </h3>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#666]">
+              Σύνδεσε ένα ανεξάρτητο React ή Vite
+              project με μία επιχείρηση του Zisto.
+            </p>
+          </div>
+
+          <div className="mt-7 grid gap-5 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Business
+              </span>
+
+              <select
+                value={businessId}
+                onChange={(event) =>
+                  setBusinessId(event.target.value)
+                }
+                required
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+              >
+                <option value="">
+                  Επίλεξε επιχείρηση
+                </option>
+
+                {businesses.map((business) => (
+                  <option
+                    key={business.id}
+                    value={business.id}
+                  >
+                    {business.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Project name
+              </span>
+
+              <input
+                type="text"
+                value={name}
+                onChange={(event) =>
+                  setName(event.target.value)
+                }
+                required
+                maxLength={120}
+                placeholder="π.χ. Myrsini NFC Landing Page"
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
+              />
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Live URL
+              </span>
+
+              <input
+                type="url"
+                value={liveUrl}
+                onChange={(event) =>
+                  setLiveUrl(event.target.value)
+                }
+                required
+                placeholder="https://project.vercel.app"
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
+              />
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                GitHub URL
+              </span>
+
+              <input
+                type="url"
+                value={githubUrl}
+                onChange={(event) =>
+                  setGithubUrl(event.target.value)
+                }
+                placeholder="https://github.com/username/project"
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
+              />
+            </label>
+
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                Status
+              </span>
+
+              <select
+                value={status}
+                onChange={(event) =>
+                  setStatus(
+                    event.target
+                      .value as ConnectedProject["status"],
+                  )
+                }
+                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+              >
+                <option value="active">
+                  Active
+                </option>
+
+                <option value="inactive">
+                  Inactive
+                </option>
+              </select>
+            </label>
+          </div>
+
+          {businesses.length === 0 && (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-800">
+                Πρέπει πρώτα να δημιουργήσεις μία
+                επιχείρηση.
+              </p>
+            </div>
+          )}
+
+          {formError && (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-700">
+                {formError}
+              </p>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 p-4">
+              <p className="text-sm font-semibold text-green-700">
+                {successMessage}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={closeCreateForm}
+              disabled={saving}
+              className="rounded-2xl border border-black/10 bg-white px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
+            >
+              Ακύρωση
+            </button>
+
+            <button
+              type="submit"
+              disabled={
+                saving ||
+                !businessId ||
+                !name.trim() ||
+                !liveUrl.trim()
+              }
+              className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {saving
+                ? "Σύνδεση..."
+                : "Connect Project"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {projects.length === 0 ? (
+        <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
+          <h3 className="text-2xl font-black tracking-[-0.03em]">
+            Δεν υπάρχει connected project
+          </h3>
+
+          <p className="mt-3 text-sm text-[#666]">
+            Πάτησε «+ Connect Project» για να
+            συνδέσεις το πρώτο custom project.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-5">
+          {projects.map((project) => {
+            const isActive =
+              project.status === "active";
+
+            const business =
+              getProjectBusiness(project);
+
+            return (
+              <article
+                key={project.id}
+                className="overflow-hidden rounded-[28px] border border-black/10 bg-white"
+              >
+                <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                          isActive
+                            ? "bg-green-50 text-green-700"
+                            : "bg-black/5 text-[#777]"
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            isActive
+                              ? "bg-green-500"
+                              : "bg-[#999]"
+                          }`}
+                        />
+
+                        {isActive
+                          ? "Active"
+                          : "Inactive"}
+                      </span>
+
+                      {business && (
+                        <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 text-[10px] font-bold text-[#666]">
+                          {business.name}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="mt-5 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
+                      {project.name}
+                    </h3>
+
+                    <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+                      <div className="rounded-2xl bg-[#F7F5F1] p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
+                          Project key
+                        </p>
+
+                        <p className="mt-2 break-all font-mono text-xs font-semibold">
+                          {project.project_key}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-[#F7F5F1] p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#999]">
+                          Tracker
+                        </p>
+
+                        <p className="mt-2 flex items-center gap-2 font-semibold">
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              isActive
+                                ? "animate-pulse bg-[#DC2727]"
+                                : "bg-[#999]"
+                            }`}
+                          />
+
+                          {isActive
+                            ? "Ready"
+                            : "Paused"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex w-full flex-col gap-3 lg:w-auto">
+                    <a
+                      href={project.live_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full rounded-2xl bg-[#222] px-7 py-4 text-center text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
+                    >
+                      Άνοιγμα Live Site →
+                    </a>
+
+                    {project.github_url && (
+                      <a
+                        href={project.github_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full rounded-2xl border border-black/10 bg-white px-7 py-4 text-center text-sm font-bold transition hover:border-[#222] lg:w-auto"
+                      >
+                        GitHub Repository
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-black/8 bg-[#F7F5F1] px-6 py-4 sm:px-8">
+                  <p className="break-all font-mono text-[10px] text-[#999]">
+                    Project ID: {project.id}
+                  </p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
