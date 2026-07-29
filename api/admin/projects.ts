@@ -163,11 +163,12 @@ export default async function handler(
           "Projects loading failed:",
           projectsError,
         );
-    
+      
         return response.status(500).json({
           error: projectsError.message,
           code: projectsError.code,
           details: projectsError.details,
+          hint: projectsError.hint,
         });
       }
     
