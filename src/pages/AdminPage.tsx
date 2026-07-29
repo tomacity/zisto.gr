@@ -576,13 +576,41 @@ useEffect(() => {
               />
             )}
 
-              {activeAdminTab === "clients" && (
-                <ClientsPanel
-                  clients={clients}
-                  loading={clientsLoading}
-                  error={clientsError}
-                />
-              )}
+            {activeAdminTab === "clients" && (
+              <ClientsPanel
+                clients={clients}
+                loading={clientsLoading}
+                error={clientsError}
+                onClientRoleChanged={(
+                  userId,
+                  businessId,
+                  role,
+                ) => {
+                  setClients((currentClients) =>
+                    currentClients.map((client) =>
+                      client.id === userId &&
+                      client.business_id === businessId
+                        ? {
+                            ...client,
+                            role,
+                          }
+                        : client,
+                    ),
+                  );
+                }}
+                onClientRemoved={(userId, businessId) => {
+                  setClients((currentClients) =>
+                    currentClients.filter(
+                      (client) =>
+                        !(
+                          client.id === userId &&
+                          client.business_id === businessId
+                        ),
+                    ),
+                  );
+                }}
+              />
+            )}
 
               {activeAdminTab === "invitations" && (
                 <InvitationsPanel
@@ -803,11 +831,178 @@ function ClientsPanel({
   clients,
   loading,
   error,
+  onClientRoleChanged,
+  onClientRemoved,
 }: {
   clients: Client[];
   loading: boolean;
   error: string;
+  onClientRoleChanged: (
+    userId: string,
+    businessId: string,
+    role: Client["role"],
+  ) => void;
+  onClientRemoved: (
+    userId: string,
+    businessId: string,
+  ) => void;
 }) {
+  const [editingClientKey, setEditingClientKey] =
+    useState<string | null>(null);
+
+  const [selectedRole, setSelectedRole] =
+    useState<Client["role"]>("staff");
+
+  const [savingClientKey, setSavingClientKey] =
+    useState<string | null>(null);
+
+  const [actionError, setActionError] = useState("");
+
+  function getClientKey(client: Client) {
+    return `${client.id}-${client.business_id}`;
+  }
+
+  function startEditing(client: Client) {
+    setActionError("");
+    setSelectedRole(client.role);
+    setEditingClientKey(getClientKey(client));
+  }
+
+  function cancelEditing() {
+    setEditingClientKey(null);
+    setActionError("");
+  }
+
+  async function getAccessToken() {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw sessionError;
+    }
+
+    if (!session) {
+      window.location.hash = "/login";
+      throw new Error("Authentication required");
+    }
+
+    return session.access_token;
+  }
+
+  async function updateClientRole(client: Client) {
+    const clientKey = getClientKey(client);
+
+    try {
+      setSavingClientKey(clientKey);
+      setActionError("");
+
+      const accessToken = await getAccessToken();
+
+      const response = await fetch("/api/admin/clients", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: client.id,
+          business_id: client.business_id,
+          role: selectedRole,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Could not update client role",
+        );
+      }
+
+      onClientRoleChanged(
+        client.id,
+        client.business_id,
+        selectedRole,
+      );
+
+      setEditingClientKey(null);
+    } catch (updateError) {
+      console.error(
+        "Client role update failed:",
+        updateError,
+      );
+
+      setActionError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Δεν ήταν δυνατή η αλλαγή του ρόλου.",
+      );
+    } finally {
+      setSavingClientKey(null);
+    }
+  }
+
+  async function removeClient(client: Client) {
+    const confirmed = window.confirm(
+      `Θέλεις σίγουρα να αφαιρέσεις την πρόσβαση του ${client.email} από την επιχείρηση "${client.business?.name ?? "Άγνωστη επιχείρηση"}";`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const clientKey = getClientKey(client);
+
+    try {
+      setSavingClientKey(clientKey);
+      setActionError("");
+
+      const accessToken = await getAccessToken();
+
+      const response = await fetch("/api/admin/clients", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: client.id,
+          business_id: client.business_id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Could not remove client access",
+        );
+      }
+
+      onClientRemoved(
+        client.id,
+        client.business_id,
+      );
+
+      setEditingClientKey(null);
+    } catch (removeError) {
+      console.error(
+        "Client removal failed:",
+        removeError,
+      );
+
+      setActionError(
+        removeError instanceof Error
+          ? removeError.message
+          : "Δεν ήταν δυνατή η αφαίρεση του client.",
+      );
+    } finally {
+      setSavingClientKey(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
@@ -879,16 +1074,31 @@ function ClientsPanel({
         />
       </div>
 
+      {actionError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
+          {actionError}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
-        <div className="hidden grid-cols-[1.5fr_1.2fr_0.7fr_0.7fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] lg:grid">
+        <div className="hidden grid-cols-[1.4fr_1.1fr_0.65fr_0.7fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
           <span>Client</span>
           <span>Επιχείρηση</span>
           <span>Ρόλος</span>
           <span>Status</span>
+          <span>Ενέργειες</span>
         </div>
 
         <div className="divide-y divide-black/8">
           {clients.map((client) => {
+            const clientKey = getClientKey(client);
+
+            const isEditing =
+              editingClientKey === clientKey;
+
+            const isSaving =
+              savingClientKey === clientKey;
+
             const displayName =
               client.full_name.trim() ||
               client.email.split("@")[0] ||
@@ -898,13 +1108,15 @@ function ClientsPanel({
               .split(" ")
               .filter(Boolean)
               .slice(0, 2)
-              .map((part) => part.charAt(0).toUpperCase())
+              .map((part) =>
+                part.charAt(0).toUpperCase(),
+              )
               .join("");
 
             return (
               <article
-                key={`${client.id}-${client.business_id}`}
-                className="grid gap-5 px-6 py-6 lg:grid-cols-[1.5fr_1.2fr_0.7fr_0.7fr] lg:items-center"
+                key={clientKey}
+                className="grid gap-5 px-6 py-6 xl:grid-cols-[1.4fr_1.1fr_0.65fr_0.7fr_0.9fr] xl:items-center"
               >
                 <div className="flex min-w-0 items-center gap-4">
                   <div className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-full bg-[#222] text-sm font-black text-white">
@@ -923,11 +1135,11 @@ function ClientsPanel({
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] lg:hidden">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
                     Επιχείρηση
                   </p>
 
-                  <p className="mt-1 font-semibold lg:mt-0">
+                  <p className="mt-1 font-semibold xl:mt-0">
                     {client.business?.name ??
                       "Άγνωστη επιχείρηση"}
                   </p>
@@ -940,22 +1152,48 @@ function ClientsPanel({
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] lg:hidden">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
                     Ρόλος
                   </p>
 
-                  <span className="mt-2 inline-flex rounded-full bg-[#F7F5F1] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#555] lg:mt-0">
-                    {client.role}
-                  </span>
+                  {isEditing ? (
+                    <select
+                      value={selectedRole}
+                      disabled={isSaving}
+                      onChange={(event) =>
+                        setSelectedRole(
+                          event.target
+                            .value as Client["role"],
+                        )
+                      }
+                      className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none transition focus:border-[#222] xl:mt-0"
+                    >
+                      <option value="owner">
+                        Owner
+                      </option>
+
+                      <option value="manager">
+                        Manager
+                      </option>
+
+                      <option value="staff">
+                        Staff
+                      </option>
+                    </select>
+                  ) : (
+                    <span className="mt-2 inline-flex rounded-full bg-[#F7F5F1] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#555] xl:mt-0">
+                      {client.role}
+                    </span>
+                  )}
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] lg:hidden">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
                     Status
                   </p>
 
                   <span
-                    className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] lg:mt-0 ${
+                    className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] xl:mt-0 ${
                       client.status === "active"
                         ? "bg-green-50 text-green-700"
                         : "bg-amber-50 text-amber-700"
@@ -973,6 +1211,57 @@ function ClientsPanel({
                       ? "Active"
                       : "Invited"}
                   </span>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#999] xl:hidden">
+                    Ενέργειες
+                  </p>
+
+                  {isEditing ? (
+                    <div className="mt-2 flex flex-wrap gap-2 xl:mt-0">
+                      <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() =>
+                          updateClientRole(client)
+                        }
+                        className="rounded-xl bg-[#222] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSaving
+                          ? "Αποθήκευση..."
+                          : "Save"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={cancelEditing}
+                        className="rounded-xl border border-black/10 px-4 py-2.5 text-xs font-bold transition hover:border-[#222] disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() =>
+                          removeClient(client)
+                        }
+                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditing(client)}
+                      className="mt-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-xs font-bold transition hover:border-[#222] hover:bg-[#F7F5F1] xl:mt-0"
+                    >
+                      Edit
+                    </button>
+                  )}
                 </div>
               </article>
             );
