@@ -161,7 +161,23 @@ const [invitationsError, setInvitationsError] =
           },
         );
   
-        const result = await response.json();
+        const responseText = await response.text();
+        
+        let result: {
+          error?: string;
+          invitation?: Invitation;
+        } = {};
+        
+        try {
+          result = responseText
+            ? JSON.parse(responseText)
+            : {};
+        } catch {
+          throw new Error(
+            responseText ||
+              `Server error (${response.status})`,
+          );
+        }
   
         if (response.status === 401) {
           await supabase.auth.signOut();
