@@ -589,6 +589,13 @@ useEffect(() => {
                   ),
                 );
               }}
+              onBusinessDeleted={(businessId) => {
+                setBusinesses((currentBusinesses) =>
+                  currentBusinesses.filter(
+                    (business) => business.id !== businessId,
+                  ),
+                );
+              }}
             />
             )}
 
@@ -735,6 +742,16 @@ function BusinessesPanel({
   
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+
+  const [deletingBusiness, setDeletingBusiness] =
+    useState<Business | null>(null);
+  
+  const [deleteConfirmation, setDeleteConfirmation] =
+    useState("");
+  const [deleteSaving, setDeleteSaving] =
+    useState(false);
+  const [deleteError, setDeleteError] =
+    useState("");
 
   function generateSlug(value: string) {
     return value
@@ -932,6 +949,92 @@ async function updateBusiness(
     setEditSaving(false);
   }
 }
+
+  function startDeletingBusiness(business: Business) {
+    setDeletingBusiness(business);
+    setDeleteConfirmation("");
+    setDeleteError("");
+  }
+  
+  function cancelDeletingBusiness() {
+    if (deleteSaving) {
+      return;
+    }
+  
+    setDeletingBusiness(null);
+    setDeleteConfirmation("");
+    setDeleteError("");
+  }
+  
+  async function deleteBusiness() {
+    if (!deletingBusiness) {
+      return;
+    }
+  
+    try {
+      setDeleteSaving(true);
+      setDeleteError("");
+  
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+  
+      if (sessionError) {
+        throw sessionError;
+      }
+  
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+  
+      const response = await fetch(
+        "/api/admin/businesses",
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            id: deletingBusiness.id,
+            confirm_slug: deleteConfirmation.trim(),
+          }),
+        },
+      );
+  
+      const result = await response.json();
+  
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+  
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Could not delete business",
+        );
+      }
+  
+      onBusinessDeleted(deletingBusiness.id);
+      cancelDeletingBusiness();
+    } catch (deleteBusinessError) {
+      console.error(
+        "Business deletion failed:",
+        deleteBusinessError,
+      );
+  
+      setDeleteError(
+        deleteBusinessError instanceof Error
+          ? deleteBusinessError.message
+          : "Δεν ήταν δυνατή η διαγραφή της επιχείρησης.",
+      );
+    } finally {
+      setDeleteSaving(false);
+    }
+  }
   
   const activeBusinesses = businesses.filter(
     (business) => business.status === "active",
@@ -1263,6 +1366,16 @@ async function updateBusiness(
                     >
                       Edit
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startDeletingBusiness(business)
+                      }
+                      className="w-full rounded-2xl border border-red-200 bg-red-50 px-7 py-4 text-sm font-bold text-[#DC2727] transition hover:border-[#DC2727] lg:w-auto"
+                    >
+                      Delete
+                    </button>
                   
                     <button
                       type="button"
@@ -1433,6 +1546,92 @@ async function updateBusiness(
           })}
         </div>
       )}
+
+      {deletingBusiness && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5 py-8">
+          <div className="w-full max-w-lg rounded-[28px] bg-white p-6 shadow-2xl sm:p-8">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Permanent deletion
+            </p>
+      
+            <h3 className="mt-4 text-3xl font-black tracking-[-0.04em]">
+              Διαγραφή επιχείρησης;
+            </h3>
+      
+            <p className="mt-4 text-sm leading-6 text-[#666]">
+              Πρόκειται να διαγράψεις οριστικά την επιχείρηση{" "}
+              <strong className="text-[#222]">
+                {deletingBusiness.name}
+              </strong>
+              .
+            </p>
+      
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-700">
+                Η ενέργεια δεν μπορεί να αναιρεθεί.
+              </p>
+            </div>
+      
+            <label className="mt-6 block">
+              <span className="text-xs font-bold uppercase tracking-[0.15em] text-[#666]">
+                Πληκτρολόγησε το slug για επιβεβαίωση
+              </span>
+      
+              <div className="mt-2 rounded-2xl bg-[#F7F5F1] px-4 py-3">
+                <code className="text-sm font-bold">
+                  {deletingBusiness.slug}
+                </code>
+              </div>
+      
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(event) =>
+                  setDeleteConfirmation(event.target.value)
+                }
+                autoComplete="off"
+                placeholder={deletingBusiness.slug}
+                className="mt-3 w-full rounded-2xl border border-black/10 px-4 py-4 font-mono text-sm outline-none transition focus:border-[#DC2727]"
+              />
+            </label>
+      
+            {deleteError && (
+              <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-red-700">
+                  {deleteError}
+                </p>
+              </div>
+            )}
+      
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={cancelDeletingBusiness}
+                disabled={deleteSaving}
+                className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
+              >
+                Ακύρωση
+              </button>
+      
+              <button
+                type="button"
+                onClick={deleteBusiness}
+                disabled={
+                  deleteSaving ||
+                  deleteConfirmation.trim() !==
+                    deletingBusiness.slug
+                }
+                className="rounded-2xl bg-[#DC2727] px-6 py-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {deleteSaving
+                  ? "Διαγραφή..."
+                  : "Οριστική διαγραφή"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 }
