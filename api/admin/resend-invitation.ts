@@ -292,7 +292,7 @@ export default async function handler(
       data: emailData,
       error: emailError,
     } = await resend.emails.send({
-      from: "Zisto <hello@zisto.app>",
+      from: "Zisto <hello@mail.zisto.app>",
       to: invitation.email,
       subject:
         "Η πρόσκλησή σου στο Zisto",
