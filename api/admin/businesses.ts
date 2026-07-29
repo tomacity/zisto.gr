@@ -37,7 +37,7 @@ export default async function handler(
 
   response.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, OPTIONS",
+    "GET, POST, PATCH, OPTIONS",
   );
 
   response.setHeader(
@@ -51,7 +51,8 @@ export default async function handler(
 
   if (
     request.method !== "GET" &&
-    request.method !== "POST"
+    request.method !== "POST" &&
+    request.method !== "PATCH"
   ) {
     return response.status(405).json({
       error: "Method not allowed",
@@ -165,6 +166,165 @@ export default async function handler(
 
       return response.status(200).json({
         businesses: businesses ?? [],
+      });
+    }
+
+    if (request.method === "PATCH") {
+      const body = (request.body ?? {}) as {
+        id?: unknown;
+        name?: unknown;
+        slug?: unknown;
+        timezone?: unknown;
+        status?: unknown;
+      };
+    
+      const id =
+        typeof body.id === "string"
+          ? body.id.trim()
+          : "";
+    
+      const name =
+        typeof body.name === "string"
+          ? body.name.trim()
+          : "";
+    
+      const requestedSlug =
+        typeof body.slug === "string"
+          ? body.slug.trim()
+          : "";
+    
+      const timezone =
+        typeof body.timezone === "string"
+          ? body.timezone.trim()
+          : "";
+    
+      const status =
+        typeof body.status === "string"
+          ? body.status.trim()
+          : "";
+    
+      if (!id) {
+        return response.status(400).json({
+          error: "Business ID is required",
+        });
+      }
+    
+      if (!name) {
+        return response.status(400).json({
+          error: "Business name is required",
+        });
+      }
+    
+      if (name.length > 120) {
+        return response.status(400).json({
+          error:
+            "Business name must be 120 characters or fewer",
+        });
+      }
+    
+      const slug = createSlug(requestedSlug || name);
+    
+      if (!slug) {
+        return response.status(400).json({
+          error: "A valid slug is required",
+        });
+      }
+    
+      if (slug.length > 100) {
+        return response.status(400).json({
+          error:
+            "Slug must be 100 characters or fewer",
+        });
+      }
+    
+      if (!timezone) {
+        return response.status(400).json({
+          error: "Timezone is required",
+        });
+      }
+    
+      if (
+        !ALLOWED_STATUSES.has(
+          status as BusinessStatus,
+        )
+      ) {
+        return response.status(400).json({
+          error: "Invalid business status",
+        });
+      }
+    
+      const {
+        data: existingBusiness,
+        error: existingBusinessError,
+      } = await supabaseAdmin
+        .from("businesses")
+        .select("id")
+        .eq("slug", slug)
+        .neq("id", id)
+        .maybeSingle();
+    
+      if (existingBusinessError) {
+        console.error(
+          "Business slug verification failed:",
+          existingBusinessError,
+        );
+    
+        return response.status(500).json({
+          error: "Could not verify business slug",
+        });
+      }
+    
+      if (existingBusiness) {
+        return response.status(409).json({
+          error:
+            "A business with this slug already exists",
+        });
+      }
+    
+      const {
+        data: business,
+        error: updateError,
+      } = await supabaseAdmin
+        .from("businesses")
+        .update({
+          name,
+          slug,
+          timezone,
+          status,
+        })
+        .eq("id", id)
+        .select(`
+          id,
+          name,
+          slug,
+          timezone,
+          status,
+          created_at,
+          updated_at
+        `)
+        .single();
+    
+      if (updateError) {
+        console.error(
+          "Business update failed:",
+          updateError,
+        );
+    
+        if (updateError.code === "23505") {
+          return response.status(409).json({
+            error:
+              "A business with this slug already exists",
+          });
+        }
+    
+        return response.status(500).json({
+          error: "Could not update business",
+        });
+      }
+    
+      return response.status(200).json({
+        success: true,
+        business,
       });
     }
 
