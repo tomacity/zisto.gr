@@ -14,6 +14,7 @@ type Business = {
   name: string;
   slug: string;
   timezone: string;
+  status: "active" | "inactive";
   created_at: string;
   updated_at: string;
 };
