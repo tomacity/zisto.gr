@@ -37,7 +37,7 @@ export default async function handler(
 
   response.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, PATCH, OPTIONS",
+    "GET, POST, PATCH, DELETE, OPTIONS",
   );
 
   response.setHeader(
@@ -52,7 +52,8 @@ export default async function handler(
   if (
     request.method !== "GET" &&
     request.method !== "POST" &&
-    request.method !== "PATCH"
+    request.method !== "PATCH" &&
+    request.method !== "DELETE"
   ) {
     return response.status(405).json({
       error: "Method not allowed",
@@ -166,6 +167,95 @@ export default async function handler(
 
       return response.status(200).json({
         businesses: businesses ?? [],
+      });
+    }
+
+    if (request.method === "DELETE") {
+      const body = (request.body ?? {}) as {
+        id?: unknown;
+        confirm_slug?: unknown;
+      };
+    
+      const id =
+        typeof body.id === "string"
+          ? body.id.trim()
+          : "";
+    
+      const confirmSlug =
+        typeof body.confirm_slug === "string"
+          ? body.confirm_slug.trim()
+          : "";
+    
+      if (!id) {
+        return response.status(400).json({
+          error: "Business ID is required",
+        });
+      }
+    
+      if (!confirmSlug) {
+        return response.status(400).json({
+          error: "Slug confirmation is required",
+        });
+      }
+    
+      const {
+        data: existingBusiness,
+        error: loadBusinessError,
+      } = await supabaseAdmin
+        .from("businesses")
+        .select("id, name, slug")
+        .eq("id", id)
+        .maybeSingle();
+    
+      if (loadBusinessError) {
+        console.error(
+          "Business lookup before deletion failed:",
+          loadBusinessError,
+        );
+    
+        return response.status(500).json({
+          error: "Could not verify business",
+        });
+      }
+    
+      if (!existingBusiness) {
+        return response.status(404).json({
+          error: "Business not found",
+        });
+      }
+    
+      if (existingBusiness.slug !== confirmSlug) {
+        return response.status(400).json({
+          error: "The confirmation slug does not match",
+        });
+      }
+    
+      const { error: deleteError } = await supabaseAdmin
+        .from("businesses")
+        .delete()
+        .eq("id", id);
+    
+      if (deleteError) {
+        console.error(
+          "Business deletion failed:",
+          deleteError,
+        );
+    
+        if (deleteError.code === "23503") {
+          return response.status(409).json({
+            error:
+              "Η επιχείρηση έχει συνδεδεμένους clients, invitations ή άλλα δεδομένα. Αφαίρεσε πρώτα τις συνδέσεις ή κάνε την επιχείρηση inactive.",
+          });
+        }
+    
+        return response.status(500).json({
+          error: "Could not delete business",
+        });
+      }
+    
+      return response.status(200).json({
+        success: true,
+        deleted_business_id: id,
       });
     }
 
