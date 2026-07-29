@@ -8,16 +8,28 @@ function setCorsHeaders(req, res) {
   const origin = req.headers.origin;
 
   if (origin && ALLOWED_ORIGINS.has(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      origin,
+    );
   }
 
   res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, OPTIONS",
+  );
+
   res.setHeader(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization",
   );
-  res.setHeader("Cache-Control", "no-store");
+
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate",
+  );
 }
 
 async function supabaseRequest({
@@ -29,16 +41,130 @@ async function supabaseRequest({
 }) {
   return fetch(`${supabaseUrl}${path}`, {
     method,
+
     headers: {
       apikey: supabaseSecretKey,
-      Authorization: `Bearer ${supabaseSecretKey}`,
+
+      Authorization:
+        `Bearer ${supabaseSecretKey}`,
+
       "Content-Type": "application/json",
+
       ...headers,
     },
   });
 }
 
-export default async function handler(req, res) {
+function getEventName(eventType) {
+  /*
+   * Το dashboard χρησιμοποιεί ακόμη review_click.
+   * Στη νέα βάση το event αποθηκεύεται ως review_open.
+   */
+  if (eventType === "review_open") {
+    return "review_click";
+  }
+
+  return eventType;
+}
+
+function getEventSource(event) {
+  const metadata =
+    event.metadata &&
+    typeof event.metadata === "object" &&
+    !Array.isArray(event.metadata)
+      ? event.metadata
+      : {};
+
+  const source =
+    typeof metadata.source === "string"
+      ? metadata.source.toLowerCase()
+      : "unknown";
+
+  const allowedSources = new Set([
+    "nfc",
+    "qr",
+    "direct",
+    "unknown",
+  ]);
+
+  return allowedSources.has(source)
+    ? source
+    : "unknown";
+}
+
+function normalizeEvent(event) {
+  return {
+    event_name: getEventName(
+      event.event_type,
+    ),
+
+    source: getEventSource(event),
+
+    session_id:
+      event.session_id ?? null,
+
+    visitor_id:
+      event.visitor_id ?? null,
+
+    metadata:
+      event.metadata &&
+      typeof event.metadata === "object" &&
+      !Array.isArray(event.metadata)
+        ? event.metadata
+        : {},
+
+    created_at: event.created_at,
+  };
+}
+
+function getUniqueVisitorCount(events) {
+  const identifiers = events
+    .map(
+      (event) =>
+        event.visitor_id ||
+        event.session_id,
+    )
+    .filter(Boolean);
+
+  return new Set(identifiers).size;
+}
+
+function countEvent(events, eventName) {
+  return events.filter(
+    (event) =>
+      event.event_name === eventName,
+  ).length;
+}
+
+function getStartOfToday(now) {
+  const date = new Date(now);
+
+  date.setHours(0, 0, 0, 0);
+
+  return date;
+}
+
+function getStartOfWeek(now) {
+  const date = new Date(now);
+
+  date.setDate(now.getDate() - 6);
+  date.setHours(0, 0, 0, 0);
+
+  return date;
+}
+
+function getStartOfMonth(now) {
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1,
+  );
+}
+
+export default async function handler(
+  req,
+  res,
+) {
   setCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -51,8 +177,11 @@ export default async function handler(req, res) {
     });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+  const supabaseUrl =
+    process.env.SUPABASE_URL;
+
+  const supabaseSecretKey =
+    process.env.SUPABASE_SECRET_KEY;
 
   if (!supabaseUrl || !supabaseSecretKey) {
     return res.status(500).json({
@@ -60,14 +189,17 @@ export default async function handler(req, res) {
     });
   }
 
-  const authorization = req.headers.authorization ?? "";
+  const authorization =
+    req.headers.authorization ?? "";
 
-  const accessToken = authorization.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : null;
+  const accessToken =
+    authorization.startsWith("Bearer ")
+      ? authorization.slice(7)
+      : null;
 
   const requestedBusinessId =
-    typeof req.query.business_id === "string"
+    typeof req.query.business_id ===
+    "string"
       ? req.query.business_id
       : null;
 
@@ -78,107 +210,171 @@ export default async function handler(req, res) {
   }
 
   try {
-    const userResponse = await supabaseRequest({
-      supabaseUrl,
-      supabaseSecretKey,
-      path: "/auth/v1/user",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+    /*
+     * 1. Επιβεβαίωση Supabase session.
+     */
+    const userResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path: "/auth/v1/user",
+
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+      });
 
     if (!userResponse.ok) {
       return res.status(401).json({
-        error: "Invalid or expired session",
+        error:
+          "Invalid or expired session",
       });
     }
 
     const user = await userResponse.json();
 
-    const adminQuery = new URLSearchParams({
-      user_id: `eq.${user.id}`,
-      select: "user_id",
-      limit: "1",
-    });
+    /*
+     * 2. Έλεγχος αν ο χρήστης είναι admin.
+     */
+    const adminQuery =
+      new URLSearchParams({
+        user_id: `eq.${user.id}`,
+        select: "user_id",
+        limit: "1",
+      });
 
-    const adminResponse = await supabaseRequest({
-      supabaseUrl,
-      supabaseSecretKey,
-      path: `/rest/v1/zisto_admins?${adminQuery.toString()}`,
-    });
+    const adminResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+
+        path:
+          `/rest/v1/zisto_admins?${adminQuery.toString()}`,
+      });
 
     if (!adminResponse.ok) {
-      const errorText = await adminResponse.text();
+      const errorText =
+        await adminResponse.text();
 
-      console.error("Admin query failed:", errorText);
+      console.error(
+        "Admin query failed:",
+        errorText,
+      );
 
       return res.status(500).json({
         error: "Failed to verify admin",
       });
     }
 
-    const admins = await adminResponse.json();
+    const admins =
+      await adminResponse.json();
+
     const isAdmin = admins.length > 0;
 
-    const membershipQuery = new URLSearchParams({
-      user_id: `eq.${user.id}`,
-      select: "business_id,role",
-      limit: "1",
-    });
+    /*
+     * 3. Φόρτωση business membership.
+     */
+    const membershipQuery =
+      new URLSearchParams({
+        user_id: `eq.${user.id}`,
+        select: "business_id,role",
+        limit: "1",
+      });
 
-    const membershipResponse = await supabaseRequest({
-      supabaseUrl,
-      supabaseSecretKey,
-      path: `/rest/v1/business_members?${membershipQuery.toString()}`,
-    });
+    const membershipResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+
+        path:
+          `/rest/v1/business_members?${membershipQuery.toString()}`,
+      });
 
     if (!membershipResponse.ok) {
-      const errorText = await membershipResponse.text();
+      const errorText =
+        await membershipResponse.text();
 
-      console.error("Membership query failed:", errorText);
+      console.error(
+        "Membership query failed:",
+        errorText,
+      );
 
       return res.status(500).json({
-        error: "Failed to load membership",
+        error:
+          "Failed to load membership",
       });
     }
 
-    const memberships = await membershipResponse.json();
-    const membership = memberships[0] ?? null;
+    const memberships =
+      await membershipResponse.json();
+
+    const membership =
+      memberships[0] ?? null;
 
     let businessId;
 
-    if (isAdmin && requestedBusinessId) {
-      businessId = requestedBusinessId;
+    if (
+      isAdmin &&
+      requestedBusinessId
+    ) {
+      businessId =
+        requestedBusinessId;
     } else {
       if (!membership) {
         return res.status(403).json({
-          error: "This user is not assigned to a business",
+          error:
+            "This user is not assigned to a business",
         });
       }
 
-      businessId = membership.business_id;
+      businessId =
+        membership.business_id;
     }
 
-    const businessQuery = new URLSearchParams({
-      id: `eq.${businessId}`,
-      select: "id,name,slug,timezone",
-      limit: "1",
-    });
+    /*
+     * 4. Queries για business, location
+     *    και τα νέα analytics events.
+     */
+    const businessQuery =
+      new URLSearchParams({
+        id: `eq.${businessId}`,
 
-    const locationQuery = new URLSearchParams({
-      business_id: `eq.${businessId}`,
-      select: "name",
-      order: "created_at.asc",
-      limit: "1",
-    });
+        select:
+          "id,name,slug,timezone",
 
-    const eventsQuery = new URLSearchParams({
-      business_id: `eq.${businessId}`,
-      select:
-        "event_name,source,session_id,metadata,created_at",
-      order: "created_at.desc",
-      limit: "10000",
-    });
+        limit: "1",
+      });
+
+    const locationQuery =
+      new URLSearchParams({
+        business_id:
+          `eq.${businessId}`,
+
+        select: "name",
+
+        order: "created_at.asc",
+
+        limit: "1",
+      });
+
+    const eventsQuery =
+      new URLSearchParams({
+        business_id:
+          `eq.${businessId}`,
+
+        select: [
+          "event_type",
+          "session_id",
+          "visitor_id",
+          "metadata",
+          "created_at",
+        ].join(","),
+
+        order: "created_at.desc",
+
+        limit: "10000",
+      });
 
     const [
       businessResponse,
@@ -188,17 +384,25 @@ export default async function handler(req, res) {
       supabaseRequest({
         supabaseUrl,
         supabaseSecretKey,
-        path: `/rest/v1/businesses?${businessQuery.toString()}`,
+
+        path:
+          `/rest/v1/businesses?${businessQuery.toString()}`,
       }),
+
       supabaseRequest({
         supabaseUrl,
         supabaseSecretKey,
-        path: `/rest/v1/locations?${locationQuery.toString()}`,
+
+        path:
+          `/rest/v1/locations?${locationQuery.toString()}`,
       }),
+
       supabaseRequest({
         supabaseUrl,
         supabaseSecretKey,
-        path: `/rest/v1/events?${eventsQuery.toString()}`,
+
+        path:
+          `/rest/v1/analytics_events?${eventsQuery.toString()}`,
       }),
     ]);
 
@@ -207,25 +411,42 @@ export default async function handler(req, res) {
       !locationResponse.ok ||
       !eventsResponse.ok
     ) {
-      console.error("Analytics data query failed", {
-        business: await businessResponse.text(),
-        location: await locationResponse.text(),
-        events: await eventsResponse.text(),
-      });
+      const businessError =
+        await businessResponse.text();
+
+      const locationError =
+        await locationResponse.text();
+
+      const eventsError =
+        await eventsResponse.text();
+
+      console.error(
+        "Analytics data query failed",
+        {
+          business: businessError,
+          location: locationError,
+          events: eventsError,
+        },
+      );
 
       return res.status(500).json({
-        error: "Failed to load analytics",
+        error:
+          "Failed to load analytics",
       });
     }
 
-    const [businesses, locations, events] =
-      await Promise.all([
-        businessResponse.json(),
-        locationResponse.json(),
-        eventsResponse.json(),
-      ]);
+    const [
+      businesses,
+      locations,
+      rawEvents,
+    ] = await Promise.all([
+      businessResponse.json(),
+      locationResponse.json(),
+      eventsResponse.json(),
+    ]);
 
-    const business = businesses[0];
+    const business =
+      businesses[0];
 
     if (!business) {
       return res.status(404).json({
@@ -233,66 +454,71 @@ export default async function handler(req, res) {
       });
     }
 
+    /*
+     * Μετατροπή του νέου schema στο format
+     * που ήδη περιμένει το React dashboard.
+     */
+    const events =
+      rawEvents.map(normalizeEvent);
+
     const now = new Date();
 
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
+    const startOfToday =
+      getStartOfToday(now);
 
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - 6);
-    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfWeek =
+      getStartOfWeek(now);
 
-    const startOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1,
-    );
+    const startOfMonth =
+      getStartOfMonth(now);
 
-    const todayEvents = events.filter(
-      (event) => new Date(event.created_at) >= startOfToday,
-    );
+    const todayEvents =
+      events.filter(
+        (event) =>
+          new Date(event.created_at) >=
+          startOfToday,
+      );
 
-    const weekEvents = events.filter(
-      (event) => new Date(event.created_at) >= startOfWeek,
-    );
+    const weekEvents =
+      events.filter(
+        (event) =>
+          new Date(event.created_at) >=
+          startOfWeek,
+      );
 
-    const monthEvents = events.filter(
-      (event) => new Date(event.created_at) >= startOfMonth,
-    );
+    const monthEvents =
+      events.filter(
+        (event) =>
+          new Date(event.created_at) >=
+          startOfMonth,
+      );
 
-    const countEvent = (list, eventName) =>
-      list.filter(
-        (event) => event.event_name === eventName,
-      ).length;
+    const pageViewsToday =
+      countEvent(
+        todayEvents,
+        "page_view",
+      );
 
-    const uniqueSessions = (list) =>
-      new Set(
-        list
-          .map((event) => event.session_id)
-          .filter(Boolean),
-      ).size;
+    const menuOpensToday =
+      countEvent(
+        todayEvents,
+        "menu_open",
+      );
 
-    const pageViewsToday = countEvent(
-      todayEvents,
-      "page_view",
-    );
-
-    const menuOpensToday = countEvent(
-      todayEvents,
-      "menu_open",
-    );
-
-    const reviewClicksToday = countEvent(
-      todayEvents,
-      "review_click",
-    );
+    const reviewClicksToday =
+      countEvent(
+        todayEvents,
+        "review_click",
+      );
 
     const reviewConversionRate =
       pageViewsToday > 0
         ? Number(
             (
-              (reviewClicksToday / pageViewsToday) *
-              100
+              (
+                reviewClicksToday /
+                pageViewsToday
+              ) * 100
             ).toFixed(1),
           )
         : 0;
@@ -301,58 +527,100 @@ export default async function handler(req, res) {
       pageViewsToday > 0
         ? Number(
             (
-              (menuOpensToday / pageViewsToday) *
-              100
+              (
+                menuOpensToday /
+                pageViewsToday
+              ) * 100
             ).toFixed(1),
           )
         : 0;
 
-    const sourceCounts = events.reduce(
-      (accumulator, event) => {
-        const source = event.source || "unknown";
+    /*
+     * Οι πηγές υπολογίζονται μόνο από page views.
+     * Έτσι ένα menu click δεν μετράει ξανά
+     * σαν δεύτερη επίσκεψη NFC.
+     */
+    const pageViewEvents =
+      events.filter(
+        (event) =>
+          event.event_name ===
+          "page_view",
+      );
 
-        accumulator[source] =
-          (accumulator[source] || 0) + 1;
+    const sourceCounts =
+      pageViewEvents.reduce(
+        (accumulator, event) => {
+          const source =
+            event.source || "unknown";
 
-        return accumulator;
-      },
-      {},
-    );
+          accumulator[source] =
+            (accumulator[source] || 0) +
+            1;
 
+          return accumulator;
+        },
+        {},
+      );
+
+    /*
+     * Δραστηριότητα τελευταίων 7 ημερών.
+     */
     const dailyActivity = [];
 
-    for (let offset = 6; offset >= 0; offset -= 1) {
+    for (
+      let offset = 6;
+      offset >= 0;
+      offset -= 1
+    ) {
       const day = new Date(now);
 
-      day.setDate(now.getDate() - offset);
+      day.setDate(
+        now.getDate() - offset,
+      );
+
       day.setHours(0, 0, 0, 0);
 
-      const nextDay = new Date(day);
-      nextDay.setDate(day.getDate() + 1);
+      const nextDay =
+        new Date(day);
 
-      const dayEvents = events.filter((event) => {
-        const createdAt = new Date(event.created_at);
+      nextDay.setDate(
+        day.getDate() + 1,
+      );
 
-        return createdAt >= day && createdAt < nextDay;
-      });
+      const dayEvents =
+        events.filter((event) => {
+          const createdAt =
+            new Date(event.created_at);
+
+          return (
+            createdAt >= day &&
+            createdAt < nextDay
+          );
+        });
 
       dailyActivity.push({
-        date: day.toISOString().slice(0, 10),
+        date:
+          day
+            .toISOString()
+            .slice(0, 10),
 
-        page_views: countEvent(
-          dayEvents,
-          "page_view",
-        ),
+        page_views:
+          countEvent(
+            dayEvents,
+            "page_view",
+          ),
 
-        menu_opens: countEvent(
-          dayEvents,
-          "menu_open",
-        ),
+        menu_opens:
+          countEvent(
+            dayEvents,
+            "menu_open",
+          ),
 
-        review_clicks: countEvent(
-          dayEvents,
-          "review_click",
-        ),
+        review_clicks:
+          countEvent(
+            dayEvents,
+            "review_click",
+          ),
       });
     }
 
@@ -371,28 +639,38 @@ export default async function handler(req, res) {
       },
 
       totals: {
-        page_views_today: pageViewsToday,
+        page_views_today:
+          pageViewsToday,
 
-        page_views_week: countEvent(
-          weekEvents,
-          "page_view",
-        ),
+        page_views_week:
+          countEvent(
+            weekEvents,
+            "page_view",
+          ),
 
-        page_views_month: countEvent(
-          monthEvents,
-          "page_view",
-        ),
+        page_views_month:
+          countEvent(
+            monthEvents,
+            "page_view",
+          ),
 
         unique_visitors_today:
-          uniqueSessions(todayEvents),
+          getUniqueVisitorCount(
+            todayEvents,
+          ),
 
         unique_visitors_week:
-          uniqueSessions(weekEvents),
+          getUniqueVisitorCount(
+            weekEvents,
+          ),
 
         unique_visitors_month:
-          uniqueSessions(monthEvents),
+          getUniqueVisitorCount(
+            monthEvents,
+          ),
 
-        menu_opens_today: menuOpensToday,
+        menu_opens_today:
+          menuOpensToday,
 
         review_clicks_today:
           reviewClicksToday,
@@ -405,18 +683,30 @@ export default async function handler(req, res) {
       },
 
       sources: {
-        nfc: sourceCounts.nfc || 0,
-        qr: sourceCounts.qr || 0,
-        direct: sourceCounts.direct || 0,
-        unknown: sourceCounts.unknown || 0,
+        nfc:
+          sourceCounts.nfc || 0,
+
+        qr:
+          sourceCounts.qr || 0,
+
+        direct:
+          sourceCounts.direct || 0,
+
+        unknown:
+          sourceCounts.unknown || 0,
       },
 
-      daily_activity: dailyActivity,
+      daily_activity:
+        dailyActivity,
 
-      recent_activity: events.slice(0, 10),
+      recent_activity:
+        events.slice(0, 10),
     });
   } catch (error) {
-    console.error("Analytics API error:", error);
+    console.error(
+      "Analytics API error:",
+      error,
+    );
 
     return res.status(500).json({
       error: "Internal server error",
