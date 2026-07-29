@@ -570,17 +570,26 @@ useEffect(() => {
             </div>
 
             {activeAdminTab === "businesses" && (
-              <BusinessesPanel
-                businesses={businesses}
-                loading={businessesLoading}
-                error={businessesError}
-                onBusinessCreated={(business) => {
-                  setBusinesses((currentBusinesses) => [
-                    business,
-                    ...currentBusinesses,
-                  ]);
-                }}
-              />
+            <BusinessesPanel
+              businesses={businesses}
+              loading={businessesLoading}
+              error={businessesError}
+              onBusinessCreated={(business) => {
+                setBusinesses((currentBusinesses) => [
+                  business,
+                  ...currentBusinesses,
+                ]);
+              }}
+              onBusinessUpdated={(updatedBusiness) => {
+                setBusinesses((currentBusinesses) =>
+                  currentBusinesses.map((business) =>
+                    business.id === updatedBusiness.id
+                      ? updatedBusiness
+                      : business,
+                  ),
+                );
+              }}
+            />
             )}
 
             {activeAdminTab === "clients" && (
@@ -694,11 +703,13 @@ function BusinessesPanel({
   loading,
   error,
   onBusinessCreated,
+  onBusinessUpdated,
 }: {
   businesses: Business[];
   loading: boolean;
   error: string;
   onBusinessCreated: (business: Business) => void;
+  onBusinessUpdated: (business: Business) => void;
 }) {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -711,6 +722,19 @@ function BusinessesPanel({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [editingBusinessId, setEditingBusinessId] =
+    useState<string | null>(null);
+  
+  const [editName, setEditName] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editTimezone, setEditTimezone] =
+    useState("Europe/Athens");
+  
+  const [editStatus, setEditStatus] =
+    useState<Business["status"]>("active");
+  
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
   function generateSlug(value: string) {
     return value
@@ -820,6 +844,95 @@ function BusinessesPanel({
     }
   }
 
+  function startEditingBusiness(business: Business) {
+  setEditingBusinessId(business.id);
+  setEditName(business.name);
+  setEditSlug(business.slug);
+  setEditTimezone(business.timezone);
+  setEditStatus(business.status);
+  setEditError("");
+}
+
+function cancelEditingBusiness() {
+  setEditingBusinessId(null);
+  setEditName("");
+  setEditSlug("");
+  setEditTimezone("Europe/Athens");
+  setEditStatus("active");
+  setEditError("");
+}
+
+async function updateBusiness(
+  businessId: string,
+) {
+  try {
+    setEditSaving(true);
+    setEditError("");
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw sessionError;
+    }
+
+    if (!session) {
+      window.location.hash = "/login";
+      return;
+    }
+
+    const response = await fetch(
+      "/api/admin/businesses",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: businessId,
+          name: editName.trim(),
+          slug: editSlug.trim(),
+          timezone: editTimezone.trim(),
+          status: editStatus,
+        }),
+      },
+    );
+
+    const result = await response.json();
+
+    if (response.status === 401) {
+      await supabase.auth.signOut();
+      window.location.hash = "/login";
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        result.error || "Could not update business",
+      );
+    }
+
+    onBusinessUpdated(result.business);
+    cancelEditingBusiness();
+  } catch (updateError) {
+    console.error(
+      "Business update failed:",
+      updateError,
+    );
+
+    setEditError(
+      updateError instanceof Error
+        ? updateError.message
+        : "Δεν ήταν δυνατή η ενημέρωση της επιχείρησης.",
+    );
+  } finally {
+    setEditSaving(false);
+  }
+}
+  
   const activeBusinesses = businesses.filter(
     (business) => business.status === "active",
   ).length;
@@ -1140,17 +1253,175 @@ function BusinessesPanel({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.hash =
-                        `/dashboard?business=${business.id}`;
-                    }}
-                    className="w-full rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
-                  >
-                    Άνοιγμα Dashboard →
-                  </button>
+                  <div className="flex w-full flex-col gap-3 lg:w-auto">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startEditingBusiness(business)
+                      }
+                      className="w-full rounded-2xl border border-black/10 bg-white px-7 py-4 text-sm font-bold transition hover:border-[#222] lg:w-auto"
+                    >
+                      Edit
+                    </button>
+                  
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.hash =
+                          `/dashboard?business=${business.id}`;
+                      }}
+                      className="w-full rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
+                    >
+                      Άνοιγμα Dashboard →
+                    </button>
+                  </div>
                 </div>
+
+                {editingBusinessId === business.id && (
+                <div className="border-t border-black/10 bg-white p-6 sm:p-8">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                      Edit business
+                    </p>
+              
+                    <h4 className="mt-3 text-2xl font-black tracking-[-0.04em]">
+                      Επεξεργασία Επιχείρησης
+                    </h4>
+                  </div>
+              
+                  <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                    <label className="block sm:col-span-2">
+                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                        Business name
+                      </span>
+              
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(event) =>
+                          setEditName(event.target.value)
+                        }
+                        maxLength={120}
+                        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+                      />
+                    </label>
+              
+                    <label className="block">
+                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                        Slug
+                      </span>
+              
+                      <div className="mt-2 flex overflow-hidden rounded-2xl border border-black/10 bg-[#F7F5F1] focus-within:border-[#222]">
+                        <span className="flex items-center border-r border-black/10 px-4 font-mono text-sm text-[#888]">
+                          /
+                        </span>
+              
+                        <input
+                          type="text"
+                          value={editSlug}
+                          onChange={(event) =>
+                            setEditSlug(
+                              generateSlug(event.target.value),
+                            )
+                          }
+                          maxLength={100}
+                          className="min-w-0 flex-1 bg-transparent px-4 py-4 font-mono text-sm outline-none"
+                        />
+                      </div>
+                    </label>
+              
+                    <label className="block">
+                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                        Timezone
+                      </span>
+              
+                      <select
+                        value={editTimezone}
+                        onChange={(event) =>
+                          setEditTimezone(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+                      >
+                        <option value="Europe/Athens">
+                          Europe/Athens
+                        </option>
+              
+                        <option value="Europe/London">
+                          Europe/London
+                        </option>
+              
+                        <option value="Europe/Paris">
+                          Europe/Paris
+                        </option>
+              
+                        <option value="America/New_York">
+                          America/New_York
+                        </option>
+              
+                        <option value="America/Los_Angeles">
+                          America/Los_Angeles
+                        </option>
+                      </select>
+                    </label>
+              
+                    <label className="block sm:col-span-2">
+                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                        Status
+                      </span>
+              
+                      <select
+                        value={editStatus}
+                        onChange={(event) =>
+                          setEditStatus(
+                            event.target.value as Business["status"],
+                          )
+                        }
+                        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </label>
+                  </div>
+              
+                  {editError && (
+                    <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+                      <p className="text-sm font-semibold text-red-700">
+                        {editError}
+                      </p>
+                    </div>
+                  )}
+              
+                  <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={cancelEditingBusiness}
+                      disabled={editSaving}
+                      className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
+                    >
+                      Ακύρωση
+                    </button>
+              
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateBusiness(business.id)
+                      }
+                      disabled={
+                        editSaving ||
+                        !editName.trim() ||
+                        !editSlug.trim() ||
+                        !editTimezone.trim()
+                      }
+                      className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {editSaving
+                        ? "Αποθήκευση..."
+                        : "Αποθήκευση αλλαγών"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
                 <div className="border-t border-black/8 bg-[#F7F5F1] px-6 py-4 sm:px-8">
                   <p className="font-mono text-[10px] text-[#999]">
