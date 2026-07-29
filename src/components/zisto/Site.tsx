@@ -11,7 +11,7 @@ import { supabase } from "../../lib/supabase";
 import { AdminPage } from "../../pages/AdminPage";
 
 const WORDMARK = "/images/zisto-wordmark.png";
-const WORDMARKWHITE = "/images/zisto-wormark-white.png";
+const WORDMARKWHITE = "/images/zisto-wordmark-white.png";
 const MONOGRAM = "/images/zisto-monogram.png";
 
 const RED = "#DC2727";
