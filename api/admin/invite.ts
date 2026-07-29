@@ -339,9 +339,27 @@ export default async function handler(
           html: `
             <div style="font-family:Arial,sans-serif;background:#f4f4f2;padding:40px 16px;">
               <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:24px;padding:40px;">
-                <h2 style="margin:0;font-size:28px;color:#222222;">
-                  ZISTO<span style="color:#DC2727;">.</span>
-                </h2>
+              
+              <a
+                href="https://zisto.app"
+                target="_blank"
+                style="display:inline-block;text-decoration:none;"
+              >
+                <img
+                  src="https://zisto.app/images/zisto-wordmark.png"
+                  alt="Zisto"
+                  width="130"
+                  style="
+                    display:block;
+                    width:130px;
+                    max-width:100%;
+                    height:auto;
+                    border:0;
+                    outline:none;
+                    text-decoration:none;
+                  "
+                />
+              </a>
 
                 <h1 style="font-size:42px;line-height:1;margin-top:28px;color:#222222;">
                   Καλώς ήρθες<br />στο Zisto.
