@@ -152,30 +152,82 @@ export default async function handler(
           project_key,
           status,
           created_at,
-          updated_at,
-          businesses (
-            id,
-            name,
-            slug
-          )
+          updated_at
         `)
         .order("created_at", {
           ascending: false,
         });
-
+    
       if (projectsError) {
         console.error(
           "Projects loading failed:",
           projectsError,
         );
-
+    
         return response.status(500).json({
-          error: "Could not load connected projects",
+          error: projectsError.message,
+          code: projectsError.code,
+          details: projectsError.details,
         });
       }
-
+    
+      const businessIds = [
+        ...new Set(
+          (projects ?? []).map(
+            (project) => project.business_id,
+          ),
+        ),
+      ];
+    
+      let businessesById = new Map<
+        string,
+        {
+          id: string;
+          name: string;
+          slug: string;
+        }
+      >();
+    
+      if (businessIds.length > 0) {
+        const {
+          data: businesses,
+          error: businessesError,
+        } = await supabaseAdmin
+          .from("businesses")
+          .select("id, name, slug")
+          .in("id", businessIds);
+    
+        if (businessesError) {
+          console.error(
+            "Project businesses loading failed:",
+            businessesError,
+          );
+    
+          return response.status(500).json({
+            error: businessesError.message,
+            code: businessesError.code,
+            details: businessesError.details,
+          });
+        }
+    
+        businessesById = new Map(
+          (businesses ?? []).map((business) => [
+            business.id,
+            business,
+          ]),
+        );
+      }
+    
+      const projectsWithBusinesses =
+        (projects ?? []).map((project) => ({
+          ...project,
+          businesses:
+            businessesById.get(project.business_id) ??
+            null,
+        }));
+    
       return response.status(200).json({
-        projects: projects ?? [],
+        projects: projectsWithBusinesses,
       });
     }
 
@@ -313,7 +365,7 @@ export default async function handler(
     }
 
     const {
-      data: project,
+      data: createdProject,
       error: createError,
     } = await supabaseAdmin
       .from("connected_projects")
@@ -333,12 +385,7 @@ export default async function handler(
         project_key,
         status,
         created_at,
-        updated_at,
-        businesses (
-          id,
-          name,
-          slug
-        )
+        updated_at
       `)
       .single();
 
@@ -366,10 +413,20 @@ export default async function handler(
       });
     }
 
+    const project = {
+      ...createdProject,
+      businesses: {
+        id: business.id,
+        name: business.name,
+        slug: business.slug,
+      },
+    };
+    
     return response.status(201).json({
       success: true,
       project,
     });
+    
   } catch (error) {
     console.error(
       "Admin projects API error:",
