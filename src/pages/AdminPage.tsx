@@ -775,13 +775,22 @@ useEffect(() => {
               />
             )}
 
-              {activeAdminTab === "invitations" && (
-                <InvitationsPanel
-                  invitations={invitations}
-                  loading={invitationsLoading}
-                  error={invitationsError}
-                />
-              )}
+            {activeAdminTab === "invitations" && (
+              <InvitationsPanel
+                invitations={invitations}
+                loading={invitationsLoading}
+                error={invitationsError}
+                onInvitationUpdated={(updatedInvitation) => {
+                  setInvitations((currentInvitations) =>
+                    currentInvitations.map((invitation) =>
+                      invitation.id === updatedInvitation.id
+                        ? updatedInvitation
+                        : invitation,
+                    ),
+                  );
+                }}
+              />
+            )}
 
               {activeAdminTab === "invite" && (
                 <InviteClientPanel
@@ -2770,10 +2779,14 @@ function InvitationsPanel({
   invitations,
   loading,
   error,
+  onInvitationUpdated,
 }: {
   invitations: Invitation[];
   loading: boolean;
   error: string;
+  onInvitationUpdated: (
+    invitation: Invitation,
+  ) => void;
 }) {
   if (loading) {
     return (
