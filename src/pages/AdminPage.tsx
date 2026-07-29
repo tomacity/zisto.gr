@@ -781,9 +781,9 @@ function AdminSidebar({
             className="inline-flex"
           >
             <img
-              src="/images/zisto-wordmark.png"
+              src="/images/zisto-wordmark-white.png"
               alt="Zisto"
-              className="h-7 w-auto invert"
+              className="h-7 w-auto"
             />
           </a>
 
