@@ -137,6 +137,7 @@ type Invitation = {
 };
 
 export function AdminPage() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projects, setProjects] =
     useState<ConnectedProject[]>([]);
   
@@ -645,12 +646,45 @@ useEffect(() => {
         <AdminSidebar
           activeTab={activeAdminTab}
           adminEmail={adminEmail}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
           onTabChange={setActiveAdminTab}
           onLogout={handleLogout}
         />
+
+        {sidebarOpen && (
+          <button
+            type="button"
+            aria-label="Κλείσιμο μενού"
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+          />
+        )}
   
-        <section className="min-w-0 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
-          <div className="mx-auto w-full max-w-[1250px]">
+          <section className="min-w-0">
+            <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-black/5 bg-[#F7F5F1]/90 px-5 backdrop-blur-xl sm:px-8 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white text-xl"
+                aria-label="Άνοιγμα μενού"
+                aria-expanded={sidebarOpen}
+              >
+                ☰
+              </button>
+          
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35">
+                Admin Dashboard
+              </p>
+          
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-[#222] text-xs font-black uppercase text-white">
+                {adminEmail.charAt(0) || "A"}
+              </div>
+            </header>
+          
+            <div className="px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+              <div className="mx-auto w-full max-w-[1250px]">
+        
             <header className="border-b border-black/10 pb-8">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
                 Admin workspace
@@ -748,11 +782,12 @@ useEffect(() => {
                 />
               )}
   
-              {activeAdminTab === "invite" && (
-                <InviteClientPanel
-                  businesses={businesses}
-                />
-              )}
+                {activeAdminTab === "invite" && (
+                  <InviteClientPanel
+                    businesses={businesses}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -764,18 +799,29 @@ useEffect(() => {
 function AdminSidebar({
   activeTab,
   adminEmail,
+  sidebarOpen,
+  setSidebarOpen,
   onTabChange,
   onLogout,
 }: {
   activeTab: AdminTab;
   adminEmail: string;
+  sidebarOpen: boolean;
+  setSidebarOpen: (value: boolean) => void;
   onTabChange: (tab: AdminTab) => void;
   onLogout: () => void;
 }) {
   return (
-    <aside className="border-b border-black/10 bg-[#222] text-white lg:sticky lg:top-0 lg:h-screen lg:border-b-0">
+    <aside
+      className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-[#222] text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:static lg:h-screen lg:translate-x-0 lg:shadow-none ${
+        sidebarOpen
+          ? "translate-x-0"
+          : "-translate-x-full"
+      }`}
+    >
       <div className="flex h-full flex-col p-5 sm:p-7">
-        <div>
+       <div>
+        <div className="flex items-center justify-between">
           <a
             href="https://zisto.app"
             className="inline-flex"
@@ -786,11 +832,20 @@ function AdminSidebar({
               className="h-7 w-auto"
             />
           </a>
-
-          <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.24em] text-white/40">
-            Admin dashboard
-          </p>
+      
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-[24px] font-light text-white lg:hidden"
+          >
+            ×
+          </button>
         </div>
+      
+        <p className="mt-8 text-[10px] font-bold uppercase tracking-[0.24em] text-white/40">
+          Admin dashboard
+        </p>
+      </div>
 
         <nav className="mt-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
           {ADMIN_TABS.map((tab) => {
@@ -801,9 +856,12 @@ function AdminSidebar({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() =>
-                  onTabChange(tab.id)
-                }
+
+                onClick={() => {
+                  onTabChange(tab.id);
+                  setSidebarOpen(false);
+                }}
+                
                 className={`flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left text-sm font-bold transition ${
                   isActive
                     ? "bg-white text-[#222]"
