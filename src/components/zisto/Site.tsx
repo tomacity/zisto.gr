@@ -2331,6 +2331,324 @@ function RecentActivity({ events }: { events: AnalyticsEvent[] }) {
 /* ================================================================== */
 /*  DASHBOARD PAGE                                                    */
 /* ================================================================== */
+function AnalyticsTab({
+  analytics,
+}: {
+  analytics: AnalyticsResponse;
+}) {
+  const totalSources =
+    analytics.sources.nfc +
+    analytics.sources.qr +
+    analytics.sources.direct +
+    analytics.sources.unknown;
+
+  const sourceItems = [
+    {
+      label: "NFC",
+      value: analytics.sources.nfc,
+    },
+    {
+      label: "QR code",
+      value: analytics.sources.qr,
+    },
+    {
+      label: "Direct",
+      value: analytics.sources.direct,
+    },
+    {
+      label: "Άγνωστο",
+      value: analytics.sources.unknown,
+    },
+  ];
+
+  const maxDailyViews = Math.max(
+    ...analytics.daily_activity.map(
+      (item) => item.page_views,
+    ),
+    1,
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Κεντρικές μετρήσεις */}
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: "Επισκέψεις σήμερα",
+            value:
+              analytics.totals.page_views_today,
+            note: `${analytics.totals.unique_visitors_today} μοναδικοί`,
+          },
+          {
+            label: "Επισκέψεις εβδομάδας",
+            value:
+              analytics.totals.page_views_week,
+            note: `${analytics.totals.unique_visitors_week} μοναδικοί`,
+          },
+          {
+            label: "Επισκέψεις μήνα",
+            value:
+              analytics.totals.page_views_month,
+            note: `${analytics.totals.unique_visitors_month} μοναδικοί`,
+          },
+          {
+            label: "Συνολικό conversion",
+            value: `${percentFormatter.format(
+              Math.max(
+                analytics.totals
+                  .menu_conversion_rate,
+                analytics.totals
+                  .review_conversion_rate,
+              ),
+            )}%`,
+            note: "Καλύτερη σημερινή ενέργεια",
+          },
+        ].map((item, index) => (
+          <article
+            key={item.label}
+            className={`min-h-[190px] rounded-[20px] border p-6 ${
+              index === 0
+                ? "border-[#222] bg-[#222] text-white"
+                : "border-black/10 bg-white text-[#222]"
+            }`}
+          >
+            <p
+              className={`text-[9px] font-bold uppercase tracking-[0.2em] ${
+                index === 0
+                  ? "text-white/45"
+                  : "text-[#222]/35"
+              }`}
+            >
+              {item.label}
+            </p>
+
+            <p className="mt-8 text-[44px] font-black leading-none tracking-[-0.05em]">
+              {typeof item.value === "number"
+                ? numberFormatter.format(
+                    item.value,
+                  )
+                : item.value}
+            </p>
+
+            <p
+              className={`mt-5 text-[11px] ${
+                index === 0
+                  ? "text-white/45"
+                  : "text-[#222]/40"
+              }`}
+            >
+              {item.note}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      {/* Γράφημα + πηγές */}
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Activity
+              </p>
+
+              <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+                Επισκέψεις τελευταίων 7 ημερών
+              </h2>
+            </div>
+
+            <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/40">
+              Live data
+            </span>
+          </div>
+
+          <div className="mt-10 flex h-[280px] items-end gap-3 md:gap-5">
+            {analytics.daily_activity.map(
+              (item) => {
+                const height =
+                  item.page_views === 0
+                    ? 4
+                    : Math.max(
+                        12,
+                        (item.page_views /
+                          maxDailyViews) *
+                          100,
+                      );
+
+                return (
+                  <div
+                    key={item.date}
+                    className="flex min-w-0 flex-1 flex-col items-center justify-end"
+                  >
+                    <span className="mb-3 text-[10px] font-bold text-[#222]/40">
+                      {item.page_views}
+                    </span>
+
+                    <div className="flex h-[210px] w-full items-end rounded-[8px] bg-[#F1F1EF]">
+                      <div
+                        className="w-full rounded-[8px] bg-[#222] transition-all duration-500"
+                        style={{
+                          height: `${height}%`,
+                        }}
+                      />
+                    </div>
+
+                    <span className="mt-4 text-[9px] font-bold uppercase text-[#222]/35">
+                      {new Intl.DateTimeFormat(
+                        "el-GR",
+                        {
+                          weekday: "short",
+                          timeZone:
+                            "Europe/Athens",
+                        },
+                      ).format(
+                        new Date(
+                          `${item.date}T12:00:00`,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                );
+              },
+            )}
+          </div>
+        </article>
+
+        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-4">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Traffic sources
+          </p>
+
+          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+            Από πού έρχονται
+          </h2>
+
+          <div className="mt-8 space-y-6">
+            {sourceItems.map((source) => {
+              const percentage =
+                totalSources > 0
+                  ? (source.value /
+                      totalSources) *
+                    100
+                  : 0;
+
+              return (
+                <div key={source.label}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-bold">
+                      {source.label}
+                    </span>
+
+                    <span className="text-[11px] font-bold text-[#222]/40">
+                      {numberFormatter.format(
+                        source.value,
+                      )}{" "}
+                      ·{" "}
+                      {percentFormatter.format(
+                        percentage,
+                      )}
+                      %
+                    </span>
+                  </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#EEEEEC]">
+                    <div
+                      className="h-full rounded-full bg-[#DC2727] transition-all duration-500"
+                      style={{
+                        width: `${percentage}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      </section>
+
+      {/* Conversions */}
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Menu conversion
+          </p>
+
+          <div className="mt-6 flex items-end justify-between gap-4">
+            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
+              {percentFormatter.format(
+                analytics.totals
+                  .menu_conversion_rate,
+              )}
+              %
+            </p>
+
+            <p className="text-right text-[11px] leading-relaxed text-[#222]/40">
+              {
+                analytics.totals
+                  .menu_opens_today
+              }{" "}
+              ανοίγματα σήμερα
+            </p>
+          </div>
+
+          <div className="mt-8 h-3 overflow-hidden rounded-full bg-[#EEEEEC]">
+            <div
+              className="h-full rounded-full bg-[#222]"
+              style={{
+                width: `${Math.min(
+                  analytics.totals
+                    .menu_conversion_rate,
+                  100,
+                )}%`,
+              }}
+            />
+          </div>
+        </article>
+
+        <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
+            Review conversion
+          </p>
+
+          <div className="mt-6 flex items-end justify-between gap-4">
+            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
+              {percentFormatter.format(
+                analytics.totals
+                  .review_conversion_rate,
+              )}
+              %
+            </p>
+
+            <p className="text-right text-[11px] leading-relaxed text-white/55">
+              {
+                analytics.totals
+                  .review_clicks_today
+              }{" "}
+              clicks σήμερα
+            </p>
+          </div>
+
+          <div className="mt-8 h-3 overflow-hidden rounded-full bg-white/20">
+            <div
+              className="h-full rounded-full bg-white"
+              style={{
+                width: `${Math.min(
+                  analytics.totals
+                    .review_conversion_rate,
+                  100,
+                )}%`,
+              }}
+            />
+          </div>
+        </article>
+      </section>
+
+      <RecentActivity
+        events={analytics.recent_activity}
+      />
+    </div>
+  );
+}
 
 function DashboardTabPlaceholder({
   tab,
@@ -2909,108 +3227,21 @@ function DashboardPage({
                 window.location.hash = "/login";
               }}
             />
-          ) : activeTab === "overview" ? (
+
+          {activeTab === "overview" ? (
             <>
-          <section className="flex flex-wrap items-end justify-between gap-8">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
-                Dashboard
-              </p>
-
-              <h1 className="mt-4 max-w-[12ch] text-[12vw] font-black leading-[0.86] tracking-[-0.055em] sm:text-[8vw] lg:text-[5.8vw] xl:text-[5.8rem]">
-                Καλησπέρα,
-                <br />
-                <span className="text-[#DC2727]">{clientDisplayName}.</span>
-              </h1>
-            </div>
-
-            <div className="max-w-sm">
-              <p className="text-[14px] leading-relaxed text-[#222]/55">
-                Τα δεδομένα ενημερώνονται αυτόματα από το smart link.
-                {analytics && (
-                  <>
-                    {" "}Αυτόν τον μήνα καταγράφηκαν{" "}
-                    <strong className="text-[#222]">
-                      {numberFormatter.format(analytics.totals.page_views_month)}
-                    </strong>{" "}
-                    επισκέψεις.
-                  </>
-                )}
-              </p>
-            </div>
-          </section>
-
-          <section className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {analyticsLoading &&
-              Array.from({ length: 4 }, (_, index) => (
-                <div
-                  key={index}
-                  className="min-h-[260px] animate-pulse rounded-[20px] border border-black/5 bg-white"
-                />
-              ))}
-
-            {analyticsError && (
-              <div className="rounded-[20px] border border-red-200 bg-red-50 p-6 text-sm text-red-700 sm:col-span-2 xl:col-span-4">
-                {analyticsError}
-              </div>
-            )}
-
-            {!analyticsLoading &&
-              !analyticsError &&
-              dashboardMetrics.map((metric, index) => (
-                <DashboardMetric
-                  key={metric.label}
-                  {...metric}
-                  index={index}
-                />
-              ))}
-          </section>
-
-          <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
-            <div className="xl:col-span-8">
-              <DashboardChart data={analytics?.daily_activity ?? []} />
-            </div>
-
-            <div className="xl:col-span-4">
-              <BusinessHealth analytics={analytics} />
-            </div>
-          </section>
-
-          <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
-            <div className="xl:col-span-7">
-              <RecentActivity events={analytics?.recent_activity ?? []} />
-            </div>
-
-            <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#DC2727]">
-                Review opportunity
-              </p>
-
-              <h2 className="mt-3 text-[28px] font-black leading-[0.95] tracking-[-0.04em] md:text-[38px]">
-                {numberFormatter.format(reviewOpportunity)} επισκέψεις χωρίς review click.
-              </h2>
-
-              <p className="mt-5 max-w-md text-[13px] leading-relaxed text-[#222]/50">
-                Η μέτρηση αφορά τις τελευταίες 7 ημέρες. Δεν σημαίνει ότι κάθε
-                επίσκεψη θα γινόταν αξιολόγηση, αλλά δείχνει το περιθώριο βελτίωσης
-                της διαδρομής προς το Google Review.
-              </p>
-
-              <button
-                type="button"
-                className="group mt-10 inline-flex items-center gap-3 rounded-full bg-[#222] px-6 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#DC2727]"
-              >
-                Βελτίωσε το review rate
-                <span className="transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </button>
-            </section>
-          </section>
+              {/* κράτησε εδώ όλο το υπάρχον overview */}
             </>
+          ) : activeTab === "analytics" &&
+            analytics ? (
+            <AnalyticsTab analytics={analytics} />
           ) : (
-            <DashboardTabPlaceholder tab={activeTab} analytics={analytics} />
+            <DashboardTabPlaceholder
+              tab={activeTab}
+              analytics={analytics}
+            />
           )}
+      
         </div>
       </div>
       {showTutorial && analytics && (
