@@ -3335,6 +3335,336 @@ function MenuTab({
   );
 }
 
+function SettingsTab({
+  analytics,
+  userEmail,
+  onLogout,
+}: {
+  analytics: AnalyticsResponse;
+  userEmail: string;
+  onLogout: () => Promise<void>;
+}) {
+  const [newPassword, setNewPassword] =
+    useState("");
+
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [savingPassword, setSavingPassword] =
+    useState(false);
+
+  const [passwordError, setPasswordError] =
+    useState("");
+
+  const [passwordSuccess, setPasswordSuccess] =
+    useState("");
+
+  const roleLabels: Record<string, string> = {
+    owner: "Ιδιοκτήτης",
+    manager: "Manager",
+    staff: "Προσωπικό",
+  };
+
+  const membershipRole =
+    analytics.membership_role ?? "staff";
+
+  async function handlePasswordUpdate(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (newPassword.length < 8) {
+      setPasswordError(
+        "Ο νέος κωδικός πρέπει να περιέχει τουλάχιστον 8 χαρακτήρες.",
+      );
+
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError(
+        "Οι δύο κωδικοί δεν ταιριάζουν.",
+      );
+
+      return;
+    }
+
+    try {
+      setSavingPassword(true);
+
+      const { error } =
+        await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setNewPassword("");
+      setConfirmPassword("");
+
+      setPasswordSuccess(
+        "Ο κωδικός ενημερώθηκε επιτυχώς.",
+      );
+    } catch (error) {
+      console.error(
+        "Password update failed:",
+        error,
+      );
+
+      setPasswordError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η αλλαγή του κωδικού.",
+      );
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Business information */}
+      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Επιχείρηση
+            </p>
+
+            <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+              Στοιχεία επιχείρησης
+            </h2>
+
+            <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-[#222]/45">
+              Τα στοιχεία αυτά χρησιμοποιούνται
+              στο dashboard και στα reports του
+              Zisto.
+            </p>
+          </div>
+
+          <span className="inline-flex w-fit rounded-full bg-green-50 px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-green-700">
+            Ενεργή σύνδεση
+          </span>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+              Επωνυμία
+            </p>
+
+            <p className="mt-3 text-[15px] font-bold">
+              {analytics.business.name}
+            </p>
+          </div>
+
+          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+              Τοποθεσία
+            </p>
+
+            <p className="mt-3 text-[15px] font-bold">
+              {analytics.business.location_name ??
+                "Δεν έχει οριστεί"}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-[16px] border border-[#DC2727]/15 bg-[#DC2727]/5 p-5">
+          <p className="text-[11px] leading-relaxed text-[#222]/55">
+            Για αλλαγή επωνυμίας, τοποθεσίας ή
+            σύνδεσης με διαφορετικό project,
+            επικοινώνησε με τον διαχειριστή του
+            Zisto.
+          </p>
+        </div>
+      </section>
+
+      {/* Account */}
+      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+          Λογαριασμός
+        </p>
+
+        <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+          Στοιχεία χρήστη
+        </h2>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+              Email
+            </p>
+
+            <p className="mt-3 break-all text-[14px] font-bold">
+              {userEmail}
+            </p>
+          </div>
+
+          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+              Ρόλος
+            </p>
+
+            <p className="mt-3 text-[14px] font-bold">
+              {roleLabels[membershipRole] ??
+                membershipRole}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Password */}
+      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+          Ασφάλεια
+        </p>
+
+        <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+          Αλλαγή κωδικού
+        </h2>
+
+        <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-[#222]/45">
+          Χρησιμοποίησε τουλάχιστον 8 χαρακτήρες
+          και απόφυγε κωδικούς που χρησιμοποιείς
+          σε άλλες υπηρεσίες.
+        </p>
+
+        <form
+          onSubmit={handlePasswordUpdate}
+          className="mt-8 max-w-2xl"
+        >
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <label className="block">
+              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40">
+                Νέος κωδικός
+              </span>
+
+              <input
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                value={newPassword}
+                onChange={(event) =>
+                  setNewPassword(
+                    event.target.value,
+                  )
+                }
+                autoComplete="new-password"
+                required
+                minLength={8}
+                className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40">
+                Επιβεβαίωση κωδικού
+              </span>
+
+              <input
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                value={confirmPassword}
+                onChange={(event) =>
+                  setConfirmPassword(
+                    event.target.value,
+                  )
+                }
+                autoComplete="new-password"
+                required
+                minLength={8}
+                className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]"
+              />
+            </label>
+          </div>
+
+          <label className="mt-5 flex cursor-pointer items-center gap-3 text-[11px] font-semibold text-[#222]/50">
+            <input
+              type="checkbox"
+              checked={showPassword}
+              onChange={(event) =>
+                setShowPassword(
+                  event.target.checked,
+                )
+              }
+              className="h-4 w-4 accent-[#DC2727]"
+            />
+
+            Εμφάνιση κωδικών
+          </label>
+
+          {passwordError && (
+            <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+              {passwordError}
+            </p>
+          )}
+
+          {passwordSuccess && (
+            <p className="mt-5 rounded-[14px] bg-green-50 px-4 py-3 text-[11px] font-semibold text-green-700">
+              {passwordSuccess}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={savingPassword}
+            className="mt-7 inline-flex min-w-[190px] items-center justify-center rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {savingPassword
+              ? "Αποθήκευση..."
+              : "Αλλαγή κωδικού"}
+          </button>
+        </form>
+      </section>
+
+      {/* Session */}
+      <section className="rounded-[22px] border border-red-200 bg-red-50 p-6 md:p-8">
+        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-red-600">
+          Session
+        </p>
+
+        <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[#222]">
+              Αποσύνδεση λογαριασμού
+            </h2>
+
+            <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-[#222]/50">
+              Θα χρειαστεί να εισαγάγεις ξανά το
+              email και τον κωδικό σου για να
+              αποκτήσεις πρόσβαση στο dashboard.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              void onLogout();
+            }}
+            className="w-full rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-red-600 transition hover:bg-red-600 hover:text-white sm:w-auto"
+          >
+            Αποσύνδεση
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function DashboardTabPlaceholder({
   tab,
   analytics,
@@ -3927,6 +4257,16 @@ function DashboardPage({
             ) : activeTab === "menu" &&
               analytics ? (
               <MenuTab analytics={analytics} />
+            ) : activeTab === "settings" &&
+              analytics ? (
+              <SettingsTab
+                analytics={analytics}
+                userEmail={userEmail}
+                onLogout={async () => {
+                  await supabase.auth.signOut();
+                  window.location.hash = "/login";
+                }}
+              />
             ) : (
               <DashboardTabPlaceholder
                 tab={activeTab}
