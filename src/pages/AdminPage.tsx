@@ -642,7 +642,7 @@ useEffect(() => {
 
   return (
     <main className="min-h-screen bg-[#F7F5F1] text-[#222]">
-      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="min-h-screen">
         <AdminSidebar
           activeTab={activeAdminTab}
           adminEmail={adminEmail}
@@ -661,7 +661,7 @@ useEffect(() => {
           />
         )}
   
-          <section className="min-w-0">
+          <section className="min-w-0 px-5 py-8 sm:px-8 lg:ml-[280px] lg:px-10 lg:py-10">
             <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-black/5 bg-[#F7F5F1]/90 px-5 backdrop-blur-xl sm:px-8 lg:hidden">
               <button
                 type="button"
@@ -813,7 +813,7 @@ function AdminSidebar({
 }) {
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-[#222] text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:static lg:h-screen lg:translate-x-0 lg:shadow-none ${
+      className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col overflow-y-auto bg-[#222] text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:translate-x-0 lg:shadow-none ${
         sidebarOpen
           ? "translate-x-0"
           : "-translate-x-full"
