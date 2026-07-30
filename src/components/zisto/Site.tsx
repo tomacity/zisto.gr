@@ -3219,7 +3219,7 @@ function DashboardPage({
         </header>
 
         <div className="mx-auto w-full max-w-[1600px] px-5 py-10 md:px-8 lg:px-10 lg:py-14">
-          {awaitingApproval ? (
+         {awaitingApproval ? (
             <PendingApproval
               email={userEmail}
               onSignOut={async () => {
@@ -3227,19 +3227,21 @@ function DashboardPage({
                 window.location.hash = "/login";
               }}
             />
-
-          {activeTab === "overview" ? (
-            <>
-              {/* κράτησε εδώ όλο το υπάρχον overview */}
-            </>
-          ) : activeTab === "analytics" &&
-            analytics ? (
-            <AnalyticsTab analytics={analytics} />
           ) : (
-            <DashboardTabPlaceholder
-              tab={activeTab}
-              analytics={analytics}
-            />
+            <>
+              {activeTab === "overview" ? (
+                <>
+                  {/* Εδώ βάλε ξανά όλο το υπάρχον Overview */}
+                </>
+              ) : activeTab === "analytics" && analytics ? (
+                <AnalyticsTab analytics={analytics} />
+              ) : (
+                <DashboardTabPlaceholder
+                  tab={activeTab}
+                  analytics={analytics}
+                />
+              )}
+            </>
           )}
       
         </div>
