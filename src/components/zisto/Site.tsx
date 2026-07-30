@@ -3005,6 +3005,336 @@ function ReviewsTab({
   );
 }
 
+function MenuTab({
+  analytics,
+}: {
+  analytics: AnalyticsResponse;
+}) {
+  const sevenDayPageViews =
+    analytics.daily_activity.reduce(
+      (sum, item) => sum + item.page_views,
+      0,
+    );
+
+  const sevenDayMenuOpens =
+    analytics.daily_activity.reduce(
+      (sum, item) => sum + item.menu_opens,
+      0,
+    );
+
+  const menuOpportunity = Math.max(
+    0,
+    sevenDayPageViews - sevenDayMenuOpens,
+  );
+
+  const sevenDayConversion =
+    sevenDayPageViews > 0
+      ? Number(
+          (
+            (sevenDayMenuOpens /
+              sevenDayPageViews) *
+            100
+          ).toFixed(1),
+        )
+      : 0;
+
+  const menuEvents =
+    analytics.recent_activity.filter(
+      (event) =>
+        event.event_name === "menu_open",
+    );
+
+  const maxDailyMenuOpens = Math.max(
+    ...analytics.daily_activity.map(
+      (item) => item.menu_opens,
+    ),
+    1,
+  );
+
+  return (
+    <div className="space-y-6">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: "Ανοίγματα σήμερα",
+            value:
+              analytics.totals
+                .menu_opens_today,
+            note:
+              "Μεταβάσεις προς το ψηφιακό μενού",
+          },
+          {
+            label: "Conversion σήμερα",
+            value: `${percentFormatter.format(
+              analytics.totals
+                .menu_conversion_rate,
+            )}%`,
+            note:
+              "Ανοίγματα ανά σημερινή επίσκεψη",
+          },
+          {
+            label: "Ανοίγματα 7 ημερών",
+            value: sevenDayMenuOpens,
+            note: `${sevenDayPageViews} συνολικές επισκέψεις`,
+          },
+          {
+            label: "Δεν άνοιξαν μενού",
+            value: menuOpportunity,
+            note:
+              "Επισκέψεις χωρίς menu open",
+          },
+        ].map((item, index) => (
+          <article
+            key={item.label}
+            className={`min-h-[190px] rounded-[20px] border p-6 ${
+              index === 1
+                ? "border-[#222] bg-[#222] text-white"
+                : "border-black/10 bg-white text-[#222]"
+            }`}
+          >
+            <p
+              className={`text-[9px] font-bold uppercase tracking-[0.2em] ${
+                index === 1
+                  ? "text-white/50"
+                  : "text-[#222]/35"
+              }`}
+            >
+              {item.label}
+            </p>
+
+            <p className="mt-8 text-[44px] font-black leading-none tracking-[-0.05em]">
+              {typeof item.value === "number"
+                ? numberFormatter.format(
+                    item.value,
+                  )
+                : item.value}
+            </p>
+
+            <p
+              className={`mt-5 text-[11px] ${
+                index === 1
+                  ? "text-white/55"
+                  : "text-[#222]/40"
+              }`}
+            >
+              {item.note}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Menu performance
+              </p>
+
+              <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+                Ανοίγματα μενού τελευταίων 7 ημερών
+              </h2>
+            </div>
+
+            <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/40">
+              {percentFormatter.format(
+                sevenDayConversion,
+              )}
+              % conversion
+            </span>
+          </div>
+
+          <div className="mt-10 flex h-[280px] items-end gap-3 md:gap-5">
+            {analytics.daily_activity.map(
+              (item) => {
+                const height =
+                  item.menu_opens === 0
+                    ? 4
+                    : Math.max(
+                        12,
+                        (item.menu_opens /
+                          maxDailyMenuOpens) *
+                          100,
+                      );
+
+                return (
+                  <div
+                    key={item.date}
+                    className="flex min-w-0 flex-1 flex-col items-center justify-end"
+                  >
+                    <span className="mb-3 text-[10px] font-bold text-[#222]/40">
+                      {item.menu_opens}
+                    </span>
+
+                    <div className="flex h-[210px] w-full items-end rounded-[8px] bg-[#F1F1EF]">
+                      <div
+                        className="w-full rounded-[8px] bg-[#222] transition-all duration-500"
+                        style={{
+                          height: `${height}%`,
+                        }}
+                      />
+                    </div>
+
+                    <span className="mt-4 text-[9px] font-bold uppercase text-[#222]/35">
+                      {new Intl.DateTimeFormat(
+                        "el-GR",
+                        {
+                          weekday: "short",
+                          timeZone:
+                            "Europe/Athens",
+                        },
+                      ).format(
+                        new Date(
+                          `${item.date}T12:00:00`,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                );
+              },
+            )}
+          </div>
+        </article>
+
+        <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8 xl:col-span-4">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
+            Menu opportunity
+          </p>
+
+          <p className="mt-8 text-[72px] font-black leading-none tracking-[-0.07em]">
+            {numberFormatter.format(
+              menuOpportunity,
+            )}
+          </p>
+
+          <h2 className="mt-5 text-[25px] font-black leading-tight tracking-[-0.04em]">
+            επισκέψεις χωρίς άνοιγμα μενού.
+          </h2>
+
+          <p className="mt-5 text-[12px] leading-relaxed text-white/55">
+            Η μέτρηση αφορά τις τελευταίες
+            7 ημέρες και δείχνει πόσες
+            επισκέψεις δεν προχώρησαν στο
+            ψηφιακό μενού.
+          </p>
+
+          <div className="mt-10 h-2 overflow-hidden rounded-full bg-white/20">
+            <div
+              className="h-full rounded-full bg-white"
+              style={{
+                width: `${Math.min(
+                  sevenDayConversion,
+                  100,
+                )}%`,
+              }}
+            />
+          </div>
+
+          <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">
+            {percentFormatter.format(
+              sevenDayConversion,
+            )}
+            % άνοιξαν το μενού
+          </p>
+        </article>
+      </section>
+
+      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Live activity
+            </p>
+
+            <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+              Πρόσφατα ανοίγματα μενού
+            </h2>
+          </div>
+
+          <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/35">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#DC2727]" />
+            Live
+          </span>
+        </div>
+
+        <div className="mt-8">
+          {menuEvents.length === 0 ? (
+            <div className="rounded-[16px] bg-[#F6F6F4] px-6 py-12 text-center">
+              <p className="text-[32px]">
+                ☰
+              </p>
+
+              <p className="mt-4 text-[14px] font-bold">
+                Δεν υπάρχει ακόμη άνοιγμα
+                μενού.
+              </p>
+
+              <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-[#222]/40">
+                Μόλις κάποιος επισκέπτης
+                πατήσει το κουμπί του
+                μενού, η ενέργεια θα
+                εμφανιστεί εδώ αυτόματα.
+              </p>
+            </div>
+          ) : (
+            menuEvents.map(
+              (event, index) => (
+                <div
+                  key={`${event.created_at}-${index}`}
+                  className={`grid grid-cols-[70px_1fr_auto] items-center gap-4 py-4 ${
+                    index !== 0
+                      ? "border-t border-black/8"
+                      : ""
+                  }`}
+                >
+                  <span className="font-mono text-[11px] font-bold text-[#222]/35">
+                    {new Intl.DateTimeFormat(
+                      "el-GR",
+                      {
+                        hour: "2-digit",
+                        minute:
+                          "2-digit",
+                        hour12: false,
+                        timeZone:
+                          "Europe/Athens",
+                      },
+                    ).format(
+                      new Date(
+                        event.created_at,
+                      ),
+                    )}
+                  </span>
+
+                  <div>
+                    <p className="text-[13px] font-bold">
+                      Άνοιγμα ψηφιακού μενού
+                    </p>
+
+                    <p className="mt-1 text-[10px] text-[#222]/35">
+                      {typeof event.metadata
+                        ?.destination ===
+                      "string"
+                        ? event.metadata
+                            .destination
+                        : "Σελίδα μενού"}
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-[#222]/5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[#222]/50">
+                    {formatSource(
+                      event.source,
+                    )}
+                  </span>
+                </div>
+              ),
+            )
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function DashboardTabPlaceholder({
   tab,
   analytics,
@@ -3586,18 +3916,17 @@ function DashboardPage({
             <>
             {activeTab === "overview" ? (
               <>
-                {/* κράτησε εδώ το υπάρχον Overview */}
+                {/* υπάρχον Overview */}
               </>
             ) : activeTab === "analytics" &&
               analytics ? (
-              <AnalyticsTab
-                analytics={analytics}
-              />
+              <AnalyticsTab analytics={analytics} />
             ) : activeTab === "reviews" &&
               analytics ? (
-              <ReviewsTab
-                analytics={analytics}
-              />
+              <ReviewsTab analytics={analytics} />
+            ) : activeTab === "menu" &&
+              analytics ? (
+              <MenuTab analytics={analytics} />
             ) : (
               <DashboardTabPlaceholder
                 tab={activeTab}
