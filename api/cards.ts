@@ -1,61 +1,424 @@
+const ALLOWED_ORIGINS = new Set([
+  "https://zistogr.vercel.app",
+  "https://zisto.app",
+  "https://www.zisto.app",
+]);
+
+function setCorsHeaders(req: any, res: any) {
+  const origin = req.headers.origin;
+
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      origin,
+    );
+  }
+
+  res.setHeader("Vary", "Origin");
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, OPTIONS",
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization",
+  );
+
+  res.setHeader(
+    "Cache-Control",
+    "no-store",
+  );
+}
+
 async function supabaseRequest({
   supabaseUrl,
   supabaseSecretKey,
   path,
   method = "GET",
+  headers = {},
+}: {
+  supabaseUrl: string;
+  supabaseSecretKey: string;
+  path: string;
+  method?: string;
+  headers?: Record<string, string>;
 }) {
   return fetch(`${supabaseUrl}${path}`, {
     method,
     headers: {
       apikey: supabaseSecretKey,
-      Authorization: `Bearer ${supabaseSecretKey}`,
+      Authorization:
+        `Bearer ${supabaseSecretKey}`,
       "Content-Type": "application/json",
+      ...headers,
     },
   });
 }
 
-const businessId = membership.business_id;
+export default async function handler(
+  req: any,
+  res: any,
+) {
+  setCorsHeaders(req, res);
 
-const locationsResponse = await supabaseRequest({
-  supabaseUrl,
-  supabaseSecretKey,
-  path: `/rest/v1/locations?business_id=eq.${businessId}&select=id`,
-});
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
 
-const locations = await locationsResponse.json();
+  if (req.method !== "GET") {
+    return res.status(405).json({
+      error: "Method not allowed",
+    });
+  }
 
-const locationIds = locations.map(
-  (location: any) => location.id,
-);
+  const supabaseUrl =
+    process.env.SUPABASE_URL;
 
-if (locationIds.length === 0) {
-  return res.status(200).json([]);
+  const supabaseSecretKey =
+    process.env.SUPABASE_SECRET_KEY;
+
+  if (!supabaseUrl || !supabaseSecretKey) {
+    return res.status(500).json({
+      error: "Server configuration error",
+    });
+  }
+
+  const authorization =
+    req.headers.authorization ?? "";
+
+  const accessToken =
+    authorization.startsWith("Bearer ")
+      ? authorization.slice(7)
+      : null;
+
+  const requestedBusinessId =
+    typeof req.query.business_id ===
+    "string"
+      ? req.query.business_id
+      : null;
+
+  if (!accessToken) {
+    return res.status(401).json({
+      error: "Authentication required",
+    });
+  }
+
+  try {
+    /*
+     * Επιβεβαίωση χρήστη.
+     */
+    const userResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path: "/auth/v1/user",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+      });
+
+    if (!userResponse.ok) {
+      return res.status(401).json({
+        error:
+          "Invalid or expired session",
+      });
+    }
+
+    const user = await userResponse.json();
+
+    /*
+     * Έλεγχος admin.
+     */
+    const adminQuery =
+      new URLSearchParams({
+        user_id: `eq.${user.id}`,
+        select: "user_id",
+        limit: "1",
+      });
+
+    const adminResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/zisto_admins?${adminQuery.toString()}`,
+      });
+
+    if (!adminResponse.ok) {
+      const errorText =
+        await adminResponse.text();
+
+      console.error(
+        "Admin query failed:",
+        errorText,
+      );
+
+      return res.status(500).json({
+        error: "Failed to verify admin",
+      });
+    }
+
+    const admins =
+      await adminResponse.json();
+
+    const isAdmin = admins.length > 0;
+
+    /*
+     * Φόρτωση membership.
+     */
+    const membershipQuery =
+      new URLSearchParams({
+        user_id: `eq.${user.id}`,
+        select: "business_id,role",
+        limit: "1",
+      });
+
+    const membershipResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/business_members?${membershipQuery.toString()}`,
+      });
+
+    if (!membershipResponse.ok) {
+      const errorText =
+        await membershipResponse.text();
+
+      console.error(
+        "Membership query failed:",
+        errorText,
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to load membership",
+      });
+    }
+
+    const memberships =
+      await membershipResponse.json();
+
+    const membership =
+      memberships[0] ?? null;
+
+    let businessId: string;
+
+    if (
+      isAdmin &&
+      requestedBusinessId
+    ) {
+      businessId =
+        requestedBusinessId;
+    } else {
+      if (!membership) {
+        return res.status(403).json({
+          error:
+            "This user is not assigned to a business",
+        });
+      }
+
+      businessId =
+        membership.business_id;
+    }
+
+    /*
+     * Locations της επιχείρησης.
+     */
+    const locationsQuery =
+      new URLSearchParams({
+        business_id:
+          `eq.${businessId}`,
+        select: "id,name",
+      });
+
+    const locationsResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/locations?${locationsQuery.toString()}`,
+      });
+
+    if (!locationsResponse.ok) {
+      const errorText =
+        await locationsResponse.text();
+
+      console.error(
+        "Locations query failed:",
+        errorText,
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to load locations",
+      });
+    }
+
+    const locations =
+      await locationsResponse.json();
+
+    const locationIds = locations.map(
+      (location: { id: string }) =>
+        location.id,
+    );
+
+    if (locationIds.length === 0) {
+      return res.status(200).json({
+        cards: [],
+      });
+    }
+
+    /*
+     * Landing pages των locations.
+     */
+    const landingPagesQuery =
+      new URLSearchParams({
+        location_id:
+          `in.(${locationIds.join(",")})`,
+        select:
+          "id,name,slug,location_id",
+      });
+
+    const landingPagesResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/landing_pages?${landingPagesQuery.toString()}`,
+      });
+
+    if (!landingPagesResponse.ok) {
+      const errorText =
+        await landingPagesResponse.text();
+
+      console.error(
+        "Landing pages query failed:",
+        errorText,
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to load landing pages",
+      });
+    }
+
+    const landingPages =
+      await landingPagesResponse.json();
+
+    const landingPageIds =
+      landingPages.map(
+        (page: { id: string }) =>
+          page.id,
+      );
+
+    if (
+      landingPageIds.length === 0
+    ) {
+      return res.status(200).json({
+        cards: [],
+      });
+    }
+
+    /*
+     * Cards που ανήκουν στα landing pages.
+     */
+    const cardsQuery =
+      new URLSearchParams({
+        landing_page_id:
+          `in.(${landingPageIds.join(",")})`,
+
+        select: [
+          "id",
+          "landing_page_id",
+          "name",
+          "card_type",
+          "public_token",
+          "placement",
+          "is_active",
+          "created_at",
+          "updated_at",
+        ].join(","),
+
+        order: "created_at.desc",
+      });
+
+    const cardsResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/cards?${cardsQuery.toString()}`,
+      });
+
+    if (!cardsResponse.ok) {
+      const errorText =
+        await cardsResponse.text();
+
+      console.error(
+        "Cards query failed:",
+        errorText,
+      );
+
+      return res.status(500).json({
+        error: "Failed to load cards",
+      });
+    }
+
+    const cards =
+      await cardsResponse.json();
+
+    const enrichedCards = cards.map(
+      (card: any) => {
+        const landingPage =
+          landingPages.find(
+            (page: any) =>
+              page.id ===
+              card.landing_page_id,
+          );
+
+        const location =
+          locations.find(
+            (item: any) =>
+              item.id ===
+              landingPage?.location_id,
+          );
+
+        const source =
+          card.card_type === "qr"
+            ? "qr"
+            : "nfc";
+
+        return {
+          ...card,
+
+          landing_page_name:
+            landingPage?.name ?? null,
+
+          location_name:
+            location?.name ?? null,
+
+          tracking_url:
+            `https://tomacity.github.io/tsipouradiko-smart-link-/?source=${source}&card=${card.public_token}`,
+        };
+      },
+    );
+
+    return res.status(200).json({
+      business_id: businessId,
+      cards: enrichedCards,
+    });
+  } catch (error) {
+    console.error(
+      "Cards API error:",
+      error,
+    );
+
+    return res.status(500).json({
+      error: "Internal server error",
+    });
+  }
 }
-
-const landingPagesResponse =
-  await supabaseRequest({
-    supabaseUrl,
-    supabaseSecretKey,
-    path: `/rest/v1/landing_pages?location_id=in.(${locationIds.join(",")})&select=id,name`,
-  });
-
-const landingPages =
-  await landingPagesResponse.json();
-
-const landingIds = landingPages.map(
-  (page: any) => page.id,
-);
-
-if (landingIds.length === 0) {
-  return res.status(200).json([]);
-}
-
-const cardsResponse = await supabaseRequest({
-  supabaseUrl,
-  supabaseSecretKey,
-  path: `/rest/v1/cards?landing_page_id=in.(${landingIds.join(",")})&select=*`,
-});
-
-const cards = await cardsResponse.json();
-
-return res.status(200).json(cards);
