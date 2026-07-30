@@ -209,10 +209,62 @@ export default async function handler(request, response) {
       body.page_path,
     );
 
+    const metadata =
+      cleanMetadata(body.metadata);
+    
+    const cardToken =
+      cleanText(
+        metadata.card_token,
+        100,
+      );
+    
+    let resolvedCardId = null;
+    
+    if (cardToken) {
+      const {
+        data: card,
+        error: cardError,
+      } = await supabaseAdmin
+        .from("cards")
+        .select(`
+          id,
+          landing_page_id,
+          is_active
+        `)
+        .eq("public_token", cardToken)
+        .maybeSingle();
+    
+      if (cardError) {
+        console.error(
+          "Card lookup failed:",
+          cardError,
+        );
+    
+        return response.status(500).json({
+          error: "Could not verify card",
+        });
+      }
+    
+      if (!card) {
+        return response.status(404).json({
+          error: "NFC card not found",
+        });
+      }
+    
+      if (!card.is_active) {
+        return response.status(403).json({
+          error: "NFC card is inactive",
+        });
+      }
+    
+      resolvedCardId = card.id;
+    }
+
     const eventRecord = {
       project_id: project.id,
       business_id: project.business_id,
       event_type: eventType,
+      card_id: resolvedCardId,
 
       session_id: sessionId,
       visitor_id: visitorId,
@@ -268,9 +320,7 @@ export default async function handler(request, response) {
         200,
       ),
 
-      metadata: cleanMetadata(
-        body.metadata,
-      ),
+      metadata,
     };
 
     const {
