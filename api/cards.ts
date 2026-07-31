@@ -483,7 +483,7 @@ export default async function handler(
           ].join(","),
       
           order: "created_at.desc",
-          limit: "10000",
+          limit: "50",
         });
     
     const eventsResponse =
