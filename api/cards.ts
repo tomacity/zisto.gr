@@ -18,7 +18,7 @@ function setCorsHeaders(req: any, res: any) {
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, DELETE, OPTIONS"
+    "GET, POST, DELETE, OPTIONS",
   );
 
   res.setHeader(
@@ -76,7 +76,7 @@ export default async function handler(
     req.method !== "GET" &&
     req.method !== "POST" &&
     req.method !== "DELETE"
-  )
+  ) {
     return res.status(405).json({
       error: "Method not allowed",
     });
