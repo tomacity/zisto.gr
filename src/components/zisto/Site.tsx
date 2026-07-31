@@ -3705,7 +3705,20 @@ function NfcCardsTab({
   error: string | null;
   businessId?: string | null;
   onCardCreated: (card: NfcCard) => void;
+  onCardUpdated: (card: NfcCard) => void;
 }) {
+  const [editingCard, setEditingCard] =
+    useState<NfcCard | null>(null);
+  
+  const [editingName, setEditingName] =
+    useState("");
+  
+  const [savingEdit, setSavingEdit] =
+    useState(false);
+  
+  const [editError, setEditError] =
+    useState<string | null>(null);
+  
   const [copiedCardId, setCopiedCardId] =
     useState<string | null>(null);
   
@@ -3762,6 +3775,108 @@ function NfcCardsTab({
     }
   
     window.location.reload();
+  }
+
+  async function updateCardName(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+  
+    if (!editingCard) {
+      return;
+    }
+  
+    const cleanName =
+      editingName.trim();
+  
+    if (!cleanName) {
+      setEditError(
+        "Γράψε ένα όνομα.",
+      );
+      return;
+    }
+  
+    try {
+      setSavingEdit(true);
+      setEditError(null);
+  
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+  
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+  
+      const businessQuery =
+        businessId
+          ? `&business_id=${encodeURIComponent(
+              businessId,
+            )}`
+          : "";
+  
+      const response = await fetch(
+        `/api/cards?card_id=${encodeURIComponent(
+          editingCard.id,
+        )}${businessQuery}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            name: cleanName,
+          }),
+        },
+      );
+  
+      const responseText =
+        await response.text();
+  
+      let result: {
+        card?: Partial<NfcCard>;
+        error?: string;
+      };
+  
+      try {
+        result = responseText
+          ? JSON.parse(responseText)
+          : {};
+      } catch {
+        throw new Error(
+          responseText ||
+            "Το API επέστρεψε μη έγκυρη απάντηση.",
+        );
+      }
+  
+      if (!response.ok || !result.card) {
+        throw new Error(
+          result.error ||
+            "Απέτυχε η αλλαγή ονόματος.",
+        );
+      }
+  
+      onCardUpdated({
+        ...editingCard,
+        ...result.card,
+        name: cleanName,
+      });
+  
+      setEditingCard(null);
+      setEditingName("");
+    } catch (error) {
+      setEditError(
+        error instanceof Error
+          ? error.message
+          : "Παρουσιάστηκε κάποιο σφάλμα.",
+      );
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function createTable(
@@ -3994,9 +4109,35 @@ function NfcCardsTab({
                   </span>
                 </div>
             
-                <h2 className="mt-5 text-[28px] font-black tracking-[-0.04em]">
-                  {card.name}
-                </h2>
+                <div className="mt-5 inline-flex items-center gap-2">
+                  <h2 className="text-[28px] font-black tracking-[-0.04em]">
+                    {card.name}
+                  </h2>
+                
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCard(card);
+                      setEditingName(card.name);
+                      setEditError(null);
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[#DC2727]/10 text-[#DC2727] transition-all duration-200 hover:scale-110 hover:bg-[#DC2727] hover:text-white"
+                    aria-label="Επεξεργασία"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
+                </div>
             
                 <p className="mt-2 text-[12px] text-[#222]/45">
                   {card.placement ||
