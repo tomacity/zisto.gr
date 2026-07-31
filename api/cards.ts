@@ -18,7 +18,7 @@ function setCorsHeaders(req: any, res: any) {
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, OPTIONS",
+    "GET, POST, DELETE, OPTIONS"
   );
 
   res.setHeader(
@@ -74,8 +74,9 @@ export default async function handler(
 
   if (
     req.method !== "GET" &&
-    req.method !== "POST"
-  ) {
+    req.method !== "POST" &&
+    req.method !== "DELETE"
+  )
     return res.status(405).json({
       error: "Method not allowed",
     });
@@ -316,6 +317,43 @@ export default async function handler(
 
     const landingPages =
       await landingPagesResponse.json();
+
+    if (req.method === "DELETE") {
+      const cardId =
+        typeof req.query.card_id === "string"
+          ? req.query.card_id
+          : null;
+    
+      if (!cardId) {
+        return res.status(400).json({
+          error: "Λείπει το card_id",
+        });
+      }
+    
+      const deleteResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path: `/rest/v1/cards?id=eq.${cardId}`,
+          method: "DELETE",
+        });
+    
+      if (!deleteResponse.ok) {
+        const errorText =
+          await deleteResponse.text();
+    
+        console.error(errorText);
+    
+        return res.status(500).json({
+          error:
+            "Απέτυχε η διαγραφή",
+        });
+      }
+    
+      return res.status(200).json({
+        success: true,
+      });
+    }
 
     if (req.method === "POST") {
       const name =
