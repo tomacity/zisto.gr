@@ -1788,6 +1788,26 @@ type DailyActivity = {
   review_clicks: number;
 };
 
+type NfcCard = {
+  id: string;
+  landing_page_id: string;
+  name: string;
+  card_type: "nfc" | "qr" | "nfc_qr";
+  public_token: string;
+  placement: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  landing_page_name: string | null;
+  location_name: string | null;
+  tracking_url: string;
+};
+
+type CardsResponse = {
+  business_id: string;
+  cards: NfcCard[];
+};
+
 type AnalyticsResponse = {
   business_id: string;
   membership_role: "owner" | "manager" | "staff";
@@ -3665,6 +3685,215 @@ function SettingsTab({
   );
 }
 
+function NfcCardsTab({
+  cards,
+  loading,
+  error,
+}: {
+  cards: NfcCard[];
+  loading: boolean;
+  error: string | null;
+}) {
+  const [copiedCardId, setCopiedCardId] =
+    useState<string | null>(null);
+
+  async function copyTrackingUrl(card: NfcCard) {
+    try {
+      await navigator.clipboard.writeText(
+        card.tracking_url,
+      );
+
+      setCopiedCardId(card.id);
+
+      window.setTimeout(() => {
+        setCopiedCardId(null);
+      }, 2000);
+    } catch (error) {
+      console.error("Copy failed:", error);
+    }
+  }
+
+  if (loading) {
+    return (
+      <section className="rounded-[22px] border border-black/10 bg-white p-8">
+        <p className="text-sm font-semibold text-[#222]/45">
+          Φόρτωση καρτών...
+        </p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="rounded-[22px] border border-red-200 bg-red-50 p-8">
+        <p className="text-sm font-semibold text-red-700">
+          {error}
+        </p>
+      </section>
+    );
+  }
+
+  if (cards.length === 0) {
+    return (
+      <section className="rounded-[22px] border border-black/10 bg-white px-6 py-16 text-center">
+        <p className="text-[42px]">⌁</p>
+
+        <h2 className="mt-5 text-[28px] font-black tracking-[-0.04em]">
+          Δεν υπάρχουν ακόμη κάρτες
+        </h2>
+
+        <p className="mx-auto mt-4 max-w-lg text-[13px] leading-relaxed text-[#222]/45">
+          Όταν δημιουργηθεί η πρώτη NFC ή QR κάρτα,
+          θα εμφανιστεί εδώ μαζί με το tracking URL της.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <article className="rounded-[20px] bg-[#222] p-6 text-white">
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+            Σύνολο καρτών
+          </p>
+
+          <p className="mt-8 text-[48px] font-black leading-none">
+            {cards.length}
+          </p>
+        </article>
+
+        <article className="rounded-[20px] border border-black/10 bg-white p-6">
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
+            Ενεργές
+          </p>
+
+          <p className="mt-8 text-[48px] font-black leading-none">
+            {
+              cards.filter((card) => card.is_active)
+                .length
+            }
+          </p>
+        </article>
+
+        <article className="rounded-[20px] border border-black/10 bg-white p-6">
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
+            Ανενεργές
+          </p>
+
+          <p className="mt-8 text-[48px] font-black leading-none">
+            {
+              cards.filter((card) => !card.is_active)
+                .length
+            }
+          </p>
+        </article>
+      </section>
+
+      <section className="space-y-4">
+        {cards.map((card) => (
+          <article
+            key={card.id}
+            className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8"
+          >
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span
+                    className={`rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] ${
+                      card.is_active
+                        ? "bg-green-50 text-green-700"
+                        : "bg-[#F1F1EF] text-[#222]/45"
+                    }`}
+                  >
+                    {card.is_active
+                      ? "Ενεργή"
+                      : "Ανενεργή"}
+                  </span>
+
+                  <span className="rounded-full bg-[#F6F6F4] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/45">
+                    {card.card_type}
+                  </span>
+                </div>
+
+                <h2 className="mt-5 text-[28px] font-black tracking-[-0.04em]">
+                  {card.name}
+                </h2>
+
+                <p className="mt-2 text-[12px] text-[#222]/45">
+                  {card.placement ||
+                    card.location_name ||
+                    "Δεν έχει οριστεί θέση"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void copyTrackingUrl(card);
+                }}
+                className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727]"
+              >
+                {copiedCardId === card.id
+                  ? "Αντιγράφηκε"
+                  : "Αντιγραφή URL"}
+              </button>
+            </div>
+
+            <div className="mt-7 rounded-[16px] bg-[#F6F6F4] p-5">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                Tracking URL
+              </p>
+
+              <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-[#222]/65">
+                {card.tracking_url}
+              </p>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="rounded-[14px] border border-black/8 p-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/30">
+                  Landing page
+                </p>
+
+                <p className="mt-2 text-[12px] font-bold">
+                  {card.landing_page_name ??
+                    "Χωρίς όνομα"}
+                </p>
+              </div>
+
+              <div className="rounded-[14px] border border-black/8 p-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/30">
+                  Public token
+                </p>
+
+                <p className="mt-2 truncate font-mono text-[11px] font-bold">
+                  {card.public_token}
+                </p>
+              </div>
+
+              <div className="rounded-[14px] border border-black/8 p-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/30">
+                  Δημιουργήθηκε
+                </p>
+
+                <p className="mt-2 text-[12px] font-bold">
+                  {new Intl.DateTimeFormat("el-GR", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    timeZone: "Europe/Athens",
+                  }).format(new Date(card.created_at))}
+                </p>
+              </div>
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
 function DashboardTabPlaceholder({
   tab,
   analytics,
@@ -3934,6 +4163,9 @@ function DashboardPage({
 }: {
   businessId?: string | null;
 }) {
+  const [cards, setCards] = useState<NfcCard[]>([]);
+  const [cardsLoading, setCardsLoading] = useState(true);
+  const [cardsError, setCardsError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
@@ -3960,6 +4192,54 @@ function DashboardPage({
 
       if (active) {
         setUserEmail(session.user.email ?? "");
+      }
+
+      async function loadCards() {
+        try {
+          setCardsLoading(true);
+          setCardsError(null);
+      
+          const query = businessId
+            ? `?business_id=${encodeURIComponent(businessId)}`
+            : "";
+      
+          const response = await fetch(`/api/cards${query}`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            cache: "no-store",
+          });
+      
+          const result: CardsResponse | { error?: string } =
+            await response.json();
+      
+          if (!response.ok) {
+            throw new Error(
+              "error" in result && result.error
+                ? result.error
+                : "Δεν ήταν δυνατή η φόρτωση των καρτών.",
+            );
+          }
+      
+          if (active) {
+            setCards((result as CardsResponse).cards ?? []);
+          }
+        } catch (error) {
+          console.error("Cards loading failed:", error);
+      
+          if (active) {
+            setCardsError(
+              error instanceof Error
+                ? error.message
+                : "Δεν ήταν δυνατή η φόρτωση των καρτών.",
+            );
+          }
+        } finally {
+          if (active) {
+            setCardsLoading(false);
+          }
+        }
       }
 
       async function loadAnalytics() {
@@ -4005,6 +4285,7 @@ function DashboardPage({
       }
 
       await loadAnalytics();
+      await loadCards();
 
       refreshTimer = window.setInterval(loadAnalytics, 60_000);
     }
@@ -4257,6 +4538,12 @@ function DashboardPage({
             ) : activeTab === "menu" &&
               analytics ? (
               <MenuTab analytics={analytics} />
+            ) : activeTab === "nfc" ? (
+              <NfcCardsTab
+                cards={cards}
+                loading={cardsLoading}
+                error={cardsError}
+              />
             ) : activeTab === "settings" &&
               analytics ? (
               <SettingsTab
