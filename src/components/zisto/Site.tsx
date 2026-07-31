@@ -3689,13 +3689,116 @@ function NfcCardsTab({
   cards,
   loading,
   error,
+  businessId,
+  onCardCreated,
 }: {
   cards: NfcCard[];
   loading: boolean;
   error: string | null;
+  businessId?: string | null;
+  onCardCreated: (card: NfcCard) => void;
 }) {
   const [copiedCardId, setCopiedCardId] =
     useState<string | null>(null);
+  
+  const [showAddTable, setShowAddTable] =
+  useState(false);
+
+const [tableName, setTableName] =
+  useState("");
+
+const [creatingTable, setCreatingTable] =
+  useState(false);
+
+const [createError, setCreateError] =
+  useState<string | null>(null);
+
+  async function createTable(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+  
+    const cleanName = tableName.trim();
+  
+    if (!cleanName) {
+      setCreateError(
+        "Γράψε ένα όνομα για το τραπέζι.",
+      );
+      return;
+    }
+  
+    try {
+      setCreatingTable(true);
+      setCreateError(null);
+  
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+  
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+  
+      const query = businessId
+        ? `?business_id=${encodeURIComponent(
+            businessId,
+          )}`
+        : "";
+  
+      const response = await fetch(
+        `/api/cards${query}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            name: cleanName,
+          }),
+        },
+      );
+  
+      const result = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Απέτυχε η δημιουργία του τραπεζιού.",
+        );
+      }
+  
+      const createdCard: NfcCard = {
+        ...result.card,
+        landing_page_name:
+          result.card.landing_page_name ??
+          cards[0]?.landing_page_name ??
+          null,
+        location_name:
+          result.card.location_name ??
+          cards[0]?.location_name ??
+          null,
+        tracking_url:
+          result.card.tracking_url ??
+          `https://tomacity.github.io/tsipouradiko-smart-link-/?source=nfc&card=${result.card.public_token}`,
+      };
+  
+      onCardCreated(createdCard);
+  
+      setTableName("");
+      setShowAddTable(false);
+    } catch (error) {
+      setCreateError(
+        error instanceof Error
+          ? error.message
+          : "Παρουσιάστηκε κάποιο σφάλμα.",
+      );
+    } finally {
+      setCreatingTable(false);
+    }
+  }
 
   async function copyTrackingUrl(card: NfcCard) {
     try {
@@ -3752,6 +3855,30 @@ function NfcCardsTab({
 
   return (
     <div className="space-y-6">
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+        NFC Management
+      </p>
+  
+      <h1 className="mt-2 text-[32px] font-black tracking-[-0.04em]">
+        Τραπέζια
+      </h1>
+    </div>
+  
+    <button
+      type="button"
+      onClick={() => {
+        setShowAddTable(true);
+        setCreateError(null);
+      }}
+      className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727]"
+    >
+      + Προσθήκη τραπεζιού
+    </button>
+  </div>
+      
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <article className="rounded-[20px] bg-[#222] p-6 text-white">
           <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
@@ -3890,6 +4017,84 @@ function NfcCardsTab({
           </article>
         ))}
       </section>
+
+      {showAddTable &&
+        createPortal(
+          <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-5 backdrop-blur-sm">
+            <section className="w-full max-w-[460px] rounded-[24px] bg-white p-7 shadow-2xl md:p-9">
+              <div className="flex items-start justify-between gap-5">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                    Νέα NFC κάρτα
+                  </p>
+      
+                  <h2 className="mt-3 text-[30px] font-black tracking-[-0.04em]">
+                    Προσθήκη τραπεζιού
+                  </h2>
+                </div>
+      
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!creatingTable) {
+                      setShowAddTable(false);
+                      setTableName("");
+                      setCreateError(null);
+                    }
+                  }}
+                  className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#F4F4F2] text-lg font-bold"
+                  aria-label="Κλείσιμο"
+                >
+                  ×
+                </button>
+              </div>
+      
+              <form
+                onSubmit={createTable}
+                className="mt-8"
+              >
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#222]/45">
+                    Όνομα τραπεζιού
+                  </span>
+      
+                  <input
+                    type="text"
+                    value={tableName}
+                    onChange={(event) =>
+                      setTableName(event.target.value)
+                    }
+                    placeholder="π.χ. Τραπέζι 2"
+                    autoFocus
+                    disabled={creatingTable}
+                    className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]/35 disabled:opacity-60"
+                  />
+                </label>
+      
+                {createError && (
+                  <p className="mt-4 rounded-[12px] bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-700">
+                    {createError}
+                  </p>
+                )}
+      
+                <button
+                  type="submit"
+                  disabled={
+                    creatingTable ||
+                    !tableName.trim()
+                  }
+                  className="mt-7 w-full rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {creatingTable
+                    ? "Δημιουργία..."
+                    : "Δημιουργία τραπεζιού"}
+                </button>
+              </form>
+            </section>
+          </div>,
+          document.body,
+        )}
+      
     </div>
   );
 }
@@ -4543,6 +4748,13 @@ function DashboardPage({
                 cards={cards}
                 loading={cardsLoading}
                 error={cardsError}
+                businessId={businessId}
+                onCardCreated={(createdCard) => {
+                  setCards((currentCards) => [
+                    createdCard,
+                    ...currentCards,
+                  ]);
+                }}
               />
             ) : activeTab === "settings" &&
               analytics ? (
