@@ -431,21 +431,22 @@ export default async function handler(
     const cards =
       await cardsResponse.json();
 
-    const eventsQuery =
-      new URLSearchParams({
-        business_id: `eq.${businessId}`,
-    
-        select: [
-          "event_name",
-          "visitor_id",
-          "session_id",
-          "metadata",
-          "created_at",
-        ].join(","),
-    
-        order: "created_at.desc",
-        limit: "10000",
-      });
+      const eventsQuery =
+        new URLSearchParams({
+          business_id: `eq.${businessId}`,
+      
+          select: [
+            "event_type",
+            "card_id",
+            "visitor_id",
+            "session_id",
+            "metadata",
+            "created_at",
+          ].join(","),
+      
+          order: "created_at.desc",
+          limit: "10000",
+        });
     
     const eventsResponse =
       await supabaseRequest({
@@ -481,51 +482,35 @@ export default async function handler(
             page.id ===
             card.landing_page_id,
         );
-  
-      const location =
-        locations.find(
-          (item: any) =>
-            item.id ===
-            landingPage?.location_id,
-        );
-  
-      const source =
-        card.card_type === "qr"
-          ? "qr"
-          : "nfc";
-  
+
       const cardEvents =
         analyticsEvents.filter(
           (event: any) =>
+            event.card_id === card.id ||
             event.metadata?.card_token ===
-            card.public_token,
+              card.public_token,
         );
-  
+      
       const tapEvents =
         cardEvents.filter(
           (event: any) =>
-            event.event_name ===
-            "page_view",
+            event.event_type === "page_view",
         );
-  
+      
       const menuEvents =
         cardEvents.filter(
           (event: any) =>
-            event.event_name ===
-              "menu_open" ||
-            event.event_name ===
-              "menu_click",
+            event.event_type === "menu_open" ||
+            event.event_type === "menu_click",
         );
-  
+      
       const reviewEvents =
         cardEvents.filter(
           (event: any) =>
-            event.event_name ===
-              "review_click" ||
-            event.event_name ===
-              "review_open",
+            event.event_type === "review_open" ||
+            event.event_type === "review_click",
         );
-  
+        
       const uniqueVisitors =
         new Set(
           tapEvents
