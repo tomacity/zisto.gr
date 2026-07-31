@@ -317,6 +317,58 @@ export default async function handler(
     const landingPages =
       await landingPagesResponse.json();
 
+    if (req.method === "POST") {
+      const name =
+        typeof req.body?.name === "string"
+          ? req.body.name.trim()
+          : "";
+    
+      if (!name) {
+        return res.status(400).json({
+          error: "Δώσε όνομα τραπεζιού",
+        });
+      }
+    
+      const publicToken = crypto.randomUUID();
+    
+      const createResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path: "/rest/v1/cards",
+          method: "POST",
+          headers: {
+            Prefer: "return=representation",
+          },
+          body: {
+            landing_page_id: landingPages[0].id,
+            name,
+            card_type: "nfc",
+            public_token: publicToken,
+            is_active: true,
+          },
+        });
+    
+      if (!createResponse.ok) {
+        const errorText =
+          await createResponse.text();
+    
+        console.error(errorText);
+    
+        return res.status(500).json({
+          error:
+            "Απέτυχε η δημιουργία τραπεζιού",
+        });
+      }
+    
+      const created =
+        await createResponse.json();
+    
+      return res.status(201).json({
+        card: created[0],
+      });
+    }
+
     const landingPageIds =
       landingPages.map(
         (page: { id: string }) =>
