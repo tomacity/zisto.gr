@@ -4519,8 +4519,18 @@ function DashboardPage({
             cache: "no-store",
           });
       
-          const result: CardsResponse | { error?: string } =
-            await response.json();
+          const responseText = await response.text();
+          
+          let result: CardsResponse | { error?: string };
+          
+          try {
+            result = JSON.parse(responseText);
+          } catch {
+            throw new Error(
+              responseText ||
+                `Το Cards API απέτυχε με status ${response.status}`,
+            );
+          }
       
           if (!response.ok) {
             throw new Error(
