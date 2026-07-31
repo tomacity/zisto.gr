@@ -3710,16 +3710,59 @@ function NfcCardsTab({
     useState<string | null>(null);
   
   const [showAddTable, setShowAddTable] =
-  useState(false);
+    useState(false);
 
-const [tableName, setTableName] =
-  useState("");
+  const [tableName, setTableName] =
+    useState("");
 
-const [creatingTable, setCreatingTable] =
-  useState(false);
+  const [creatingTable, setCreatingTable] =
+    useState(false);
 
-const [createError, setCreateError] =
-  useState<string | null>(null);
+  const [createError, setCreateError] =
+    useState<string | null>(null);
+
+  async function deleteCard(
+    cardId: string,
+  ) {
+    const confirmed =
+      window.confirm(
+        "Θέλεις σίγουρα να διαγράψεις αυτό το τραπέζι;"
+      );
+  
+    if (!confirmed) {
+      return;
+    }
+  
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+  
+    if (!session) {
+      return;
+    }
+  
+    const response = await fetch(
+      `/api/cards?card_id=${cardId}`,
+      {
+        method: "DELETE",
+  
+        headers: {
+          Authorization:
+            `Bearer ${session.access_token}`,
+        },
+      },
+    );
+  
+    if (!response.ok) {
+      alert(
+        "Απέτυχε η διαγραφή."
+      );
+  
+      return;
+    }
+  
+    window.location.reload();
+  }
 
   async function createTable(
     event: FormEvent<HTMLFormElement>,
@@ -3972,6 +4015,15 @@ const [createError, setCreateError] =
                 {copiedCardId === card.id
                   ? "Αντιγράφηκε"
                   : "Αντιγραφή URL"}
+              </button>
+
+              <button
+                onClick={() =>
+                  deleteCard(card.id)
+                }
+                className="rounded-full border border-red-200 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600"
+              >
+                🗑 Διαγραφή
               </button>
             </div>
 
