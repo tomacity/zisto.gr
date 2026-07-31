@@ -18,7 +18,7 @@ function setCorsHeaders(req: any, res: any) {
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, OPTIONS",
+    "GET, POST, OPTIONS",
   );
 
   res.setHeader(
@@ -38,22 +38,27 @@ async function supabaseRequest({
   path,
   method = "GET",
   headers = {},
+  body,
 }: {
   supabaseUrl: string;
   supabaseSecretKey: string;
   path: string;
   method?: string;
   headers?: Record<string, string>;
+  body?: unknown;
 }) {
   return fetch(`${supabaseUrl}${path}`, {
     method,
     headers: {
       apikey: supabaseSecretKey,
-      Authorization:
-        `Bearer ${supabaseSecretKey}`,
+      Authorization: `Bearer ${supabaseSecretKey}`,
       "Content-Type": "application/json",
       ...headers,
     },
+    body:
+      body !== undefined
+        ? JSON.stringify(body)
+        : undefined,
   });
 }
 
@@ -67,7 +72,10 @@ export default async function handler(
     return res.status(204).end();
   }
 
-  if (req.method !== "GET") {
+  if (
+    req.method !== "GET" &&
+    req.method !== "POST"
+  ) {
     return res.status(405).json({
       error: "Method not allowed",
     });
