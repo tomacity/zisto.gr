@@ -3991,7 +3991,7 @@ const [createError, setCreateError] =
                   </p>
               
                   <p className="mt-3 text-[30px] font-black">
-                    {card.analytics.total_taps}
+                    {card.analytics?.total_taps ?? 0}
                   </p>
                 </div>
               
@@ -4001,7 +4001,7 @@ const [createError, setCreateError] =
                   </p>
               
                   <p className="mt-3 text-[30px] font-black">
-                    {card.analytics.menu_opens}
+                    {card.analytics?.menu_opens ?? 0}
                   </p>
                 </div>
               
@@ -4011,7 +4011,7 @@ const [createError, setCreateError] =
                   </p>
               
                   <p className="mt-3 text-[30px] font-black">
-                    {card.analytics.review_clicks}
+                    {card.analytics?.review_clicks ?? 0}
                   </p>
                 </div>
               
@@ -4021,7 +4021,7 @@ const [createError, setCreateError] =
                   </p>
               
                   <p className="mt-3 text-[30px] font-black">
-                    {card.analytics.unique_visitors}
+                    {card.analytics?.unique_visitors ?? 0}
                   </p>
                 </div>
               </div>
