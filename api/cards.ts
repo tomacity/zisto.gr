@@ -483,6 +483,18 @@ export default async function handler(
             card.landing_page_id,
         );
 
+      const location =
+        locations.find(
+          (item: any) =>
+            item.id ===
+            landingPage?.location_id,
+        );
+      
+      const source =
+        card.card_type === "qr"
+          ? "qr"
+          : "nfc";
+
       const cardEvents =
         analyticsEvents.filter(
           (event: any) =>
@@ -565,7 +577,10 @@ export default async function handler(
     );
 
     return res.status(500).json({
-      error: "Internal server error",
+      error:
+        error instanceof Error
+          ? error.message
+          : String(error),
     });
   }
 }
