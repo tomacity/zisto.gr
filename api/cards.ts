@@ -18,7 +18,7 @@ function setCorsHeaders(req: any, res: any) {
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, DELETE, OPTIONS",
+    "GET, POST, PATCH, DELETE, OPTIONS",
   );
 
   res.setHeader(
@@ -75,6 +75,7 @@ export default async function handler(
   if (
     req.method !== "GET" &&
     req.method !== "POST" &&
+    req.method !== "PATCH" &&
     req.method !== "DELETE"
   ) {
     return res.status(405).json({
@@ -317,6 +318,109 @@ export default async function handler(
 
     const landingPages =
       await landingPagesResponse.json();
+
+    if (req.method === "PATCH") {
+      const cardId =
+        typeof req.query.card_id === "string"
+          ? req.query.card_id
+          : null;
+    
+      const name =
+        typeof req.body?.name === "string"
+          ? req.body.name.trim()
+          : "";
+    
+      if (!cardId) {
+        return res.status(400).json({
+          error: "Λείπει το card_id",
+        });
+      }
+    
+      if (!name) {
+        return res.status(400).json({
+          error: "Το όνομα είναι υποχρεωτικό",
+        });
+      }
+    
+      const allowedLandingPageIds =
+        landingPages.map(
+          (page: { id: string }) => page.id,
+        );
+    
+      const cardCheckQuery =
+        new URLSearchParams({
+          id: `eq.${cardId}`,
+          landing_page_id:
+            `in.(${allowedLandingPageIds.join(",")})`,
+          select: "id",
+          limit: "1",
+        });
+    
+      const cardCheckResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/cards?${cardCheckQuery.toString()}`,
+        });
+    
+      if (!cardCheckResponse.ok) {
+        return res.status(500).json({
+          error:
+            "Απέτυχε ο έλεγχος της κάρτας",
+        });
+      }
+    
+      const matchingCards =
+        await cardCheckResponse.json();
+    
+      if (matchingCards.length === 0) {
+        return res.status(404).json({
+          error:
+            "Η κάρτα δεν βρέθηκε ή δεν ανήκει σε αυτή την επιχείρηση",
+        });
+      }
+    
+      const updateResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path: `/rest/v1/cards?id=eq.${encodeURIComponent(
+            cardId,
+          )}`,
+          method: "PATCH",
+          headers: {
+            Prefer: "return=representation",
+          },
+          body: {
+            name,
+            updated_at:
+              new Date().toISOString(),
+          },
+        });
+    
+      if (!updateResponse.ok) {
+        const errorText =
+          await updateResponse.text();
+    
+        console.error(
+          "Card update failed:",
+          errorText,
+        );
+    
+        return res.status(500).json({
+          error:
+            "Απέτυχε η αλλαγή ονόματος",
+        });
+      }
+    
+      const updatedCards =
+        await updateResponse.json();
+    
+      return res.status(200).json({
+        card: updatedCards[0],
+      });
+    }
 
     if (req.method === "DELETE") {
       const cardId =
