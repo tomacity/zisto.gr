@@ -1801,6 +1801,14 @@ type NfcCard = {
   landing_page_name: string | null;
   location_name: string | null;
   tracking_url: string;
+
+  analytics: {
+    total_taps: number;
+    menu_opens: number;
+    review_clicks: number;
+    unique_visitors: number;
+    last_used_at: string | null;
+  };
 };
 
 type CardsResponse = {
@@ -3975,6 +3983,49 @@ const [createError, setCreateError] =
               <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-[#222]/65">
                 {card.tracking_url}
               </p>
+
+              <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="rounded-[14px] bg-[#222] p-4 text-white">
+                  <p className="text-[9px] uppercase text-white/40">
+                    Taps
+                  </p>
+              
+                  <p className="mt-3 text-[30px] font-black">
+                    {card.analytics.total_taps}
+                  </p>
+                </div>
+              
+                <div className="rounded-[14px] border border-black/10 p-4">
+                  <p className="text-[9px] uppercase text-[#222]/35">
+                    Menu opens
+                  </p>
+              
+                  <p className="mt-3 text-[30px] font-black">
+                    {card.analytics.menu_opens}
+                  </p>
+                </div>
+              
+                <div className="rounded-[14px] border border-black/10 p-4">
+                  <p className="text-[9px] uppercase text-[#222]/35">
+                    Review clicks
+                  </p>
+              
+                  <p className="mt-3 text-[30px] font-black">
+                    {card.analytics.review_clicks}
+                  </p>
+                </div>
+              
+                <div className="rounded-[14px] border border-black/10 p-4">
+                  <p className="text-[9px] uppercase text-[#222]/35">
+                    Visitors
+                  </p>
+              
+                  <p className="mt-3 text-[30px] font-black">
+                    {card.analytics.unique_visitors}
+                  </p>
+                </div>
+              </div>
+              
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
