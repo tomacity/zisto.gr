@@ -431,42 +431,144 @@ export default async function handler(
     const cards =
       await cardsResponse.json();
 
-    const enrichedCards = cards.map(
-      (card: any) => {
-        const landingPage =
-          landingPages.find(
-            (page: any) =>
-              page.id ===
-              card.landing_page_id,
-          );
+    const eventsQuery =
+      new URLSearchParams({
+        business_id: `eq.${businessId}`,
+    
+        select: [
+          "event_name",
+          "visitor_id",
+          "session_id",
+          "metadata",
+          "created_at",
+        ].join(","),
+    
+        order: "created_at.desc",
+        limit: "10000",
+      });
+    
+    const eventsResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/analytics_events?${eventsQuery.toString()}`,
+      });
+    
+    if (!eventsResponse.ok) {
+      const errorText =
+        await eventsResponse.text();
+    
+      console.error(
+        "Card analytics query failed:",
+        errorText,
+      );
+    
+      return res.status(500).json({
+        error:
+          "Failed to load card analytics",
+      });
+    }
+    
+    const analyticsEvents =
+      await eventsResponse.json();
 
-        const location =
-          locations.find(
-            (item: any) =>
-              item.id ===
-              landingPage?.location_id,
-          );
-
-        const source =
-          card.card_type === "qr"
-            ? "qr"
-            : "nfc";
-
-        return {
-          ...card,
-
-          landing_page_name:
-            landingPage?.name ?? null,
-
-          location_name:
-            location?.name ?? null,
-
-          tracking_url:
-            `https://tomacity.github.io/tsipouradiko-smart-link-/?source=${source}&card=${card.public_token}`,
-        };
-      },
-    );
-
+   const enrichedCards = cards.map(
+    (card: any) => {
+      const landingPage =
+        landingPages.find(
+          (page: any) =>
+            page.id ===
+            card.landing_page_id,
+        );
+  
+      const location =
+        locations.find(
+          (item: any) =>
+            item.id ===
+            landingPage?.location_id,
+        );
+  
+      const source =
+        card.card_type === "qr"
+          ? "qr"
+          : "nfc";
+  
+      const cardEvents =
+        analyticsEvents.filter(
+          (event: any) =>
+            event.metadata?.card_token ===
+            card.public_token,
+        );
+  
+      const tapEvents =
+        cardEvents.filter(
+          (event: any) =>
+            event.event_name ===
+            "page_view",
+        );
+  
+      const menuEvents =
+        cardEvents.filter(
+          (event: any) =>
+            event.event_name ===
+              "menu_open" ||
+            event.event_name ===
+              "menu_click",
+        );
+  
+      const reviewEvents =
+        cardEvents.filter(
+          (event: any) =>
+            event.event_name ===
+              "review_click" ||
+            event.event_name ===
+              "review_open",
+        );
+  
+      const uniqueVisitors =
+        new Set(
+          tapEvents
+            .map(
+              (event: any) =>
+                event.visitor_id ||
+                event.session_id,
+            )
+            .filter(Boolean),
+        ).size;
+  
+      return {
+        ...card,
+  
+        landing_page_name:
+          landingPage?.name ?? null,
+  
+        location_name:
+          location?.name ?? null,
+  
+        tracking_url:
+          `https://tomacity.github.io/tsipouradiko-smart-link-/?source=${source}&card=${card.public_token}`,
+  
+        analytics: {
+          total_taps:
+            tapEvents.length,
+  
+          menu_opens:
+            menuEvents.length,
+  
+          review_clicks:
+            reviewEvents.length,
+  
+          unique_visitors:
+            uniqueVisitors,
+  
+          last_used_at:
+            cardEvents[0]?.created_at ??
+            null,
+        },
+      };
+    },
+  );
     return res.status(200).json({
       business_id: businessId,
       cards: enrichedCards,
