@@ -3988,43 +3988,46 @@ function NfcCardsTab({
                       ? "Ενεργή"
                       : "Ανενεργή"}
                   </span>
-
+            
                   <span className="rounded-full bg-[#F6F6F4] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/45">
                     {card.card_type}
                   </span>
                 </div>
-
+            
                 <h2 className="mt-5 text-[28px] font-black tracking-[-0.04em]">
                   {card.name}
                 </h2>
-
+            
                 <p className="mt-2 text-[12px] text-[#222]/45">
                   {card.placement ||
                     card.location_name ||
                     "Δεν έχει οριστεί θέση"}
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  void copyTrackingUrl(card);
-                }}
-                className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727]"
-              >
-                {copiedCardId === card.id
-                  ? "Αντιγράφηκε"
-                  : "Αντιγραφή URL"}
-              </button>
-
-              <button
-                onClick={() =>
-                  deleteCard(card.id)
-                }
-                className="rounded-full border border-red-200 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600"
-              >
-                🗑 Διαγραφή
-              </button>
+            
+              <div className="flex w-full flex-col gap-3 sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyTrackingUrl(card);
+                  }}
+                  className="w-full rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727] sm:min-w-[190px]"
+                >
+                  {copiedCardId === card.id
+                    ? "Αντιγράφηκε"
+                    : "🔗 Αντιγραφή URL"}
+                </button>
+            
+                <button
+                  type="button"
+                  onClick={() => {
+                    void deleteCard(card.id);
+                  }}
+                  className="w-full rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white sm:min-w-[190px]"
+                >
+                  🗑 Διαγραφή
+                </button>
+              </div>
             </div>
 
             <div className="mt-7 rounded-[16px] bg-[#F6F6F4] p-5">
