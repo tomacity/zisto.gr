@@ -5154,18 +5154,21 @@ function DashboardPage({
       )}
 
       {/* Main content */}
-      <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-black/5 bg-[#F6F6F4]/85 px-5 backdrop-blur-xl md:px-8 lg:px-10">
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white lg:hidden"
-          aria-label="Άνοιγμα μενού"
-        >
-          ☰
-        </button>
+      <div className="min-h-screen lg:pl-[280px]">
+        <header className="sticky top-0 z-30 h-20 border-b border-black/5 bg-[#F6F6F4]/85 px-5 backdrop-blur-xl md:px-8 lg:px-10">
+          <DashboardAppear
+            delay={80}
+            className="flex h-full items-center justify-between"
+          >
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white lg:hidden"
+              aria-label="Άνοιγμα μενού"
+            >
+              ☰
+            </button>
       
-        <DashboardAppear delay={80}>
-          <div className="flex items-center gap-8">
             <p className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35 sm:block">
               {new Intl.DateTimeFormat("el-GR", {
                 weekday: "long",
@@ -5191,9 +5194,9 @@ function DashboardPage({
                 {clientInitial}
               </div>
             </div>
-          </div>
-        </DashboardAppear>
-      </header>
+          </DashboardAppear>
+        </header>
+        
         <div className="mx-auto w-full max-w-[1600px] px-5 py-10 md:px-8 lg:px-10 lg:py-14">
           <DashboardAppear
             key={awaitingApproval ? "approval" : activeTab}
