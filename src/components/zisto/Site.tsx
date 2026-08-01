@@ -703,9 +703,80 @@ function Services() {
           {SERVICES.map((s, i) => (
             <ServiceCard key={s.n} s={s} i={i} />
           ))}
-        </div>
+        </div> 
+
+        <DashboardHeroPreview />
+        
       </div>
     </section>
+  );
+
+  function DashboardHeroPreview() {
+  return (
+    <Reveal delay={200}>
+      <section className="mt-28">
+
+        <div className="mb-14 text-center">
+
+          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
+            Dashboard
+          </p>
+
+          <h2 className="mt-5 text-[10vw] font-black leading-[0.9] tracking-[-0.04em] text-[#222] md:text-[5vw]">
+            Όλα σε μία οθόνη.
+          </h2>
+
+          <p className="mx-auto mt-5 max-w-3xl text-[16px] leading-relaxed text-[#222]/60">
+            Παρακολούθησε επισκέψεις, conversions, reviews, μενού και
+            την απόδοση κάθε NFC κάρτας σε πραγματικό χρόνο.
+          </p>
+
+        </div>
+
+        <div className="relative mx-auto max-w-[1400px]">
+
+          <div
+            className="
+              overflow-hidden
+              rounded-[28px]
+              border
+              border-black/10
+              bg-white
+              shadow-[0_60px_120px_-40px_rgba(0,0,0,0.25)]
+              transition-all
+              duration-700
+              hover:-translate-y-2
+              hover:shadow-[0_80px_160px_-40px_rgba(0,0,0,0.35)]
+            "
+          >
+
+            <div className="border-b border-black/10 px-6 py-4">
+
+              <div className="flex gap-2">
+
+                <div className="h-3 w-3 rounded-full bg-red-400" />
+
+                <div className="h-3 w-3 rounded-full bg-yellow-400" />
+
+                <div className="h-3 w-3 rounded-full bg-green-400" />
+
+              </div>
+
+            </div>
+
+            <img
+              src="/images/dashboard-preview.png"
+              alt="Zisto dashboard"
+              className="w-full object-cover"
+              draggable={false}
+            />
+
+          </div>
+
+        </div>
+
+      </section>
+    </Reveal>
   );
 }
 
