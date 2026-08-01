@@ -325,22 +325,27 @@ export default async function handler(
           ? req.query.card_id
           : null;
     
-      const name =
-        typeof req.body?.name === "string"
-          ? req.body.name.trim()
-          : "";
-    
-      if (!cardId) {
-        return res.status(400).json({
-          error: "Λείπει το card_id",
-        });
-      }
-    
-      if (!name) {
-        return res.status(400).json({
-          error: "Το όνομα είναι υποχρεωτικό",
-        });
-      }
+        const name =
+          typeof req.body?.name === "string"
+            ? req.body.name.trim()
+            : null;
+        
+        const isActive =
+          typeof req.body?.is_active === "boolean"
+            ? req.body.is_active
+            : null;
+        
+        if (!cardId) {
+          return res.status(400).json({
+            error: "Λείπει το card_id",
+          });
+        }
+        
+        if (name === null && isActive === null) {
+          return res.status(400).json({
+            error: "Δεν δόθηκαν δεδομένα",
+          });
+        }
     
       const allowedLandingPageIds =
         landingPages.map(
@@ -393,9 +398,11 @@ export default async function handler(
             Prefer: "return=representation",
           },
           body: {
-            name,
-            updated_at:
-              new Date().toISOString(),
+            ...(name !== null && { name }),
+            ...(isActive !== null && {
+              is_active: isActive,
+            }),
+            updated_at: new Date().toISOString(),
           },
         });
     
