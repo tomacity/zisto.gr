@@ -670,6 +670,13 @@ const SERVICES = [
     span: "md:col-span-7",
     big: true,
   },
+  {
+    n: "05",
+    title: "Το δικό σου Dashboard",
+    body: "Κάθε επιχείρηση αποκτά προσωπικό dashboard με live analytics, στατιστικά ανά τραπέζι και πλήρη διαχείριση των NFC καρτών της.",
+    span: "md:col-span-12",
+    big: true,
+  },
 ];
 
 function Services() {
@@ -687,7 +694,7 @@ function Services() {
               </h2>
             </div>
             <div className="hidden text-right text-[11px] font-bold uppercase tracking-[0.24em] text-[#222]/40 md:block">
-              04 — Υπηρεσίες
+              05 — Υπηρεσίες
             </div>
           </div>
         </Reveal>
