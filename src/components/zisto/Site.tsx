@@ -3699,6 +3699,7 @@ function NfcCardsTab({
   error,
   businessId,
   onCardCreated,
+  onCardUpdated,
 }: {
   cards: NfcCard[];
   loading: boolean;
@@ -4082,27 +4083,118 @@ function NfcCardsTab({
     <div className="space-y-6">
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-        NFC Management
-      </p>
-  
-      <h1 className="mt-2 text-[32px] font-black tracking-[-0.04em]">
-        Τραπέζια
-      </h1>
-    </div>
-  
-    <button
-      type="button"
-      onClick={() => {
-        setShowAddTable(true);
-        setCreateError(null);
-      }}
-      className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727]"
-    >
-      + Προσθήκη τραπεζιού
-    </button>
-  </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            NFC Management
+          </p>
+      
+          <h1 className="mt-2 text-[32px] font-black tracking-[-0.04em]">
+            Τραπέζια
+          </h1>
+        </div>
+      
+        <button
+          type="button"
+          onClick={() => {
+            setShowAddTable(true);
+            setCreateError(null);
+          }}
+          className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727]"
+        >
+          + Προσθήκη τραπεζιού
+        </button>
+      </div>
+
+      {editingCard &&
+        createPortal(
+          <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-5 backdrop-blur-sm">
+            <section className="w-full max-w-[460px] rounded-[24px] bg-white p-7 shadow-2xl md:p-9">
+              <div className="flex items-start justify-between gap-5">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                    Επεξεργασία κάρτας
+                  </p>
+      
+                  <h2 className="mt-3 text-[30px] font-black tracking-[-0.04em]">
+                    Αλλαγή ονόματος
+                  </h2>
+                </div>
+      
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!savingEdit) {
+                      setEditingCard(null);
+                      setEditingName("");
+                      setEditError(null);
+                    }
+                  }}
+                  className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#F4F4F2] text-lg font-bold"
+                  aria-label="Κλείσιμο"
+                >
+                  ×
+                </button>
+              </div>
+      
+              <form
+                onSubmit={updateCardName}
+                className="mt-8"
+              >
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#222]/45">
+                    Όνομα τραπεζιού
+                  </span>
+      
+                  <input
+                    type="text"
+                    value={editingName}
+                    onChange={(event) =>
+                      setEditingName(event.target.value)
+                    }
+                    autoFocus
+                    disabled={savingEdit}
+                    className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]/35 disabled:opacity-60"
+                  />
+                </label>
+      
+                {editError && (
+                  <p className="mt-4 rounded-[12px] bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-700">
+                    {editError}
+                  </p>
+                )}
+      
+                <div className="mt-7 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={savingEdit}
+                    onClick={() => {
+                      setEditingCard(null);
+                      setEditingName("");
+                      setEditError(null);
+                    }}
+                    className="rounded-full border border-black/10 px-5 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-[#222] transition hover:border-[#222]"
+                  >
+                    Ακύρωση
+                  </button>
+      
+                  <button
+                    type="submit"
+                    disabled={
+                      savingEdit ||
+                      !editingName.trim()
+                    }
+                    className="rounded-full bg-[#222] px-5 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingEdit
+                      ? "Αποθήκευση..."
+                      : "Αποθήκευση"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>,
+          document.body,
+        )}
       
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <article className="rounded-[20px] bg-[#222] p-6 text-white">
