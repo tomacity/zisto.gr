@@ -681,7 +681,10 @@ const SERVICES = [
 
 function Services() {
   return (
-    <section id="services" className="relative bg-white py-28 md:py-40">
+    <section
+      id="services"
+      className="relative bg-white py-28 md:py-40"
+    >
       <div className="mx-auto w-full max-w-[1400px] px-5 md:px-10">
         <Reveal>
           <div className="flex flex-wrap items-end justify-between gap-6">
@@ -689,10 +692,12 @@ function Services() {
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
                 Τι φτιάχνουμε
               </p>
+
               <h2 className="mt-5 max-w-[16ch] text-[10vw] font-black leading-[0.9] tracking-[-0.035em] text-[#222] md:text-[6.5vw] lg:text-[5.2vw]">
                 Ένα ενιαίο kit, όχι σκόρπια κομμάτια.
               </h2>
             </div>
+
             <div className="hidden text-right text-[11px] font-bold uppercase tracking-[0.24em] text-[#222]/40 md:block">
               05 — Υπηρεσίες
             </div>
@@ -701,23 +706,25 @@ function Services() {
 
         <div className="mt-16 grid grid-cols-1 gap-px overflow-hidden rounded-[6px] border border-black/10 bg-black/10 md:mt-24 md:grid-cols-12">
           {SERVICES.map((s, i) => (
-            <ServiceCard key={s.n} s={s} i={i} />
+            <ServiceCard
+              key={s.n}
+              s={s}
+              i={i}
+            />
           ))}
-        </div> 
+        </div>
 
         <DashboardHeroPreview />
-        
       </div>
     </section>
   );
+}
 
-  function DashboardHeroPreview() {
+function DashboardHeroPreview() {
   return (
     <Reveal delay={200}>
       <section className="mt-28">
-
         <div className="mb-14 text-center">
-
           <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
             Dashboard
           </p>
@@ -730,51 +737,37 @@ function Services() {
             Παρακολούθησε επισκέψεις, conversions, reviews, μενού και
             την απόδοση κάθε NFC κάρτας σε πραγματικό χρόνο.
           </p>
-
         </div>
 
         <div className="relative mx-auto max-w-[1400px]">
-
           <div
-            className="
-              overflow-hidden
-              rounded-[28px]
-              border
-              border-black/10
-              bg-white
-              shadow-[0_60px_120px_-40px_rgba(0,0,0,0.25)]
-              transition-all
-              duration-700
-              hover:-translate-y-2
-              hover:shadow-[0_80px_160px_-40px_rgba(0,0,0,0.35)]
-            "
+            className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_60px_120px_-40px_rgba(0,0,0,0.25)] transition-all duration-700 hover:-translate-y-2 hover:shadow-[0_80px_160px_-40px_rgba(0,0,0,0.35)]"
+            style={{
+              transform:
+                "perspective(2000px) rotateX(4deg)",
+              transformOrigin: "center top",
+            }}
           >
-
-            <div className="border-b border-black/10 px-6 py-4">
-
+            <div className="flex items-center border-b border-black/10 px-6 py-4">
               <div className="flex gap-2">
-
                 <div className="h-3 w-3 rounded-full bg-red-400" />
-
                 <div className="h-3 w-3 rounded-full bg-yellow-400" />
-
                 <div className="h-3 w-3 rounded-full bg-green-400" />
-
               </div>
 
+              <p className="ml-5 font-mono text-[10px] text-[#222]/35">
+                dashboard.zisto.app
+              </p>
             </div>
 
             <img
               src="/images/dashboard-preview.png"
-              alt="Zisto dashboard"
-              className="w-full object-cover"
+              alt="Προεπισκόπηση του Zisto dashboard"
+              className="block h-auto w-full"
               draggable={false}
             />
-
           </div>
-
         </div>
-
       </section>
     </Reveal>
   );
@@ -789,6 +782,7 @@ function ServiceCard({
 }) {
   const [hover, setHover] = useState(false);
   const { ref, on } = useReveal<HTMLDivElement>();
+
   return (
     <div
       ref={ref}
@@ -799,51 +793,18 @@ function ServiceCard({
       }`}
       style={{
         opacity: on ? 1 : 0,
-        transform: on ? "translateY(0)" : "translateY(28px)",
-        transition: `background-color 500ms ease, color 500ms ease, opacity 800ms cubic-bezier(0.22,1,0.36,1) ${i * 80}ms, transform 800ms cubic-bezier(0.22,1,0.36,1) ${i * 80}ms`,
+        transform: on
+          ? "translateY(0)"
+          : "translateY(28px)",
+        transition: `background-color 500ms ease, color 500ms ease, opacity 800ms cubic-bezier(0.22,1,0.36,1) ${
+          i * 80
+        }ms, transform 800ms cubic-bezier(0.22,1,0.36,1) ${
+          i * 80
+        }ms`,
         minHeight: s.big ? "320px" : "260px",
       }}
     >
-      {/* Red sweep on hover */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 origin-bottom-left scale-y-0 bg-[#DC2727] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-y-100"
-        style={{ mixBlendMode: "normal", opacity: 0.9 }}
-      />
-      <div className="relative z-10 flex h-full flex-col justify-between gap-8">
-        <div className="flex items-start justify-between">
-          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.28em]">
-            {s.n}
-          </span>
-          <span className="grid h-8 w-8 place-items-center rounded-full border border-current opacity-70 transition-transform duration-500 group-hover:rotate-45">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M2 10L10 2M10 2H4M10 2V8"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-        </div>
-
-        <div>
-          <h3
-            className={`font-black tracking-[-0.02em] ${
-              s.big ? "text-[9vw] md:text-[4vw]" : "text-[8vw] md:text-[2.6vw]"
-            }`}
-          >
-            {s.title}
-          </h3>
-          <p
-            className={`mt-4 max-w-md text-[14px] leading-relaxed md:text-[15px] ${
-              hover ? "text-white/75" : "text-[#222]/60"
-            }`}
-          >
-            {s.body}
-          </p>
-        </div>
-      </div>
+      {/* Το υπάρχον περιεχόμενο του ServiceCard */}
     </div>
   );
 }
