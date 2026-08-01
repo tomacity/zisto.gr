@@ -97,6 +97,49 @@ function Magnetic({ children, strength = 0.3 }: { children: ReactNode; strength?
   );
 }
 
+function DashboardAppear({
+  children,
+  delay = 0,
+  className = "",
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setVisible(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return (
+    <div
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible
+          ? "translateY(0) scale(1)"
+          : "translateY(18px) scale(0.992)",
+        filter: visible ? "blur(0)" : "blur(5px)",
+        transition: `
+          opacity 650ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms,
+          transform 750ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms,
+          filter 500ms ease ${delay}ms
+        `,
+        willChange: "opacity, transform, filter",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Steam SVG (brand motif) — 3 curls, middle is red                  */
 /* ------------------------------------------------------------------ */
@@ -5111,43 +5154,51 @@ function DashboardPage({
       )}
 
       {/* Main content */}
-      <div className="min-h-screen lg:pl-[280px]">
-        <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-black/5 bg-[#F6F6F4]/85 px-5 backdrop-blur-xl md:px-8 lg:px-10">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white lg:hidden"
-            aria-label="Άνοιγμα μενού"
-          >
-            ☰
-          </button>
-
-          <p className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35 sm:block">
-            {new Intl.DateTimeFormat("el-GR", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-              timeZone: "Europe/Athens",
-            }).format(new Date())}
-          </p>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="max-w-[150px] truncate text-[11px] font-bold">{clientDisplayName}</p>
-              <p className="text-[9px] uppercase tracking-[0.15em] text-[#222]/35">
-                {analytics?.membership_role ?? "client"}
-              </p>
-            </div>
-
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-[#222] text-[12px] font-black text-white">
-              {clientInitial}
+      <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-black/5 bg-[#F6F6F4]/85 px-5 backdrop-blur-xl md:px-8 lg:px-10">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white lg:hidden"
+          aria-label="Άνοιγμα μενού"
+        >
+          ☰
+        </button>
+      
+        <DashboardAppear delay={80}>
+          <div className="flex items-center gap-8">
+            <p className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35 sm:block">
+              {new Intl.DateTimeFormat("el-GR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                timeZone: "Europe/Athens",
+              }).format(new Date())}
+            </p>
+      
+            <div className="flex items-center gap-3">
+              <div className="hidden text-right sm:block">
+                <p className="max-w-[150px] truncate text-[11px] font-bold">
+                  {clientDisplayName}
+                </p>
+      
+                <p className="text-[9px] uppercase tracking-[0.15em] text-[#222]/35">
+                  {analytics?.membership_role ?? "client"}
+                </p>
+              </div>
+      
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-[#222] text-[12px] font-black text-white">
+                {clientInitial}
+              </div>
             </div>
           </div>
-        </header>
-
+        </DashboardAppear>
+      </header>
         <div className="mx-auto w-full max-w-[1600px] px-5 py-10 md:px-8 lg:px-10 lg:py-14">
-         {awaitingApproval ? (
+          <DashboardAppear
+            key={awaitingApproval ? "approval" : activeTab}
+          >
+            {awaitingApproval ? (
             <PendingApproval
               email={userEmail}
               onSignOut={async () => {
@@ -5208,8 +5259,10 @@ function DashboardPage({
                 analytics={analytics}
               />
             )}
-            </>
-          )}
+          </>
+        )}
+      </DashboardAppear>
+    </div>
       
         </div>
       </div>
