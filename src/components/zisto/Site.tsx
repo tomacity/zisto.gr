@@ -3966,6 +3966,25 @@ function NfcCardsTab({
     }
   }
 
+  async function toggleCard(card: NfcCard) {
+    const response = await fetch(
+      `/api/cards?card_id=${card.id}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          is_active: !card.is_active,
+        }),
+      }
+    );
+  
+    const result = await response.json();
+  
+    onCardUpdated(result.card);
+  }
+
   async function copyTrackingUrl(card: NfcCard) {
     try {
       await navigator.clipboard.writeText(
@@ -4109,7 +4128,27 @@ function NfcCardsTab({
                   </span>
                 </div>
             
-                <div className="mt-5 inline-flex items-center gap-2">
+                <div className="mt-5 flex items-center gap-3">
+                  <h2 className="text-[28px] font-black tracking-[-0.04em]">
+                    {card.name}
+                  </h2>
+                
+                  <button>
+                    {/* μολυβάκι */}
+                  </button>
+                
+                  <button
+                    type="button"
+                    onClick={() => toggleCard(card)}
+                    className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition ${
+                      card.is_active
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {card.is_active ? "🟢 Ενεργή" : "⚫ Ανενεργή"}
+                  </button>
+                </div>
                   <h2 className="text-[28px] font-black tracking-[-0.04em]">
                     {card.name}
                   </h2>
