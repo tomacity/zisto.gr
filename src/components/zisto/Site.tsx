@@ -130,27 +130,17 @@ function DashboardAppear({
       className={className}
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible
-          ? "translate3d(0, 0, 0) scale(1)"
-          : "translate3d(0, 24px, 0) scale(0.985)",
-        filter: visible
-          ? "blur(0px)"
-          : "blur(8px)",
-        transitionProperty:
-          "opacity, transform, filter",
-        transitionDuration:
-          "650ms, 800ms, 550ms",
-        transitionTimingFunction:
-          "cubic-bezier(0.22, 1, 0.36, 1)",
-        transitionDelay: `${delay}ms`,
-        willChange:
-          "opacity, transform, filter",
+        transform: visible ? "translateY(0)" : "translateY(28px)",
+        filter: visible ? "blur(0)" : "blur(6px)",
+        transition: `opacity 900ms cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 900ms cubic-bezier(0.22,1,0.36,1) ${delay}ms, filter 700ms ease-out ${delay}ms`,
+        willChange: "opacity, transform, filter",
       }}
     >
       {children}
     </div>
   );
 }
+
 /* ------------------------------------------------------------------ */
 /*  Steam SVG (brand motif) — 3 curls, middle is red                  */
 /* ------------------------------------------------------------------ */
@@ -4136,8 +4126,9 @@ function NfcCardsTab({
   return (
     <div className="space-y-6">
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <Reveal>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
             NFC Management
           </p>
@@ -4156,8 +4147,9 @@ function NfcCardsTab({
           className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727]"
         >
           + Προσθήκη τραπεζιού
-        </button>
-      </div>
+          </button>
+        </div>
+      </Reveal>
 
       {editingCard &&
         createPortal(
@@ -4249,7 +4241,8 @@ function NfcCardsTab({
           </div>,
           document.body,
         )}
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <Reveal delay={100}>
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <article className="rounded-[20px] bg-[#222] p-6 text-white">
           <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
             Σύνολο καρτών
@@ -4285,8 +4278,8 @@ function NfcCardsTab({
             }
           </p>
         </article>
-      </section>
-    </Reveal>
+        </section>
+      </Reveal>
 
       <section className="space-y-4">
         {cards.map((card, index) => (
@@ -5408,7 +5401,11 @@ const selectedBusinessId =
   }
   
   if (route === "/admin") {
-  return <AdminPage />;
+    return (
+      <DashboardAppear key="admin-dashboard" className="min-h-screen">
+        <AdminPage />
+      </DashboardAppear>
+    );
   }
 
   return <LandingPage />;
