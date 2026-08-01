@@ -4249,7 +4249,7 @@ function NfcCardsTab({
           </div>,
           document.body,
         )}
-      
+    <Reveal>
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <article className="rounded-[20px] bg-[#222] p-6 text-white">
           <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
@@ -4287,10 +4287,12 @@ function NfcCardsTab({
           </p>
         </article>
       </section>
+    </Reveal>
 
       <section className="space-y-4">
         {cards.map((card) => (
           <article
+            <Reveal>
             key={card.id}
             className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8"
           >
@@ -4486,6 +4488,7 @@ function NfcCardsTab({
               </div>
             </div>
           </article>
+        </Reveal>
         ))}
       </section>
 
