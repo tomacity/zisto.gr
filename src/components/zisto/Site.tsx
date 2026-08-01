@@ -3967,24 +3967,64 @@ function NfcCardsTab({
   }
 
   async function toggleCard(card: NfcCard) {
-    const response = await fetch(
-      `/api/cards?card_id=${card.id}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          is_active: !card.is_active,
-        }),
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+  
+      if (!session) {
+        window.location.hash = "/login";
+        return;
       }
-    );
   
-    const result = await response.json();
+      const response = await fetch(
+        `/api/cards?card_id=${encodeURIComponent(
+          card.id,
+        )}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            is_active: !card.is_active,
+          }),
+        },
+      );
   
-    onCardUpdated(result.card);
+      const responseText = await response.text();
+  
+      const result = responseText
+        ? JSON.parse(responseText)
+        : {};
+  
+      if (!response.ok || !result.card) {
+        throw new Error(
+          result.error ||
+            "Απέτυχε η αλλαγή κατάστασης.",
+        );
+      }
+  
+      onCardUpdated({
+        ...card,
+        ...result.card,
+      });
+    } catch (error) {
+      console.error(
+        "Toggle card failed:",
+        error,
+      );
+  
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Απέτυχε η αλλαγή κατάστασης.",
+      );
+    }
   }
-
+  
   async function copyTrackingUrl(card: NfcCard) {
     try {
       await navigator.clipboard.writeText(
@@ -4128,27 +4168,7 @@ function NfcCardsTab({
                   </span>
                 </div>
             
-                <div className="mt-5 flex items-center gap-3">
-                  <h2 className="text-[28px] font-black tracking-[-0.04em]">
-                    {card.name}
-                  </h2>
-                
-                  <button>
-                    {/* μολυβάκι */}
-                  </button>
-                
-                  <button
-                    type="button"
-                    onClick={() => toggleCard(card)}
-                    className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition ${
-                      card.is_active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {card.is_active ? "🟢 Ενεργή" : "⚫ Ανενεργή"}
-                  </button>
-                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
                   <h2 className="text-[28px] font-black tracking-[-0.04em]">
                     {card.name}
                   </h2>
@@ -4161,7 +4181,7 @@ function NfcCardsTab({
                       setEditError(null);
                     }}
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-[#DC2727]/10 text-[#DC2727] transition-all duration-200 hover:scale-110 hover:bg-[#DC2727] hover:text-white"
-                    aria-label="Επεξεργασία"
+                    aria-label={`Επεξεργασία ${card.name}`}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -4171,10 +4191,29 @@ function NfcCardsTab({
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
                     >
                       <path d="M12 20h9" />
                       <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
                     </svg>
+                  </button>
+                
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void toggleCard(card);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] transition ${
+                      card.is_active
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >
+                    {card.is_active
+                      ? "● Ενεργή"
+                      : "● Ανενεργή"}
                   </button>
                 </div>
             
