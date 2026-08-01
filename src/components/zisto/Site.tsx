@@ -109,12 +109,19 @@ function DashboardAppear({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setVisible(true);
+    setVisible(false);
+
+    let secondFrame = 0;
+
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setVisible(true);
+      });
     });
 
     return () => {
-      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
     };
   }, []);
 
@@ -124,22 +131,26 @@ function DashboardAppear({
       style={{
         opacity: visible ? 1 : 0,
         transform: visible
-          ? "translateY(0) scale(1)"
-          : "translateY(18px) scale(0.992)",
-        filter: visible ? "blur(0)" : "blur(5px)",
-        transition: `
-          opacity 650ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms,
-          transform 750ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms,
-          filter 500ms ease ${delay}ms
-        `,
-        willChange: "opacity, transform, filter",
+          ? "translate3d(0, 0, 0) scale(1)"
+          : "translate3d(0, 24px, 0) scale(0.985)",
+        filter: visible
+          ? "blur(0px)"
+          : "blur(8px)",
+        transitionProperty:
+          "opacity, transform, filter",
+        transitionDuration:
+          "650ms, 800ms, 550ms",
+        transitionTimingFunction:
+          "cubic-bezier(0.22, 1, 0.36, 1)",
+        transitionDelay: `${delay}ms`,
+        willChange:
+          "opacity, transform, filter",
       }}
     >
       {children}
     </div>
   );
 }
-
 /* ------------------------------------------------------------------ */
 /*  Steam SVG (brand motif) — 3 curls, middle is red                  */
 /* ------------------------------------------------------------------ */
