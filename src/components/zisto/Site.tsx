@@ -5182,6 +5182,15 @@ function DashboardPage({
                     ...currentCards,
                   ]);
                 }}
+                onCardUpdated={(updatedCard) => {
+                  setCards((currentCards) =>
+                    currentCards.map((card) =>
+                      card.id === updatedCard.id
+                        ? updatedCard
+                        : card,
+                    ),
+                  );
+                }}
               />
             ) : activeTab === "settings" &&
               analytics ? (
