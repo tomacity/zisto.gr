@@ -5263,12 +5263,11 @@ function DashboardPage({
               />
             )}
           </>
-        )}
-      </DashboardAppear>
+          )}
+        </DashboardAppear>
+      </div>
     </div>
       
-        </div>
-      </div>
       {showTutorial && analytics && (
         <DashboardTutorial
           step={tutorialStep}
