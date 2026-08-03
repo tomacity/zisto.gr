@@ -4942,7 +4942,7 @@ function DashboardPage({
   const [cardsLoading, setCardsLoading] = useState(true);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>("aanalytics");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("analytics");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [awaitingApproval, setAwaitingApproval] = useState(false);
