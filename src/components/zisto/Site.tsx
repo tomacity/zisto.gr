@@ -6,6 +6,21 @@ import {
   type CSSProperties,
   type FormEvent,
 } from "react";
+
+import {
+  DndContext,
+  closestCenter,
+} from "@dnd-kit/core";
+
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+
+import { CSS } from "@dnd-kit/utilities";
+
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import { AdminPage } from "../../pages/AdminPage";
@@ -3841,6 +3856,76 @@ function SettingsTab({
   );
 }
 
+function SortableCard({
+  card,
+  children,
+}: {
+  card: NfcCard;
+  children: ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: card.id,
+  });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.75 : 1,
+    position: "relative",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`transition-shadow ${
+        isDragging
+          ? "rounded-[22px] shadow-2xl"
+          : ""
+      }`}
+    >
+      <div className="relative">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="absolute right-5 top-5 z-20 grid h-10 w-10 cursor-grab touch-none place-items-center rounded-full border border-black/10 bg-white text-[#222]/45 transition hover:border-[#222] hover:text-[#222] active:cursor-grabbing"
+          aria-label={`Μετακίνηση ${card.name}`}
+          title="Σύρε για αλλαγή σειράς"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M9 5h.01" />
+            <path d="M9 12h.01" />
+            <path d="M9 19h.01" />
+            <path d="M15 5h.01" />
+            <path d="M15 12h.01" />
+            <path d="M15 19h.01" />
+          </svg>
+        </button>
+
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function NfcCardsTab({
   cards,
   loading,
@@ -3858,6 +3943,37 @@ function NfcCardsTab({
 }) {
   const [editingCard, setEditingCard] =
     useState<NfcCard | null>(null);
+
+  const [orderedCards, setOrderedCards] =
+    useState<NfcCard[]>(cards);
+  
+  useEffect(() => {
+    setOrderedCards(cards);
+  }, [cards]);
+
+  function handleDragEnd(event: any) {
+    const { active, over } = event;
+  
+    if (!over || active.id === over.id) {
+      return;
+    }
+  
+    setOrderedCards((items) => {
+      const oldIndex = items.findIndex(
+        (item) => item.id === active.id
+      );
+  
+      const newIndex = items.findIndex(
+        (item) => item.id === over.id
+      );
+  
+      return arrayMove(
+        items,
+        oldIndex,
+        newIndex
+      );
+    });
+  }
   
   const [editingName, setEditingName] =
     useState("");
@@ -4384,114 +4500,122 @@ function NfcCardsTab({
         </article>
         </section>
       </Reveal>
-
+      
+  <DndContext
+    collisionDetection={closestCenter}
+    onDragEnd={handleDragEnd}
+  >
+    <SortableContext
+      items={orderedCards.map((card) => card.id)}
+      strategy={verticalListSortingStrategy}
+    >
       <section className="space-y-4">
-        {cards.map((card, index) => (
+        {orderedCards.map((card, id) => (
           <Reveal
             key={card.id}
             delay={Math.min(index * 80, 320)}
           >
             <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span
-                    className={`rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] ${
-                      card.is_active
-                        ? "bg-green-50 text-green-700"
-                        : "bg-[#F1F1EF] text-[#222]/45"
-                    }`}
-                  >
-                    {card.is_active
-                      ? "Ενεργή"
-                      : "Ανενεργή"}
-                  </span>
-            
-                  <span className="rounded-full bg-[#F6F6F4] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/45">
-                    {card.card_type}
-                  </span>
-                </div>
-            
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <h2 className="text-[28px] font-black tracking-[-0.04em]">
-                    {card.name}
-                  </h2>
-                
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingCard(card);
-                      setEditingName(card.name);
-                      setEditError(null);
-                    }}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[#DC2727]/10 text-[#DC2727] transition-all duration-200 hover:scale-110 hover:bg-[#DC2727] hover:text-white"
-                    aria-label={`Επεξεργασία ${card.name}`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span
+                      className={`rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] ${
+                        card.is_active
+                          ? "bg-green-50 text-green-700"
+                          : "bg-[#F1F1EF] text-[#222]/45"
+                      }`}
                     >
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                  </button>
+                      {card.is_active
+                        ? "Ενεργή"
+                        : "Ανενεργή"}
+                    </span>
+            
+                    <span className="rounded-full bg-[#F6F6F4] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/45">
+                      {card.card_type}
+                    </span>
+                  </div>
+            
+                  <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <h2 className="text-[28px] font-black tracking-[-0.04em]">
+                      {card.name}
+                    </h2>
+                  
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCard(card);
+                        setEditingName(card.name);
+                        setEditError(null);
+                      }}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-[#DC2727]/10 text-[#DC2727] transition-all duration-200 hover:scale-110 hover:bg-[#DC2727] hover:text-white"
+                      aria-label={`Επεξεργασία ${card.name}`}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
                 
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void toggleCard(card);
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] transition ${
+                        card.is_active
+                          ? "bg-green-100 text-green-700 hover:bg-green-200"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      {card.is_active
+                        ? "● Ενεργή"
+                        : "● Ανενεργή"}
+                    </button>
+                  </div>
+            
+                  <p className="mt-2 text-[12px] text-[#222]/45">
+                    {card.placement ||
+                      card.location_name ||
+                      "Δεν έχει οριστεί θέση"}
+                  </p>
+                </div>
+            
+                <div className="flex w-full flex-col gap-3 sm:w-auto">
                   <button
                     type="button"
                     onClick={() => {
-                      void toggleCard(card);
+                      void copyTrackingUrl(card);
                     }}
-                    className={`rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] transition ${
-                      card.is_active
-                        ? "bg-green-100 text-green-700 hover:bg-green-200"
-                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
+                    className="w-full rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727] sm:min-w-[190px]"
                   >
-                    {card.is_active
-                      ? "● Ενεργή"
-                      : "● Ανενεργή"}
+                    {copiedCardId === card.id
+                      ? "Αντιγράφηκε"
+                      : "🔗 Αντιγραφή URL"}
+                  </button>
+              
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void deleteCard(card.id);
+                    }}
+                    className="w-full rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white sm:min-w-[190px]"
+                  >
+                    🗑 Διαγραφή
                   </button>
                 </div>
-            
-                <p className="mt-2 text-[12px] text-[#222]/45">
-                  {card.placement ||
-                    card.location_name ||
-                    "Δεν έχει οριστεί θέση"}
-                </p>
               </div>
-            
-              <div className="flex w-full flex-col gap-3 sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void copyTrackingUrl(card);
-                  }}
-                  className="w-full rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727] sm:min-w-[190px]"
-                >
-                  {copiedCardId === card.id
-                    ? "Αντιγράφηκε"
-                    : "🔗 Αντιγραφή URL"}
-                </button>
-            
-                <button
-                  type="button"
-                  onClick={() => {
-                    void deleteCard(card.id);
-                  }}
-                  className="w-full rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white sm:min-w-[190px]"
-                >
-                  🗑 Διαγραφή
-                </button>
-              </div>
-            </div>
 
             <div className="mt-7 rounded-[16px] bg-[#F6F6F4] p-5">
               <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
@@ -4587,6 +4711,8 @@ function NfcCardsTab({
         </Reveal>
         ))}
       </section>
+    </SortableContext>
+  </DndContext>
 
       {showAddTable &&
         createPortal(
