@@ -4942,7 +4942,7 @@ function DashboardPage({
   const [cardsLoading, setCardsLoading] = useState(true);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("aanalytics");
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [awaitingApproval, setAwaitingApproval] = useState(false);
@@ -5202,7 +5202,6 @@ function DashboardPage({
 
         <nav className="mt-10 flex flex-col gap-2">
           {[
-            { id: "overview" as const, icon: "▦", label: "Επισκόπηση" },
             { id: "analytics" as const, icon: "↗", label: "Analytics" },
             { id: "reviews" as const, icon: "★", label: "Αξιολογήσεις" },
             { id: "menu" as const, icon: "☰", label: "Μενού" },
@@ -5320,11 +5319,7 @@ function DashboardPage({
               }}
             />
           ) : (
-            <>
-            {activeTab === "overview" ? (
-              <>
-                {/* υπάρχον Overview */}
-              </>
+            
             ) : activeTab === "analytics" &&
               analytics ? (
               <AnalyticsTab analytics={analytics} />
