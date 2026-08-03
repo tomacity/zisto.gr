@@ -5318,7 +5318,6 @@ function DashboardPage({
                 window.location.hash = "/login";
               }}
             />
-          ) : (
             
             ) : activeTab === "analytics" &&
               analytics ? (
