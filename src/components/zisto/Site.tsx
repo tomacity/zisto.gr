@@ -5307,70 +5307,73 @@ function DashboardPage({
         </header>
         
         <div className="mx-auto w-full max-w-[1600px] px-5 py-10 md:px-8 lg:px-10 lg:py-14">
+          
           <DashboardAppear
             key={awaitingApproval ? "approval" : activeTab}
           >
             {awaitingApproval ? (
-            <PendingApproval
-              email={userEmail}
-              onSignOut={async () => {
-                await supabase.auth.signOut();
-                window.location.hash = "/login";
-              }}
-            />
-            
-            ) : activeTab === "analytics" &&
-              analytics ? (
-              <AnalyticsTab analytics={analytics} />
-            ) : activeTab === "reviews" &&
-              analytics ? (
-              <ReviewsTab analytics={analytics} />
-            ) : activeTab === "menu" &&
-              analytics ? (
-              <MenuTab analytics={analytics} />
-            ) : activeTab === "nfc" ? (
-              <NfcCardsTab
-                cards={cards}
-                loading={cardsLoading}
-                error={cardsError}
-                businessId={businessId}
-                onCardCreated={(createdCard) => {
-                  setCards((currentCards) => [
-                    createdCard,
-                    ...currentCards,
-                  ]);
-                }}
-                onCardUpdated={(updatedCard) => {
-                  setCards((currentCards) =>
-                    currentCards.map((card) =>
-                      card.id === updatedCard.id
-                        ? updatedCard
-                        : card,
-                    ),
-                  );
-                }}
-              />
-            ) : activeTab === "settings" &&
-              analytics ? (
-              <SettingsTab
-                analytics={analytics}
-                userEmail={userEmail}
-                onLogout={async () => {
+              <PendingApproval
+                email={userEmail}
+                onSignOut={async () => {
                   await supabase.auth.signOut();
                   window.location.hash = "/login";
                 }}
               />
             ) : (
-              <DashboardTabPlaceholder
-                tab={activeTab}
-                analytics={analytics}
-              />
+              <>
+                {activeTab === "analytics" &&
+                analytics ? (
+                  <AnalyticsTab analytics={analytics} />
+                ) : activeTab === "reviews" &&
+                  analytics ? (
+                  <ReviewsTab analytics={analytics} />
+                ) : activeTab === "menu" &&
+                  analytics ? (
+                  <MenuTab analytics={analytics} />
+                ) : activeTab === "nfc" ? (
+                  <NfcCardsTab
+                    cards={cards}
+                    loading={cardsLoading}
+                    error={cardsError}
+                    businessId={businessId}
+                    onCardCreated={(createdCard) => {
+                      setCards((currentCards) => [
+                        createdCard,
+                        ...currentCards,
+                      ]);
+                    }}
+                    onCardUpdated={(updatedCard) => {
+                      setCards((currentCards) =>
+                        currentCards.map((card) =>
+                          card.id === updatedCard.id
+                            ? updatedCard
+                            : card,
+                        ),
+                      );
+                    }}
+                  />
+                ) : activeTab === "settings" &&
+                  analytics ? (
+                  <SettingsTab
+                    analytics={analytics}
+                    userEmail={userEmail}
+                    onLogout={async () => {
+                      await supabase.auth.signOut();
+                      window.location.hash = "/login";
+                    }}
+                  />
+                ) : (
+                  <DashboardTabPlaceholder
+                    tab={activeTab}
+                    analytics={analytics}
+                  />
+                )}
+              </>
             )}
-          </>
-          )}
-        </DashboardAppear>
-      </div>
+          </DashboardAppear>
+          
     </div>
+   </div>
       
       {showTutorial && analytics && (
         <DashboardTutorial
