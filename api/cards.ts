@@ -551,30 +551,34 @@ export default async function handler(
     /*
      * Cards που ανήκουν στα landing pages.
      */
-    const cardsQuery =
-      new URLSearchParams({
-        landing_page_id:
-          `in.(${landingPageIds.join(",")})`,
+   const cardsQuery =
+    new URLSearchParams({
+      landing_page_id:
+        `in.(${landingPageIds.join(",")})`,
+  
+      select: [
+        "id",
+        "landing_page_id",
+        "name",
+        "card_type",
+        "public_token",
+        "placement",
+        "is_active",
+        "sort_order",
+        "created_at",
+        "updated_at",
+      ].join(","),
+  
+      order: "sort_order.asc",
+    });
 
-        select: [
-          "sort_order",
-          "id",
-          "landing_page_id",
-          "name",
-          "card_type",
-          "public_token",
-          "placement",
-          "is_active",
-          "created_at",
-          "updated_at",
-        ].join(","),
-
-        order: "sort_order.asc",
+    const cardsResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/cards?${cardsQuery.toString()}`,
       });
-
-const cardsResponse = await supabaseRequest({
-  path: `/rest/v1/cards?${cardsSortQuery.toString()}`,
-});
 
     if (!cardsResponse.ok) {
       const errorText =
