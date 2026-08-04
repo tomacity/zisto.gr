@@ -3951,43 +3951,99 @@ function NfcCardsTab({
     setOrderedCards(cards);
   }, [cards]);
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-  
-    if (!over || active.id === over.id) {
+  async function handleDragEnd(event: DragEndEvent) {
+  const { active, over } = event;
+
+  if (!over || active.id === over.id) {
+    return;
+  }
+
+  const oldIndex = orderedCards.findIndex(
+    (card) => card.id === active.id,
+  );
+
+  const newIndex = orderedCards.findIndex(
+    (card) => card.id === over.id,
+  );
+
+  if (oldIndex === -1 || newIndex === -1) {
+    return;
+  }
+
+  const previousCards = orderedCards;
+
+  const reorderedCards = arrayMove(
+    orderedCards,
+    oldIndex,
+    newIndex,
+  );
+
+  setOrderedCards(reorderedCards);
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      window.location.hash = "/login";
       return;
     }
-  
-    const reordered = arrayMove(
-      items,
-      oldIndex,
-      newIndex
-    );
-    
-    setTimeout(async () => {
-      for (let i = 0; i < reordered.length; i++) {
-        await fetch(
-          `/api/cards?card_id=${reordered[i].id}`,
-          {
-            method: "PATCH",
-    
-            headers: {
-              "Content-Type":
-                "application/json",
-    
-              Authorization: `Bearer ${session.access_token}`,
-            },
-    
-            body: JSON.stringify({
-              sort_order: i,
-            }),
-          }
+
+    const businessQuery = businessId
+      ? `&business_id=${encodeURIComponent(
+          businessId,
+        )}`
+      : "";
+
+    for (
+      let index = 0;
+      index < reorderedCards.length;
+      index += 1
+    ) {
+      const card = reorderedCards[index];
+
+      const response = await fetch(
+        `/api/cards?card_id=${encodeURIComponent(
+          card.id,
+        )}${businessQuery}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            sort_order: index,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Απέτυχε η αποθήκευση της σειράς",
         );
       }
-    }, 0);
-    
-    return reordered;
+    }
+  } catch (error) {
+    console.error(
+      "Failed to save card order:",
+      error,
+    );
+
+    setOrderedCards(previousCards);
+
+    window.alert(
+      error instanceof Error
+        ? error.message
+        : "Απέτυχε η αποθήκευση της σειράς",
+    );
   }
+}
   
   const [editingName, setEditingName] =
     useState("");
