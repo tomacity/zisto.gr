@@ -4514,12 +4514,15 @@ function NfcCardsTab({
       strategy={verticalListSortingStrategy}
     >
       <section className="space-y-4">
-        {orderedCards.map((card, index) => (
+      {orderedCards.map((card, index) => (
+        <SortableCard
+          key={card.id}
+          card={card}
+        >
           <Reveal
-            key={card.id}
             delay={Math.min(index * 80, 320)}
           >
-            <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+            <article className="rounded-[22px] border border-black/10 bg-white p-6 pr-20 md:p-8 md:pr-24">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -4713,9 +4716,10 @@ function NfcCardsTab({
             </div>
           </article>
         </Reveal>
-        ))}
-      </section>
-    </SortableContext>
+       </SortableCard>
+     ))}
+    </section>
+   </SortableContext>
   </DndContext>
 
       {showAddTable &&
