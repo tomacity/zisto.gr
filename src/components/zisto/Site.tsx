@@ -3958,25 +3958,35 @@ function NfcCardsTab({
       return;
     }
   
-    setOrderedCards((items) => {
-      const oldIndex = items.findIndex(
-        (item) => item.id === active.id
-      );
-  
-      const newIndex = items.findIndex(
-        (item) => item.id === over.id
-      );
-
-      if (oldIndex === -1 || newIndex === -1) {
-        return items;
+    const reordered = arrayMove(
+      items,
+      oldIndex,
+      newIndex
+    );
+    
+    setTimeout(async () => {
+      for (let i = 0; i < reordered.length; i++) {
+        await fetch(
+          `/api/cards?card_id=${reordered[i].id}`,
+          {
+            method: "PATCH",
+    
+            headers: {
+              "Content-Type":
+                "application/json",
+    
+              Authorization: `Bearer ${session.access_token}`,
+            },
+    
+            body: JSON.stringify({
+              sort_order: i,
+            }),
+          }
+        );
       }
-  
-      return arrayMove(
-        items,
-        oldIndex,
-        newIndex
-      );
-    });
+    }, 0);
+    
+    return reordered;
   }
   
   const [editingName, setEditingName] =
