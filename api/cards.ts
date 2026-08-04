@@ -557,6 +557,7 @@ export default async function handler(
           `in.(${landingPageIds.join(",")})`,
 
         select: [
+          "sort_order",
           "id",
           "landing_page_id",
           "name",
@@ -568,7 +569,7 @@ export default async function handler(
           "updated_at",
         ].join(","),
 
-        order: "created_at.desc",
+        order: "sort_order.asc",
       });
 
     const cardsResponse =
