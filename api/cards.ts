@@ -510,7 +510,7 @@ export default async function handler(
             card_type: "nfc",
             public_token: publicToken,
             is_active: true,
-            sort_order: cards.length,
+            sort_order: 0,
           },
         });
     
