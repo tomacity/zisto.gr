@@ -334,6 +334,11 @@ export default async function handler(
           typeof req.body?.is_active === "boolean"
             ? req.body.is_active
             : null;
+
+      const sortOrder =
+        typeof req.body?.sort_order === "number"
+          ? req.body.sort_order
+          : null;
         
         if (!cardId) {
           return res.status(400).json({
@@ -341,7 +346,11 @@ export default async function handler(
           });
         }
         
-        if (name === null && isActive === null) {
+        if (
+          name === null &&
+          isActive === null &&
+          sortOrder === null
+        ) {
           return res.status(400).json({
             error: "Δεν δόθηκαν δεδομένα",
           });
@@ -399,9 +408,15 @@ export default async function handler(
           },
           body: {
             ...(name !== null && { name }),
+          
             ...(isActive !== null && {
               is_active: isActive,
             }),
+          
+            ...(sortOrder !== null && {
+              sort_order: sortOrder,
+            }),
+          
             updated_at: new Date().toISOString(),
           },
         });
