@@ -596,26 +596,6 @@ export default async function handler(
 
     const cards =
       await cardsResponse.json();
-
-      const cardsQuery =
-        new URLSearchParams({
-          landing_page_id: `in.(${landingPageIds.join(",")})`,
-      
-          select: [
-            "id",
-            "landing_page_id",
-            "name",
-            "card_type",
-            "public_token",
-            "placement",
-            "is_active",
-            "sort_order",
-            "created_at",
-            "updated_at",
-          ].join(","),
-      
-          order: "sort_order.asc",
-        });
     
     const eventsResponse =
       await supabaseRequest({
