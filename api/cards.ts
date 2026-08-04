@@ -495,6 +495,7 @@ export default async function handler(
             card_type: "nfc",
             public_token: publicToken,
             is_active: true,
+            sort_order: cards.length,
           },
         });
     
@@ -580,21 +581,24 @@ export default async function handler(
     const cards =
       await cardsResponse.json();
 
-      const eventsQuery =
+      const cardsQuery =
         new URLSearchParams({
-          business_id: `eq.${businessId}`,
+          landing_page_id: `in.(${landingPageIds.join(",")})`,
       
           select: [
-            "event_type",
-            "card_id",
-            "visitor_id",
-            "session_id",
-            "metadata",
+            "id",
+            "landing_page_id",
+            "name",
+            "card_type",
+            "public_token",
+            "placement",
+            "is_active",
+            "sort_order",
             "created_at",
+            "updated_at",
           ].join(","),
       
-          order: "created_at.desc",
-          limit: "50",
+          order: "sort_order.asc",
         });
     
     const eventsResponse =
