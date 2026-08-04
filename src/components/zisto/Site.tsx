@@ -3874,54 +3874,54 @@ function SortableCard({
     id: card.id,
   });
 
-  const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 50 : undefined,
-    opacity: isDragging ? 0.75 : 1,
+  const sortableStyle: CSSProperties = {
+    transform: transform
+      ? CSS.Transform.toString(transform)
+      : undefined,
+    transition: transition ?? undefined,
     position: "relative",
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.7 : 1,
   };
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`transition-shadow ${
+      style={sortableStyle}
+      className={
         isDragging
-          ? "rounded-[22px] shadow-2xl"
-          : ""
-      }`}
+          ? "relative rounded-[22px] shadow-2xl"
+          : "relative"
+      }
     >
-      <div className="relative">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="absolute right-5 top-5 z-20 grid h-10 w-10 cursor-grab touch-none place-items-center rounded-full border border-black/10 bg-white text-[#222]/45 transition hover:border-[#222] hover:text-[#222] active:cursor-grabbing"
-          aria-label={`Μετακίνηση ${card.name}`}
-          title="Σύρε για αλλαγή σειράς"
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="absolute right-5 top-5 z-30 grid h-10 w-10 touch-none cursor-grab place-items-center rounded-full border border-black/10 bg-white text-[#222]/45 transition hover:border-[#222]/30 hover:text-[#222] active:cursor-grabbing"
+        aria-label={`Μετακίνηση ${card.name}`}
+        title="Σύρε για αλλαγή σειράς"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          aria-hidden="true"
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <path d="M9 5h.01" />
-            <path d="M9 12h.01" />
-            <path d="M9 19h.01" />
-            <path d="M15 5h.01" />
-            <path d="M15 12h.01" />
-            <path d="M15 19h.01" />
-          </svg>
-        </button>
+          <circle cx="9" cy="5" r="1" />
+          <circle cx="9" cy="12" r="1" />
+          <circle cx="9" cy="19" r="1" />
+          <circle cx="15" cy="5" r="1" />
+          <circle cx="15" cy="12" r="1" />
+          <circle cx="15" cy="19" r="1" />
+        </svg>
+      </button>
 
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
@@ -3951,7 +3951,7 @@ function NfcCardsTab({
     setOrderedCards(cards);
   }, [cards]);
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
   
     if (!over || active.id === over.id) {
@@ -3966,6 +3966,10 @@ function NfcCardsTab({
       const newIndex = items.findIndex(
         (item) => item.id === over.id
       );
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return items;
+      }
   
       return arrayMove(
         items,
