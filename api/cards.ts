@@ -596,6 +596,23 @@ export default async function handler(
 
     const cards =
       await cardsResponse.json();
+
+    const eventsQuery =
+      new URLSearchParams({
+        business_id: `eq.${businessId}`,
+
+        select: [
+          "event_type",
+          "card_id",
+          "visitor_id",
+          "session_id",
+          "metadata",
+          "created_at",
+        ].join(","),
+
+        order: "created_at.desc",
+        limit: "50",
+      });
     
     const eventsResponse =
       await supabaseRequest({
