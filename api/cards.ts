@@ -572,13 +572,9 @@ export default async function handler(
         order: "sort_order.asc",
       });
 
-    const cardsResponse =
-      await supabaseRequest({
-        supabaseUrl,
-        supabaseSecretKey,
-        path:
-          `/rest/v1/cards?${cardsQuery.toString()}`,
-      });
+const cardsResponse = await supabaseRequest({
+  path: `/rest/v1/cards?${cardsSortQuery.toString()}`,
+});
 
     if (!cardsResponse.ok) {
       const errorText =
