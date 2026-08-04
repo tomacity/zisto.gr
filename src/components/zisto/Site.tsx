@@ -4514,7 +4514,7 @@ function NfcCardsTab({
       strategy={verticalListSortingStrategy}
     >
       <section className="space-y-4">
-        {orderedCards.map((card, id) => (
+        {orderedCards.map((card, index) => (
           <Reveal
             key={card.id}
             delay={Math.min(index * 80, 320)}
