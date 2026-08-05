@@ -4429,6 +4429,51 @@ if (loading) {
           <h1 className="mt-2 text-[32px] font-black tracking-[-0.04em]">
             Τραπέζια
           </h1>
+            {drawerOpen && (
+              <>
+                <div
+                  onClick={() => setDrawerOpen(false)}
+                  className="fixed inset-0 z-40 bg-black/40"
+                />
+            
+                <div className="fixed right-0 top-0 z-50 h-screen w-[380px] bg-white shadow-2xl p-6">
+                  <div className="flex items-center justify-between border-b border-black/10 pb-4">
+                    <h2 className="text-xl font-bold">
+                      {selectedCard?.name}
+                    </h2>
+            
+                    <button
+                      onClick={() => setDrawerOpen(false)}
+                      className="h-10 w-10 rounded-full border border-black/10"
+                    >
+                      ✕
+                    </button>
+                  </div>
+            
+                  <div className="mt-6 flex flex-col gap-3">
+                    <button className="rounded-xl border border-black/10 p-4 text-left">
+                      📊 Analytics
+                    </button>
+            
+                    <button className="rounded-xl border border-black/10 p-4 text-left">
+                      ✏️ Μετονομασία
+                    </button>
+            
+                    <button className="rounded-xl border border-black/10 p-4 text-left">
+                      📋 Αντιγραφή URL
+                    </button>
+            
+                    <button className="rounded-xl border border-black/10 p-4 text-left">
+                      🟢 Ενεργό / Ανενεργό
+                    </button>
+            
+                    <button className="rounded-xl border border-red-200 p-4 text-left text-red-500">
+                      🗑️ Διαγραφή
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
         </div>
       
         <button
@@ -4642,6 +4687,16 @@ if (loading) {
                         <path d="M12 20h9" />
                         <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
                       </svg>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSelectedCard(card);
+                        setDrawerOpen(true);
+                      }}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-black/10 hover:bg-black/5"
+                    >
+                      ⚙️
                     </button>
                 
                     <button
