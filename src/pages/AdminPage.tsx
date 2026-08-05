@@ -1,3 +1,4 @@
+import { GlobalLoader } from "../components/ui/GlobalLoader";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { InviteClientPanel } from "../components/admin/InviteClientPanel";
