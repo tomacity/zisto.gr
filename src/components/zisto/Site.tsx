@@ -4433,10 +4433,10 @@ if (loading) {
               <>
                 <div
                   onClick={() => setDrawerOpen(false)}
-                  className="fixed inset-0 z-40 bg-black/40"
+                  className="fixed inset-0 z-[9998] bg-black/40"
                 />
             
-                <div className="fixed right-0 top-0 z-50 h-screen w-[380px] bg-white shadow-2xl p-6">
+                <div className="fixed right-0 top-0 z-[9999] h-screen w-[380px] bg-white shadow-2xl p-6">
                   <div className="flex items-center justify-between border-b border-black/10 pb-4">
                     <h2 className="text-xl font-bold">
                       {selectedCard?.name}
