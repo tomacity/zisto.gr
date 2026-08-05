@@ -582,15 +582,10 @@ useEffect(() => {
   
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F7F5F1] px-6">
-        <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
-
-          <p className="mt-5 text-sm font-medium text-[#666]">
-            Έλεγχος πρόσβασης διαχειριστή...
-          </p>
-        </div>
-      </main>
+      <GlobalLoader
+        fullScreen
+        message="Έλεγχος πρόσβασης διαχειριστή..."
+      />
     );
   }
 
@@ -1344,13 +1339,10 @@ async function updateBusiness(
 
   if (loading) {
     return (
-      <div className="mt-8 rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
-        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
-
-        <p className="mt-4 text-sm font-medium text-[#666]">
-          Φόρτωση επιχειρήσεων...
-        </p>
-      </div>
+      <GlobalLoader
+        fullScreen={false}
+        message="Φόρτωση επιχειρήσεων..."
+      />
     );
   }
 
@@ -2096,13 +2088,10 @@ function ProjectsPanel({
 
   if (loading) {
     return (
-      <div className="mt-8 rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
-        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
-
-        <p className="mt-4 text-sm font-medium text-[#666]">
-          Φόρτωση connected projects...
-        </p>
-      </div>
+      <GlobalLoader
+        fullScreen
+        message="Φόρτωση admin workspace..."
+      />
     );
   }
 
@@ -2641,13 +2630,10 @@ function ClientsPanel({
 
   if (loading) {
     return (
-      <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
-        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
-
-        <p className="mt-4 text-sm font-medium text-[#666]">
-          Φόρτωση clients...
-        </p>
-      </div>
+      <GlobalLoader
+        fullScreen={false}
+        message="Φόρτωση clients..."
+      />
     );
   }
 
@@ -3028,13 +3014,10 @@ function InvitationsPanel({
   
   if (loading) {
     return (
-      <div className="rounded-[24px] border border-black/10 bg-[#F7F5F1] p-10 text-center">
-        <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#222] border-t-transparent" />
-
-        <p className="mt-4 text-sm font-medium text-[#666]">
-          Φόρτωση προσκλήσεων...
-        </p>
-      </div>
+      <GlobalLoader
+        fullScreen={false}
+        message="Φόρτωση προσκλήσεων..."
+      />
     );
   }
 
