@@ -3944,6 +3944,12 @@ function NfcCardsTab({
   onCardCreated: (card: NfcCard) => void;
   onCardUpdated: (card: NfcCard) => void;
 }) {
+  const [selectedCard, setSelectedCard] =
+    useState<NfcCard | null>(null);
+  
+  const [drawerOpen, setDrawerOpen] =
+    useState(false);
+  
   const [editingCard, setEditingCard] =
     useState<NfcCard | null>(null);
 
