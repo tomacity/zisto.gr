@@ -4429,51 +4429,78 @@ if (loading) {
           <h1 className="mt-2 text-[32px] font-black tracking-[-0.04em]">
             Τραπέζια
           </h1>
-            {drawerOpen && (
-              <>
-                <div
-                  onClick={() => setDrawerOpen(false)}
-                  className="fixed inset-0 z-[9998] bg-black/40"
-                />
-            
-                <div className="fixed right-0 top-0 z-[9999] h-screen w-[380px] bg-white shadow-2xl p-6">
-                  <div className="flex items-center justify-between border-b border-black/10 pb-4">
-                    <h2 className="text-xl font-bold">
-                      {selectedCard?.name}
-                    </h2>
-            
-                    <button
-                      onClick={() => setDrawerOpen(false)}
-                      className="h-10 w-10 rounded-full border border-black/10"
-                    >
-                      ✕
-                    </button>
-                  </div>
-            
-                  <div className="mt-6 flex flex-col gap-3">
-                    <button className="rounded-xl border border-black/10 p-4 text-left">
-                      📊 Analytics
-                    </button>
-            
-                    <button className="rounded-xl border border-black/10 p-4 text-left">
-                      ✏️ Μετονομασία
-                    </button>
-            
-                    <button className="rounded-xl border border-black/10 p-4 text-left">
-                      📋 Αντιγραφή URL
-                    </button>
-            
-                    <button className="rounded-xl border border-black/10 p-4 text-left">
-                      🟢 Ενεργό / Ανενεργό
-                    </button>
-            
-                    <button className="rounded-xl border border-red-200 p-4 text-left text-red-500">
-                      🗑️ Διαγραφή
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+            {drawerOpen &&
+              selectedCard &&
+              typeof document !== "undefined" &&
+              createPortal(
+                <>
+                  <button
+                    type="button"
+                    aria-label="Κλείσιμο ρυθμίσεων κάρτας"
+                    onClick={() => {
+                      setDrawerOpen(false);
+                      setSelectedCard(null);
+                    }}
+                    className="fixed inset-0 z-[2147483646] cursor-default bg-black/40 backdrop-blur-[2px]"
+                  />
+
+                  <aside
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`Ρυθμίσεις ${selectedCard.name}`}
+                    className="fixed right-0 top-0 z-[2147483647] flex h-dvh w-full max-w-[420px] flex-col bg-white shadow-[-24px_0_80px_rgba(0,0,0,0.22)]"
+                  >
+                    <div className="flex items-center justify-between border-b border-black/10 px-6 py-5">
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
+                          Ρυθμίσεις κάρτας
+                        </p>
+
+                        <h2 className="mt-1 text-[24px] font-black tracking-[-0.04em] text-[#222]">
+                          {selectedCard.name}
+                        </h2>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDrawerOpen(false);
+                          setSelectedCard(null);
+                        }}
+                        className="grid h-10 w-10 place-items-center rounded-full border border-black/10 text-[#222] transition hover:bg-[#222] hover:text-white"
+                        aria-label="Κλείσιμο"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6">
+                      <div className="flex flex-col gap-3">
+                        <button className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]">
+                          📊 Analytics
+                        </button>
+
+                        <button className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]">
+                          ✏️ Μετονομασία
+                        </button>
+
+                        <button className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]">
+                          📋 Αντιγραφή URL
+                        </button>
+
+                        <button className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]">
+                          🟢 Ενεργό / Ανενεργό
+                        </button>
+
+                        <button className="rounded-xl border border-red-200 p-4 text-left text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white">
+                          🗑️ Διαγραφή
+                        </button>
+                      </div>
+                    </div>
+                  </aside>
+                </>,
+                document.body,
+              )}
         </div>
       
         <button
