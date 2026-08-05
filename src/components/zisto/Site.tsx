@@ -4429,8 +4429,7 @@ if (loading) {
           <h1 className="mt-2 text-[32px] font-black tracking-[-0.04em]">
             Τραπέζια
           </h1>
-            {drawerOpen &&
-              selectedCard &&
+
               typeof document !== "undefined" &&
              {createPortal(
                 <>
