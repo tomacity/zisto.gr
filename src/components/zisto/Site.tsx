@@ -2519,6 +2519,31 @@ function RecentActivity({ events }: { events: AnalyticsEvent[] }) {
   );
 }
 
+function GlobalLoader({
+  fullScreen = true,
+}: {
+  fullScreen?: boolean;
+}) {
+  return (
+    <div
+      className={
+        fullScreen
+          ? "fixed inset-0 z-[9999] flex items-center justify-center bg-white"
+          : "flex min-h-[240px] items-center justify-center"
+      }
+    >
+      <video
+        src="/videos/loading.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        className="h-32 w-32 object-contain"
+      />
+    </div>
+  );
+}
 /* ================================================================== */
 /*  DASHBOARD PAGE                                                    */
 /* ================================================================== */
@@ -4376,15 +4401,9 @@ function NfcCardsTab({
     }
   }
 
-  if (loading) {
-    return (
-      <section className="rounded-[22px] border border-black/10 bg-white p-8">
-        <p className="text-sm font-semibold text-[#222]/45">
-          Φόρτωση καρτών...
-        </p>
-      </section>
-    );
-  }
+if (loading) {
+  return <GlobalLoader />;
+}
 
   if (error) {
     return (
