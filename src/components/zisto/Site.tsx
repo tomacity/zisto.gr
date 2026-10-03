@@ -4470,7 +4470,18 @@ if (loading) {
                           📊 Analytics
                         </button>
               
-                        <button className="rounded-xl border border-black/10 p-4 text-left">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedCard) return;
+                        
+                            setEditingCard(selectedCard);
+                            setEditingName(selectedCard.name);
+                            setEditError(null);
+                            setDrawerOpen(false);
+                          }}
+                          className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
+                        >
                           ✏️ Μετονομασία
                         </button>
               
