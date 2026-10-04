@@ -4466,9 +4466,6 @@ if (loading) {
                       </div>
               
                       <div className="mt-6 flex flex-col gap-3">
-                        <button className="rounded-xl border border-black/10 p-4 text-left">
-                          📊 Analytics
-                        </button>
               
                         <button
                           type="button"
