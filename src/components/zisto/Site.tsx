@@ -4485,8 +4485,17 @@ if (loading) {
                           ✏️ Μετονομασία
                         </button>
               
-                        <button className="rounded-xl border border-black/10 p-4 text-left">
-                          📋 Αντιγραφή URL
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedCard) return;
+                            void copyTrackingUrl(selectedCard);
+                          }}
+                          className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
+                        >
+                          {selectedCard && copiedCardId === selectedCard.id
+                            ? "✅ Αντιγράφηκε"
+                            : "📋 Αντιγραφή URL"}
                         </button>
               
                         <button className="rounded-xl border border-black/10 p-4 text-left">
