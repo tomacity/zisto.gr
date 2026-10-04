@@ -1,4 +1,4 @@
-import { GlobalLoader } from "../ui/GlobalLoader";
+φφimport { GlobalLoader } from "../ui/GlobalLoader";
 
 import {
   useEffect,
@@ -4684,15 +4684,39 @@ if (loading) {
           <Reveal
             delay={Math.min(index * 80, 320)}
           >
-          <article className="rounded-[18px] border border-black/10 bg-white px-6 py-5 pr-32 transition hover:border-black/20">
+          <article
+            onClick={() => {
+              // εδώ στο επόμενο βήμα θα ανοίξουμε
+              // τα analytics του συγκεκριμένου τραπεζιού
+              setSelectedCard(card);
+            }}
+            className="cursor-pointer rounded-[18px] border border-black/10 bg-white px-6 py-5 pr-32 transition hover:border-black/25 hover:shadow-sm"
+          >
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-[20px] font-black tracking-[-0.03em] text-[#222]">
-                {card.name}
-              </h2>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${
+                    card.is_active
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                  aria-label={
+                    card.is_active
+                      ? "Ενεργό τραπέζι"
+                      : "Ανενεργό τραπέζι"
+                  }
+                />
+          
+                <h2 className="text-[20px] font-black tracking-[-0.03em] text-[#222]">
+                  {card.name}
+                </h2>
+              </div>
           
               <button
                 type="button"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
+          
                   setSelectedCard(card);
                   setDrawerOpen(true);
                 }}
