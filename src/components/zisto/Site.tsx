@@ -4664,11 +4664,25 @@ if (loading) {
           <Reveal
             delay={Math.min(index * 80, 320)}
           >
-            <article className="rounded-[18px] border border-black/10 bg-white px-6 py-5 pr-20 transition hover:border-black/20">
+          <article className="rounded-[18px] border border-black/10 bg-white px-6 py-5 pr-32 transition hover:border-black/20">
+            <div className="flex items-center justify-between gap-4">
               <h2 className="text-[20px] font-black tracking-[-0.03em] text-[#222]">
                 {card.name}
               </h2>
-            </article>
+          
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCard(card);
+                  setDrawerOpen(true);
+                }}
+                className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full border border-black/10 text-[16px] transition hover:bg-[#222] hover:text-white"
+                aria-label={`Ρυθμίσεις ${card.name}`}
+              >
+                ⚙️
+              </button>
+            </div>
+          </article>
         </Reveal>
        </SortableCard>
      ))}
