@@ -3950,6 +3950,9 @@ function NfcCardsTab({
   const [drawerOpen, setDrawerOpen] =
     useState(false);
   
+  const [analyticsCard, setAnalyticsCard] =
+    useState<NfcCard | null>(null);
+  
   const [editingCard, setEditingCard] =
     useState<NfcCard | null>(null);
 
@@ -4400,6 +4403,106 @@ if (loading) {
   }
 
   if (cards.length === 0) {
+    if (analyticsCard) {
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <button
+                type="button"
+                onClick={() => setAnalyticsCard(null)}
+                className="mb-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#222]/45 transition hover:text-[#222]"
+              >
+                ← Πίσω στα τραπέζια
+              </button>
+    
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Analytics τραπεζιού
+              </p>
+    
+              <div className="mt-2 flex items-center gap-3">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    analyticsCard.is_active
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                />
+    
+                <h1 className="text-[32px] font-black tracking-[-0.04em]">
+                  {analyticsCard.name}
+                </h1>
+              </div>
+            </div>
+          </div>
+    
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <article className="rounded-[20px] bg-[#222] p-6 text-white">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+                Taps
+              </p>
+    
+              <p className="mt-8 text-[48px] font-black leading-none">
+                {analyticsCard.analytics?.total_taps ?? 0}
+              </p>
+            </article>
+    
+            <article className="rounded-[20px] border border-black/10 bg-white p-6">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
+                Menu opens
+              </p>
+    
+              <p className="mt-8 text-[48px] font-black leading-none">
+                {analyticsCard.analytics?.menu_opens ?? 0}
+              </p>
+            </article>
+    
+            <article className="rounded-[20px] border border-black/10 bg-white p-6">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
+                Review clicks
+              </p>
+    
+              <p className="mt-8 text-[48px] font-black leading-none">
+                {analyticsCard.analytics?.review_clicks ?? 0}
+              </p>
+            </article>
+    
+            <article className="rounded-[20px] border border-black/10 bg-white p-6">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
+                Visitors
+              </p>
+    
+              <p className="mt-8 text-[48px] font-black leading-none">
+                {analyticsCard.analytics?.unique_visitors ?? 0}
+              </p>
+            </article>
+          </section>
+    
+          <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8">
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
+              Τελευταία χρήση
+            </p>
+    
+            <p className="mt-4 text-[18px] font-black">
+              {analyticsCard.analytics?.last_used_at
+                ? new Intl.DateTimeFormat("el-GR", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "Europe/Athens",
+                  }).format(
+                    new Date(
+                      analyticsCard.analytics.last_used_at,
+                    ),
+                  )
+                : "Δεν υπάρχει ακόμη δραστηριότητα"}
+            </p>
+          </section>
+        </div>
+      );
+    }
     return (
       <section className="rounded-[22px] border border-black/10 bg-white px-6 py-16 text-center">
         <p className="text-[42px]">⌁</p>
@@ -4681,12 +4784,10 @@ if (loading) {
           <Reveal
             delay={Math.min(index * 80, 320)}
           >
-          <article
-            onClick={() => {
-              // εδώ στο επόμενο βήμα θα ανοίξουμε
-              // τα analytics του συγκεκριμένου τραπεζιού
-              setSelectedCard(card);
-            }}
+        <article
+          onClick={() => {
+            setAnalyticsCard(card);
+          }}
             className="cursor-pointer rounded-[18px] border border-black/10 bg-white px-6 py-5 pr-32 transition hover:border-black/25 hover:shadow-sm"
           >
             <div className="flex items-center justify-between gap-4">
