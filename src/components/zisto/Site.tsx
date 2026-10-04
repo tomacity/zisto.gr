@@ -1,4 +1,4 @@
-φφimport { GlobalLoader } from "../ui/GlobalLoader";
+import { GlobalLoader } from "../ui/GlobalLoader";
 
 import {
   useEffect,
