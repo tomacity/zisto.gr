@@ -4498,8 +4498,19 @@ if (loading) {
                             : "📋 Αντιγραφή URL"}
                         </button>
               
-                        <button className="rounded-xl border border-black/10 p-4 text-left">
-                          🟢 Ενεργό / Ανενεργό
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedCard) return;
+                        
+                            void toggleCard(selectedCard);
+                            setDrawerOpen(false);
+                          }}
+                          className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
+                        >
+                          {selectedCard?.is_active
+                            ? "🔴 Απενεργοποίηση"
+                            : "🟢 Ενεργοποίηση"}
                         </button>
               
                         <button className="rounded-xl border border-red-200 p-4 text-left text-red-500">
