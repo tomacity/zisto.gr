@@ -3965,6 +3965,103 @@ function NfcCardsTab({
   const [editingCard, setEditingCard] =
     useState<NfcCard | null>(null);
 
+  useEffect(() => {
+  if (!analyticsCard) {
+    setCardAnalytics(null);
+    return;
+  }
+
+  let cancelled = false;
+
+  async function loadCardAnalytics() {
+    try {
+      setCardAnalyticsLoading(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const params =
+        new URLSearchParams({
+          card_id: analyticsCard.id,
+        });
+
+      if (businessId) {
+        params.set(
+          "business_id",
+          businessId,
+        );
+      }
+
+      if (selectedAnalyticsDate) {
+        params.set(
+          "date",
+          selectedAnalyticsDate,
+        );
+      } else {
+        params.set(
+          "period",
+          "7d",
+        );
+      }
+
+      const response = await fetch(
+        `/api/card-analytics?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          cache: "no-store",
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η φόρτωση των analytics.",
+        );
+      }
+
+      if (!cancelled) {
+        setCardAnalytics(result);
+      }
+    } catch (error) {
+      console.error(
+        "Card analytics loading failed:",
+        error,
+      );
+
+      if (!cancelled) {
+        setCardAnalytics(null);
+      }
+    } finally {
+      if (!cancelled) {
+        setCardAnalyticsLoading(false);
+      }
+    }
+  }
+
+  void loadCardAnalytics();
+
+  return () => {
+    cancelled = true;
+  };
+}, [
+  analyticsCard?.id,
+  selectedAnalyticsDate,
+  businessId,
+]);
+
   const [orderedCards, setOrderedCards] =
     useState<NfcCard[]>(cards);
   
