@@ -309,7 +309,7 @@ export default async function handler(
   const requestedPeriod =
     typeof req.query.period === "string"
       ? req.query.period
-      : "today";
+      : "7d";
 
   const allowedPeriods =
     new Set<AnalyticsPeriod>([
