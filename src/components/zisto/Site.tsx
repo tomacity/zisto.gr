@@ -4402,7 +4402,6 @@ if (loading) {
     );
   }
 
-  if (cards.length === 0) {
     if (analyticsCard) {
       return (
         <div className="space-y-6">
@@ -4503,6 +4502,8 @@ if (loading) {
         </div>
       );
     }
+  
+  if (cards.length === 0) {
     return (
       <section className="rounded-[22px] border border-black/10 bg-white px-6 py-16 text-center">
         <p className="text-[42px]">⌁</p>
