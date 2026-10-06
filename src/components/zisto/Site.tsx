@@ -3953,6 +3953,15 @@ function NfcCardsTab({
   const [analyticsCard, setAnalyticsCard] =
     useState<NfcCard | null>(null);
   
+  const [cardAnalytics, setCardAnalytics] =
+    useState<any>(null);
+  
+  const [cardAnalyticsLoading, setCardAnalyticsLoading] =
+    useState(false);
+  
+  const [selectedAnalyticsDate, setSelectedAnalyticsDate] =
+    useState("");
+  
   const [editingCard, setEditingCard] =
     useState<NfcCard | null>(null);
 
