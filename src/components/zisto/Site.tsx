@@ -4538,6 +4538,28 @@ if (loading) {
                   {analyticsCard.name}
                 </h1>
               </div>
+
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="analytics-date"
+                  className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40"
+                >
+                  Επιλογή ημέρας
+                </label>
+              
+                <input
+                  id="analytics-date"
+                  type="date"
+                  value={selectedAnalyticsDate}
+                  onChange={(event) => {
+                    setSelectedAnalyticsDate(
+                      event.target.value,
+                    );
+                  }}
+                  className="rounded-[14px] border border-black/10 bg-white px-4 py-3 text-[13px] font-bold text-[#222] outline-none transition focus:border-[#222]"
+                />
+              </div>
+              
             </div>
           </div>
     
