@@ -4548,7 +4548,7 @@ if (loading) {
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
-                {analyticsCard.analytics?.total_taps ?? 0}
+                {cardAnalytics?.totals?.taps ?? 0}
               </p>
             </article>
     
@@ -4558,7 +4558,7 @@ if (loading) {
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
-                {analyticsCard.analytics?.menu_opens ?? 0}
+                {cardAnalytics?.totals?.menu_opens ?? 0}
               </p>
             </article>
     
@@ -4568,7 +4568,7 @@ if (loading) {
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
-                {analyticsCard.analytics?.review_clicks ?? 0}
+                {cardAnalytics?.totals?.review_clicks ?? 0}
               </p>
             </article>
     
@@ -4578,7 +4578,7 @@ if (loading) {
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
-                {analyticsCard.analytics?.unique_visitors ?? 0}
+                {cardAnalytics?.totals?.unique_visitors ?? 0}
               </p>
             </article>
           </section>
