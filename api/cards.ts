@@ -445,6 +445,207 @@ export default async function handler(
     const landingPages =
       await landingPagesResponse.json();
 
+    if (
+  req.method === "GET" &&
+  req.query.analytics === "card"
+) {
+  const cardId =
+    typeof req.query.card_id === "string"
+      ? req.query.card_id
+      : null;
+
+  const requestedDate =
+    typeof req.query.date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+      ? req.query.date
+      : null;
+
+  if (!cardId) {
+    return res.status(400).json({
+      error: "Λείπει το card_id",
+    });
+  }
+
+  const allowedLandingPageIds =
+    landingPages.map(
+      (page: { id: string }) => page.id,
+    );
+
+  const cardQuery =
+    new URLSearchParams({
+      id: `eq.${cardId}`,
+      landing_page_id:
+        `in.(${allowedLandingPageIds.join(",")})`,
+      select:
+        "id,name,is_active,public_token",
+      limit: "1",
+    });
+
+  const cardResponse =
+    await supabaseRequest({
+      supabaseUrl,
+      supabaseSecretKey,
+      path:
+        `/rest/v1/cards?${cardQuery.toString()}`,
+    });
+
+  const matchingCards =
+    await cardResponse.json();
+
+  const card =
+    matchingCards[0] ?? null;
+
+  if (!card) {
+    return res.status(404).json({
+      error: "Το τραπέζι δεν βρέθηκε",
+    });
+  }
+
+  const todayKey =
+    getAthensDateKey(
+      new Date(),
+    );
+
+  const startKey =
+    requestedDate ??
+    shiftDateKey(
+      todayKey,
+      -6,
+    );
+
+  const endKey =
+    requestedDate
+      ? shiftDateKey(
+          requestedDate,
+          1,
+        )
+      : shiftDateKey(
+          todayKey,
+          1,
+        );
+
+  const startIso =
+    athensMidnightToUtc(
+      startKey,
+    );
+
+  const endIso =
+    athensMidnightToUtc(
+      endKey,
+    );
+
+  const eventsQuery =
+    new URLSearchParams({
+      business_id:
+        `eq.${businessId}`,
+
+      or: [
+        "(",
+        `card_id.eq.${card.id},`,
+        `metadata->>card_token.eq.${card.public_token}`,
+        ")",
+      ].join(""),
+
+      select: [
+        "event_type",
+        "visitor_id",
+        "session_id",
+        "created_at",
+      ].join(","),
+
+      order:
+        "created_at.asc",
+    });
+
+  eventsQuery.append(
+    "created_at",
+    `gte.${startIso}`,
+  );
+
+  eventsQuery.append(
+    "created_at",
+    `lt.${endIso}`,
+  );
+
+  const eventsResponse =
+    await supabaseRequest({
+      supabaseUrl,
+      supabaseSecretKey,
+      path:
+        `/rest/v1/analytics_events?${eventsQuery.toString()}`,
+    });
+
+  if (!eventsResponse.ok) {
+    return res.status(500).json({
+      error:
+        "Failed to load table analytics",
+    });
+  }
+
+  const events =
+    await eventsResponse.json();
+
+  const tapEvents =
+    events.filter(
+      (event: any) =>
+        event.event_type ===
+        "page_view",
+    );
+
+  const menuEvents =
+    events.filter(
+      (event: any) =>
+        event.event_type ===
+          "menu_open" ||
+        event.event_type ===
+          "menu_click",
+    );
+
+  const reviewEvents =
+    events.filter(
+      (event: any) =>
+        event.event_type ===
+          "review_open" ||
+        event.event_type ===
+          "review_click",
+    );
+
+  const uniqueVisitors =
+    new Set(
+      tapEvents
+        .map(
+          (event: any) =>
+            event.visitor_id ||
+            event.session_id,
+        )
+        .filter(Boolean),
+    ).size;
+
+  return res.status(200).json({
+    card_id: card.id,
+    date:
+      requestedDate,
+    range: {
+      start: startKey,
+      end:
+        requestedDate ??
+        todayKey,
+    },
+    totals: {
+      taps:
+        tapEvents.length,
+      menu_opens:
+        menuEvents.length,
+      review_clicks:
+        reviewEvents.length,
+      unique_visitors:
+        uniqueVisitors,
+    },
+  });
+}
+
+if (req.method === "PATCH") {
+
     if (req.method === "PATCH") {
       const cardId =
         typeof req.query.card_id === "string"
