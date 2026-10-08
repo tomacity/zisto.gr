@@ -4011,7 +4011,7 @@ function NfcCardsTab({
       }
 
       const response = await fetch(
-        `/api/card-analytics?${params.toString()}`,
+  `/api/cards?analytics=card&${params.toString()}`,
         {
           method: "GET",
           headers: {
