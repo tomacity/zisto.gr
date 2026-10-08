@@ -644,8 +644,6 @@ export default async function handler(
   });
 }
 
-if (req.method === "PATCH") {
-
     if (req.method === "PATCH") {
       const cardId =
         typeof req.query.card_id === "string"
