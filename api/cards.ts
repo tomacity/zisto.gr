@@ -506,6 +506,35 @@ export default async function handler(
       new Date(),
     );
 
+      const requestedMonth =
+  typeof req.query.month === "string" &&
+  /^\d{4}-\d{2}$/.test(req.query.month)
+    ? req.query.month
+    : todayKey.slice(0, 7);
+
+const [calendarYear, calendarMonth] =
+  requestedMonth.split("-").map(Number);
+
+const calendarStartKey =
+  `${requestedMonth}-01`;
+
+const nextMonthDate =
+  new Date(
+    Date.UTC(
+      calendarYear,
+      calendarMonth,
+      1,
+    ),
+  );
+
+const calendarEndKey = [
+  nextMonthDate.getUTCFullYear(),
+  String(
+    nextMonthDate.getUTCMonth() + 1,
+  ).padStart(2, "0"),
+  "01",
+].join("-");
+
   const startKey =
     requestedDate ??
     shiftDateKey(
