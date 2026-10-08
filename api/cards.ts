@@ -614,6 +614,74 @@ const calendarEndKey = [
   const events =
     await eventsResponse.json();
 
+      const calendarStartIso =
+        athensMidnightToUtc(
+          calendarStartKey,
+        );
+      
+      const calendarEndIso =
+        athensMidnightToUtc(
+          calendarEndKey,
+        );
+      
+      const calendarEventsQuery =
+        new URLSearchParams({
+          business_id:
+            `eq.${businessId}`,
+      
+          or: [
+            "(",
+            `card_id.eq.${card.id},`,
+            `metadata->>card_token.eq.${card.public_token}`,
+            ")",
+          ].join(""),
+      
+          select:
+            "created_at",
+        });
+      
+      calendarEventsQuery.append(
+        "created_at",
+        `gte.${calendarStartIso}`,
+      );
+      
+      calendarEventsQuery.append(
+        "created_at",
+        `lt.${calendarEndIso}`,
+      );
+      
+      const calendarEventsResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/analytics_events?${calendarEventsQuery.toString()}`,
+        });
+      
+      if (!calendarEventsResponse.ok) {
+        return res.status(500).json({
+          error:
+            "Failed to load calendar activity",
+        });
+      }
+      
+      const calendarEvents =
+        await calendarEventsResponse.json();
+      
+      const activityDates =
+        Array.from(
+          new Set(
+            calendarEvents.map(
+              (event: any) =>
+                getAthensDateKey(
+                  new Date(
+                    event.created_at,
+                  ),
+                ),
+            ),
+          ),
+        );
+
   const tapEvents =
     events.filter(
       (event: any) =>
@@ -652,6 +720,8 @@ const calendarEndKey = [
 
   return res.status(200).json({
     card_id: card.id,
+    activity_dates:
+      activityDates,
     date:
       requestedDate,
     range: {
