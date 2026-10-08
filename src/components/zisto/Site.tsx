@@ -24,6 +24,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { createPortal } from "react-dom";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 import { supabase } from "../../lib/supabase";
 import { AdminPage } from "../../pages/AdminPage";
 
