@@ -1175,40 +1175,30 @@ function CaseStudy() {
     };
   }, []);
 
-  const backgroundScale =
-    1 + scrollProgress * 0.08;
-
   const handY =
-    130 - scrollProgress * 260;
+    170 - scrollProgress * 220;
 
   const handScale =
-    0.94 + scrollProgress * 0.1;
+    0.96 + scrollProgress * 0.08;
 
   const handRotate =
-    -2 + scrollProgress * 4;
+    -1.5 + scrollProgress * 3;
 
   return (
     <section
       ref={sectionRef}
       id="case"
-      className="relative h-[200vh] w-full bg-black"
+      className="relative h-[200vh] w-full bg-[#222222]"
     >
       <div className="sticky top-0 h-screen w-full overflow-hidden [perspective:1200px]">
 
-        {/* Spatial background */}
+        {/* Grey → black background */}
         <div
-          className="absolute inset-0 will-change-transform"
+          className="absolute inset-0"
           style={{
-            transform:
-              `scale(${backgroundScale})`,
             background:
-              "radial-gradient(circle at 50% -10%, rgba(220,39,39,0.32) 0%, rgba(40,10,10,0.18) 24%, #161616 58%, #090909 100%)",
+              "linear-gradient(to bottom, #222222 0%, #222222 12%, #181818 42%, #0D0D0D 70%, #000000 100%)",
           }}
-        />
-
-        {/* Soft depth glow */}
-        <div
-          className="pointer-events-none absolute left-1/2 top-[45%] h-[65vw] w-[65vw] max-h-[900px] max-w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#DC2727]/10 blur-[120px]"
         />
 
         {/* 3D foreground hand */}
@@ -1216,13 +1206,13 @@ function CaseStudy() {
           src="/images/zisto-hand.png"
           alt="Zisto NFC card"
           draggable={false}
-          className="pointer-events-none absolute left-1/2 top-1/2 w-[92vw] max-w-[1050px] select-none will-change-transform"
+          className="pointer-events-none absolute left-[42%] top-[56%] w-[118vw] max-w-none select-none will-change-transform md:w-[108vw] lg:w-[96vw]"
           style={{
             transform: `
               translate3d(
                 -50%,
                 calc(-50% + ${handY}px),
-                80px
+                100px
               )
               scale(${handScale})
               rotateZ(${handRotate}deg)
@@ -1230,16 +1220,16 @@ function CaseStudy() {
             transformOrigin:
               "50% 70%",
             filter:
-              "drop-shadow(0 45px 45px rgba(0,0,0,0.42))",
+              "drop-shadow(0 45px 45px rgba(0,0,0,0.38))",
           }}
         />
 
-        {/* Cinematic vignette */}
+        {/* Very subtle vignette */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(circle at center, transparent 42%, rgba(0,0,0,0.42) 100%)",
+              "radial-gradient(circle at 50% 48%, transparent 48%, rgba(0,0,0,0.28) 100%)",
           }}
         />
       </div>
