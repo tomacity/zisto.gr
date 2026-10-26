@@ -4615,8 +4615,8 @@ if (loading) {
               
             </div>
           </div>
-    
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <article className="rounded-[20px] bg-[#222] p-6 text-white">
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
                 Taps
@@ -4646,16 +4646,7 @@ if (loading) {
                 {cardAnalytics?.totals?.review_clicks ?? 0}
               </p>
             </article>
-    
-            <article className="rounded-[20px] border border-black/10 bg-white p-6">
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
-                Visitors
-              </p>
-    
-              <p className="mt-8 text-[48px] font-black leading-none">
-                {cardAnalytics?.totals?.unique_visitors ?? 0}
-              </p>
-            </article>
+            
           </section>
     
           <section className="rounded-[20px] border border-black/10 bg-white p-6 md:p-8">
