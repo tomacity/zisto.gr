@@ -1184,56 +1184,91 @@ function CaseStudy() {
   const handRotate =
     -1.5 + scrollProgress * 3;
 
-  return (
-    <section
-      ref={sectionRef}
-      id="case"
-      className="relative h-[135svh] w-full bg-[#222222] md:h-[200vh]"
-    >
-      <div className="sticky top-0 h-screen w-full overflow-hidden [perspective:1200px]">
+  const spatialBackground =
+    "linear-gradient(to bottom, #222222 0%, #222222 22%, #1E1E1E 38%, #161616 55%, #0B0B0B 76%, #000000 100%)";
 
-        {/* Grey → black background */}
+  return (
+    <>
+      {/* MOBILE — static, no parallax */}
+      <section
+        id="case"
+        className="relative h-[82svh] w-full overflow-hidden bg-[#222222] md:hidden"
+      >
         <div
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(to bottom, #222222 0%, #222222 12%, #181818 42%, #0D0D0D 70%, #000000 100%)",
+              spatialBackground,
           }}
         />
 
-        {/* 3D foreground hand */}
         <img
           src="/images/zisto-hand.png"
           alt="Zisto NFC card"
           draggable={false}
-          className="pointer-events-none absolute left-[42%] top-[54%] w-[185vw] max-w-none select-none will-change-transform md:left-[42%] md:top-[56%] md:w-[108vw] lg:w-[96vw]"
+          className="pointer-events-none absolute left-[40%] top-[49%] w-[195vw] max-w-none -translate-x-1/2 -translate-y-1/2 select-none"
           style={{
-            transform: `
-              translate3d(
-                -50%,
-                calc(-50% + ${handY}px),
-                100px
-              )
-              scale(${handScale})
-              rotateZ(${handRotate}deg)
-            `,
-            transformOrigin:
-              "50% 70%",
             filter:
-              "drop-shadow(0 45px 45px rgba(0,0,0,0.38))",
+              "drop-shadow(0 30px 35px rgba(0,0,0,0.32))",
           }}
         />
 
-        {/* Very subtle vignette */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(circle at 50% 48%, transparent 48%, rgba(0,0,0,0.28) 100%)",
+              "radial-gradient(circle at 50% 48%, transparent 55%, rgba(0,0,0,0.18) 100%)",
           }}
         />
-      </div>
-    </section>
+      </section>
+
+      {/* DESKTOP — existing parallax */}
+      <section
+        ref={sectionRef}
+        id="case-desktop"
+        className="relative hidden h-[200vh] w-full bg-[#222222] md:block"
+      >
+        <div className="sticky top-0 h-screen w-full overflow-hidden [perspective:1200px]">
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                spatialBackground,
+            }}
+          />
+
+          <img
+            src="/images/zisto-hand.png"
+            alt="Zisto NFC card"
+            draggable={false}
+            className="pointer-events-none absolute left-[42%] top-[56%] w-[108vw] max-w-none select-none will-change-transform lg:w-[96vw]"
+            style={{
+              transform: `
+                translate3d(
+                  -50%,
+                  calc(-50% + ${handY}px),
+                  100px
+                )
+                scale(${handScale})
+                rotateZ(${handRotate}deg)
+              `,
+              transformOrigin:
+                "50% 70%",
+              filter:
+                "drop-shadow(0 45px 45px rgba(0,0,0,0.38))",
+            }}
+          />
+
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(circle at 50% 48%, transparent 48%, rgba(0,0,0,0.28) 100%)",
+            }}
+          />
+        </div>
+      </section>
+    </>
   );
 }
 
