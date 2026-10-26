@@ -1120,93 +1120,17 @@ function Scene({ active, children }: { active: boolean; children: ReactNode }) {
 /*  CASE STUDY                                                        */
 /* ================================================================== */
 function CaseStudy() {
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
   return (
-    <section id="case" className="relative overflow-hidden bg-white py-28 md:py-40">
-      <div className="mx-auto w-full max-w-[1400px] px-5 md:px-10">
-        <Reveal>
-          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
-            Πρώτο πιλοτικό project
-          </p>
-        </Reveal>
-
-        <div className="mt-10 grid grid-cols-1 items-center gap-14 lg:grid-cols-12 lg:gap-16">
-          <Reveal delay={120} className="lg:col-span-7">
-            <h2 className="text-[10vw] font-black leading-[0.9] tracking-[-0.035em] text-[#222] md:text-[6.5vw] lg:text-[5.4vw]">
-              το Τσιπουράδικο <span className="text-[#DC2727]">της</span> Μυρσίνης
-            </h2>
-            <p className="mt-8 max-w-xl text-[15px] leading-relaxed text-[#222]/65 md:text-[17px]">
-              Το πρώτο μας πραγματικό kit — custom NFC κάρτα, smart link με
-              vintage ταυτότητα, και πλήρες δίγλωσσο ψηφιακό μενού με πλοήγηση
-              ανά κατηγορία. Χτισμένο από την αρχή γύρω από τη δική του ιστορία,
-              όχι από ένα template.
-            </p>
-            <div className="mt-10">
-              <Magnetic>
-                <a
-                  href="#contact"
-                  className="group inline-flex items-center gap-3 rounded-full bg-[#222] px-7 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white transition-all duration-300 hover:bg-[#DC2727]"
-                >
-                  Θέλω κάτι σαν αυτό
-                  <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
-                </a>
-              </Magnetic>
-            </div>
-          </Reveal>
-
-          {/* Mock card with tilt */}
-          <Reveal delay={220} className="lg:col-span-5">
-            <div
-              className="mx-auto w-full max-w-[380px] [perspective:1400px]"
-              onMouseMove={(e) => {
-                const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
-                const dy = (e.clientY - (r.top + r.height / 2)) / r.height;
-                setTilt({ ry: dx * 14, rx: -dy * 10 });
-              }}
-              onMouseLeave={() => setTilt({ rx: 0, ry: 0 })}
-            >
-              <div
-                className="relative overflow-hidden rounded-[26px] border border-black/10 bg-white p-8 shadow-[0_40px_80px_-30px_rgba(34,34,34,0.35)]"
-                style={{
-                  transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`,
-                  transformStyle: "preserve-3d",
-                  transition: "transform 400ms cubic-bezier(0.22,1,0.36,1)",
-                }}
-              >
-                {/* Corner tag */}
-                <div className="flex items-start justify-between">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#DC2727]/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.24em] text-[#DC2727]">
-                    <span className="h-1 w-1 rounded-full bg-[#DC2727]" />
-                    Live
-                  </span>
-                  <img src={MONOGRAM} alt="" className="h-8 w-auto" draggable={false} />
-                </div>
-
-                <p className="mt-8 text-[22px] font-black leading-[1.05] tracking-[-0.02em] text-[#222]">
-                  το Τσιπουράδικο
-                  <br />
-                  της Μυρσίνης
-                </p>
-
-                <div className="mt-8 flex flex-col gap-3">
-                  <span className="w-full rounded-lg bg-[#222] px-4 py-3.5 text-center text-[13px] font-bold text-white">
-                    📋 Δείτε το μενού
-                  </span>
-                  <span className="w-full rounded-lg border border-[#222]/15 px-4 py-3.5 text-center text-[13px] font-bold text-[#222]">
-                    ⭐ Αφήστε αξιολόγηση
-                  </span>
-                </div>
-
-                <div className="mt-8 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.24em] text-[#222]/40">
-                  <span>zisto.gr</span>
-                  <span>NFC · Tap</span>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </div>
+    <section
+      id="case"
+      className="relative w-full overflow-hidden bg-black"
+    >
+      <img
+        src="/images/zisto-nfc-fullwidth.png"
+        alt="Zisto NFC card"
+        className="block h-auto w-full object-cover"
+        draggable={false}
+      />
     </section>
   );
 }
