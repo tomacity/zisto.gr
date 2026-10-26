@@ -1188,7 +1188,7 @@ function CaseStudy() {
     <section
       ref={sectionRef}
       id="case"
-      className="relative h-[200vh] w-full bg-[#222222]"
+      className="relative h-[135svh] w-full bg-[#222222] md:h-[200vh]"
     >
       <div className="sticky top-0 h-screen w-full overflow-hidden [perspective:1200px]">
 
@@ -1206,7 +1206,7 @@ function CaseStudy() {
           src="/images/zisto-hand.png"
           alt="Zisto NFC card"
           draggable={false}
-          className="pointer-events-none absolute left-[42%] top-[56%] w-[118vw] max-w-none select-none will-change-transform md:w-[108vw] lg:w-[96vw]"
+          className="pointer-events-none absolute left-[42%] top-[54%] w-[185vw] max-w-none select-none will-change-transform md:left-[42%] md:top-[56%] md:w-[108vw] lg:w-[96vw]"
           style={{
             transform: `
               translate3d(
