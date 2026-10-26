@@ -1119,18 +1119,99 @@ function Scene({ active, children }: { active: boolean; children: ReactNode }) {
 /* ================================================================== */
 /*  CASE STUDY                                                        */
 /* ================================================================== */
+
 function CaseStudy() {
+  const sectionRef = useRef<HTMLElement | null>(
+    null,
+  );
+
+  const [scrollProgress, setScrollProgress] =
+    useState(0);
+
+  useEffect(() => {
+    function handleScroll() {
+      const section = sectionRef.current;
+
+      if (!section) return;
+
+      const rect =
+        section.getBoundingClientRect();
+
+      const scrollableDistance =
+        section.offsetHeight -
+        window.innerHeight;
+
+      if (scrollableDistance <= 0) {
+        setScrollProgress(0);
+        return;
+      }
+
+      const progress =
+        Math.min(
+          1,
+          Math.max(
+            0,
+            -rect.top /
+              scrollableDistance,
+          ),
+        );
+
+      setScrollProgress(progress);
+    }
+
+    handleScroll();
+
+    window.addEventListener(
+      "scroll",
+      handleScroll,
+      {
+        passive: true,
+      },
+    );
+
+    return () => {
+      window.removeEventListener(
+        "scroll",
+        handleScroll,
+      );
+    };
+  }, []);
+
+  const scale =
+    1 + scrollProgress * 0.14;
+
+  const translateY =
+    scrollProgress * -18;
+
   return (
     <section
+      ref={sectionRef}
       id="case"
-      className="relative w-full overflow-hidden bg-black"
+      className="relative h-[180vh] w-full bg-black"
     >
-      <img
-        src="/images/zisto-nfc-fullwidth.png"
-        alt="Zisto NFC card"
-        className="block h-auto w-full object-cover"
-        draggable={false}
-      />
+      <div className="sticky top-0 h-screen w-full overflow-hidden">
+        <img
+          src="/images/zisto-nfc-fullwidth.png"
+          alt="Zisto NFC card"
+          draggable={false}
+          className="h-full w-full object-cover will-change-transform"
+          style={{
+            transform:
+              `scale(${scale}) translateY(${translateY}px)`,
+            transition:
+              "transform 80ms linear",
+          }}
+        />
+
+        <div
+          className="pointer-events-none absolute inset-0 bg-black"
+          style={{
+            opacity:
+              0.08 +
+              scrollProgress * 0.12,
+          }}
+        />
+      </div>
     </section>
   );
 }
