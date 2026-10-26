@@ -200,9 +200,21 @@ function Steam({
 /*  NAV                                                               */
 /* ================================================================== */
 const NAV_LINKS = [
-  { label: "Υπηρεσίες", href: "#services" },
-  { label: "Πώς δουλεύει", href: "#how" },
-  { label: "Τιμές", href: "#pricing" },
+  {
+    label: "Υπηρεσίες",
+    href: "#services",
+    description: "Τι προσφέρει το Zisto",
+  },
+  {
+    label: "Πώς δουλεύει",
+    href: "#how",
+    description: "Η εμπειρία βήμα-βήμα",
+  },
+  {
+    label: "Τιμές",
+    href: "#pricing",
+    description: "Δες τα διαθέσιμα πακέτα",
+  },
 ];
 
 function Nav() {
@@ -317,23 +329,46 @@ function Nav() {
         style={{ transform: open ? "translateY(0)" : "translateY(-2%)" }}
       >
         <div className="flex-1 overflow-y-auto px-6 pb-10 pt-24">
-          <ul className="flex flex-col gap-5">
+          <p className="mb-4 font-mono text-[9px] font-bold uppercase tracking-[0.28em] text-white/35">
+            Πλοήγηση
+          </p>
+          
+          <ul className="flex flex-col border-y border-white/10 divide-y divide-white/10">
             {NAV_LINKS.map((l, i) => (
               <li
                 key={l.label}
                 style={{
                   transitionDelay: `${open ? 120 + i * 70 : 0}ms`,
                   opacity: open ? 1 : 0,
-                  transform: open ? "translateY(0)" : "translateY(20px)",
-                  transition: "opacity 500ms ease, transform 600ms cubic-bezier(0.22,1,0.36,1)",
+                  transform: open
+                    ? "translateY(0)"
+                    : "translateY(20px)",
+                  transition:
+                    "opacity 500ms ease, transform 600ms cubic-bezier(0.22,1,0.36,1)",
                 }}
               >
                 <a
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  className="block text-[11vw] font-black leading-[0.95] tracking-[-0.03em] text-white"
+                  className="flex w-full items-center gap-4 py-5"
                 >
-                  {l.label}
+                  <span className="w-7 flex-shrink-0 font-mono text-[10px] font-bold text-[#DC2727]">
+                    0{i + 1}
+                  </span>
+          
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[8vw] font-black leading-[0.95] tracking-[-0.03em] text-white">
+                      {l.label}
+                    </span>
+          
+                    <span className="mt-2 block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
+                      {l.description}
+                    </span>
+                  </div>
+          
+                  <span className="text-[20px] font-light text-white/35">
+                    →
+                  </span>
                 </a>
               </li>
             ))}
