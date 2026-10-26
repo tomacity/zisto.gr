@@ -5867,6 +5867,81 @@ function DashboardPage({
     </main>
   );
 }
+/* ================================================================== */
+/*  COOKIES                                                           */
+/* ================================================================== */
+function CookieConsent() {
+  const [visible, setVisible] =
+    useState(false);
+
+  useEffect(() => {
+    const consent =
+      window.localStorage.getItem(
+        "zisto_cookie_consent",
+      );
+
+    if (!consent) {
+      setVisible(true);
+    }
+  }, []);
+
+  if (!visible) {
+    return null;
+  }
+
+  function saveConsent(
+    value: "accepted" | "rejected",
+  ) {
+    window.localStorage.setItem(
+      "zisto_cookie_consent",
+      value,
+    );
+
+    window.localStorage.setItem(
+      "zisto_cookie_consent_date",
+      new Date().toISOString(),
+    );
+
+    setVisible(false);
+  }
+
+  return (
+    <div className="fixed bottom-4 left-4 right-4 z-[999999] mx-auto max-w-[720px] rounded-[22px] border border-white/10 bg-[#222] p-5 text-white shadow-[0_30px_80px_rgba(0,0,0,0.28)] md:bottom-6 md:p-6">
+      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+        Cookies & Privacy
+      </p>
+
+      <p className="mt-3 text-[13px] leading-relaxed text-white/70 md:text-[14px]">
+        Χρησιμοποιούμε απαραίτητες τεχνολογίες
+        για τη λειτουργία του Zisto. Προαιρετικά
+        analytics ενεργοποιούνται μόνο με τη
+        συγκατάθεσή σου.
+      </p>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() =>
+            saveConsent("rejected")
+          }
+          className="rounded-full border border-white/20 px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.16em] transition hover:border-white/50"
+        >
+          Απόρριψη
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            saveConsent("accepted")
+          }
+          className="rounded-full bg-[#DC2727] px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-white hover:text-[#222]"
+        >
+          Αποδοχή
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /* ================================================================== */
 /*  ROOT                                                              */
@@ -5874,6 +5949,7 @@ function DashboardPage({
 function LandingPage() {
   return (
     <div className="bg-white font-sans text-[#222] antialiased">
+      <CookieConsent />
       <Nav />
       <Hero />
       <Services />
