@@ -1128,13 +1128,6 @@ function CaseStudy() {
   const [scrollProgress, setScrollProgress] =
     useState(0);
 
-  const [cardShine, setCardShine] =
-    useState({
-      x: 50,
-      y: 50,
-      active: false,
-    });
-
   useEffect(() => {
     function handleScroll() {
       const section = sectionRef.current;
@@ -1262,83 +1255,6 @@ function CaseStudy() {
               draggable={false}
               className="block w-full"
             />
-
-            {/* INTERACTIVE CARD ONLY */}
-            <div
-              className="pointer-events-auto absolute overflow-hidden"
-               style={{
-                left: "38%",
-                top: "18%",
-                width: "42%",
-                height: "44%",
-              
-                clipPath:
-                  "polygon(1% 24%, 90% 0%, 100% 78%, 8% 100%)",
-              }}
-              
-              onMouseEnter={() => {
-                setCardShine((current) => ({
-                  ...current,
-                  active: true,
-                }));
-              }}
-              onMouseLeave={() => {
-                setCardShine((current) => ({
-                  ...current,
-                  active: false,
-                }));
-              }}
-              onMouseMove={(event) => {
-                const rect =
-                  event.currentTarget.getBoundingClientRect();
-
-                const x =
-                  ((event.clientX -
-                    rect.left) /
-                    rect.width) *
-                  100;
-
-                const y =
-                  ((event.clientY -
-                    rect.top) /
-                    rect.height) *
-                  100;
-
-                setCardShine({
-                  x,
-                  y,
-                  active: true,
-                });
-              }}
-            >
-              {/* SHINE */}
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  opacity:
-                    cardShine.active
-                      ? 1
-                      : 0,
-
-                  transition:
-                    "opacity 180ms ease",
-
-                  mixBlendMode:
-                    "screen",
-
-                  background: `
-                    radial-gradient(
-                      circle at ${cardShine.x}% ${cardShine.y}%,
-                      rgba(255,255,255,0.8) 0%,
-                      rgba(255,255,255,0.38) 7%,
-                      rgba(255,255,255,0.14) 14%,
-                      rgba(255,255,255,0.04) 22%,
-                      transparent 32%
-                    )
-                  `,
-                }}
-              />
-            </div>
           </div>
         </div>
       </section>
