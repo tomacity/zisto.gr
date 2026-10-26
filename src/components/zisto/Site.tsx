@@ -6631,11 +6631,24 @@ const route = hashLocation.pathname;
 const selectedBusinessId =
   hashLocation.searchParams.get("business");
 
-  useEffect(() => {
-    const handleHashChange = () => {
-      setHashLocation(getHashLocation());
-      window.scrollTo(0, 0);
-    };
+useEffect(() => {
+  const handleHashChange = () => {
+    const nextLocation = getHashLocation();
+  
+    // Landing-page anchors όπως #services, #how, #pricing
+    // δεν είναι routes και δεν πρέπει να κάνουν scroll στην κορυφή.
+    if (!nextLocation.pathname.startsWith("/")) {
+      setHashLocation({
+        pathname: "/",
+        searchParams: new URLSearchParams(),
+      });
+  
+      return;
+    }
+  
+    setHashLocation(nextLocation);
+    window.scrollTo(0, 0);
+  };
 
     window.addEventListener("hashchange", handleHashChange);
 
