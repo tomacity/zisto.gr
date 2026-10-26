@@ -1452,6 +1452,13 @@ function Footer() {
           <span>
             Ένα άγγιγμα. Όλη η εικόνα σου.
           </span>
+
+          <a
+            href="/#/privacy"
+            className="transition-colors duration-300 hover:text-white"
+          >
+            Πολιτική Απορρήτου
+          </a>
         
           <a
             href="/#/cookies"
