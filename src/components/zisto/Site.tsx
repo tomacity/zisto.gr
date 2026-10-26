@@ -799,19 +799,16 @@ function ServiceCard({
   s: (typeof SERVICES)[number];
   i: number;
 }) {
-  const [hover, setHover] = useState(false);
   const { ref, on } =
     useReveal<HTMLDivElement>();
 
   return (
     <div
       ref={ref}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className={`group relative overflow-hidden bg-white p-8 transition-colors duration-500 md:p-12 ${s.span} ${
-        hover
-          ? "bg-[#222] text-white"
-          : "text-[#222]"
+      className={`group relative overflow-hidden bg-white p-5 text-[#222] transition-colors duration-500 md:p-12 md:hover:text-white ${s.span} ${
+        s.big
+          ? "min-h-[210px] md:min-h-[320px]"
+          : "min-h-[190px] md:min-h-[260px]"
       }`}
       style={{
         opacity: on ? 1 : 0,
@@ -828,28 +825,25 @@ function ServiceCard({
             i * 80
           }ms
         `,
-        minHeight: s.big
-          ? "320px"
-          : "260px",
       }}
     >
-      {/* Κόκκινο background στο hover */}
+      {/* Desktop hover only */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 origin-bottom-left scale-y-0 bg-[#DC2727] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-y-100"
+        className="pointer-events-none absolute inset-0 origin-bottom-left scale-y-0 bg-[#DC2727] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] md:group-hover:scale-y-100"
         style={{
           mixBlendMode: "normal",
           opacity: 0.9,
         }}
       />
 
-      <div className="relative z-10 flex h-full flex-col justify-between gap-8">
+      <div className="relative z-10 flex h-full flex-col justify-between gap-5 md:gap-8">
         <div className="flex items-start justify-between">
-          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.28em]">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] md:text-[11px]">
             {s.n}
           </span>
 
-          <span className="grid h-8 w-8 place-items-center rounded-full border border-current opacity-70 transition-transform duration-500 group-hover:rotate-45">
+          <span className="grid h-7 w-7 place-items-center rounded-full border border-current opacity-70 transition-transform duration-500 md:h-8 md:w-8 md:group-hover:rotate-45">
             <svg
               width="12"
               height="12"
@@ -871,20 +865,14 @@ function ServiceCard({
           <h3
             className={`font-black leading-[0.95] tracking-[-0.02em] ${
               s.big
-                ? "text-[9vw] md:text-[4vw]"
-                : "text-[8vw] md:text-[2.6vw]"
+                ? "text-[7.5vw] md:text-[4vw]"
+                : "text-[7vw] md:text-[2.6vw]"
             }`}
           >
             {s.title}
           </h3>
 
-          <p
-            className={`mt-4 max-w-md text-[14px] leading-relaxed transition-colors duration-500 md:text-[15px] ${
-              hover
-                ? "text-white/75"
-                : "text-[#222]/60"
-            }`}
-          >
+          <p className="mt-3 max-w-md text-[13px] leading-relaxed text-[#222]/60 transition-colors duration-500 md:mt-4 md:text-[15px] md:group-hover:text-white/75">
             {s.body}
           </p>
         </div>
