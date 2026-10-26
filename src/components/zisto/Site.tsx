@@ -5981,7 +5981,13 @@ function CookieConsent() {
         Χρησιμοποιούμε απαραίτητες τεχνολογίες
         για τη λειτουργία του Zisto. Προαιρετικά
         analytics ενεργοποιούνται μόνο με τη
-        συγκατάθεσή σου.
+        συγκατάθεσή σου.{" "}
+        <a
+          href="/#/cookies"
+          className="font-semibold text-white underline decoration-white/40 underline-offset-4 transition hover:decoration-white"
+        >
+          Μάθε περισσότερα
+        </a>
       </p>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
