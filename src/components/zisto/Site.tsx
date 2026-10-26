@@ -5893,6 +5893,18 @@ function DashboardPage({
     </main>
   );
 }
+
+function hasAnalyticsConsent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return (
+    window.localStorage.getItem(
+      "zisto_cookie_consent",
+    ) === "accepted"
+  );
+}
 /* ================================================================== */
 /*  COOKIES                                                           */
 /* ================================================================== */
@@ -5974,9 +5986,20 @@ function CookieConsent() {
       "zisto_cookie_consent_date",
       new Date().toISOString(),
     );
-
+    
+    window.dispatchEvent(
+      new CustomEvent(
+        "zisto-cookie-consent-changed",
+        {
+          detail: {
+            analytics:
+              value === "accepted",
+          },
+        },
+      ),
+    );
+    
     setVisible(false);
-  }
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-[999999] mx-auto max-w-[720px] rounded-[22px] border border-white/10 bg-[#222] p-5 text-white shadow-[0_30px_80px_rgba(0,0,0,0.28)] md:bottom-6 md:p-6">
