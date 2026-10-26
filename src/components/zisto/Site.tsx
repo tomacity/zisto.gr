@@ -4795,9 +4795,18 @@ if (loading) {
                             : "🟢 Ενεργοποίηση"}
                         </button>
               
-                        <button className="rounded-xl border border-red-200 p-4 text-left text-red-500">
-                          🗑️ Διαγραφή
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!selectedCard) return;
+                      
+                          void deleteCard(selectedCard.id);
+                          setDrawerOpen(false);
+                        }}
+                        className="rounded-xl border border-red-200 p-4 text-left text-red-500 transition hover:bg-red-50"
+                      >
+                        🗑️ Διαγραφή
+                      </button>
                       </div>
                     </div>
                   </aside>
