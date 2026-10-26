@@ -604,7 +604,7 @@ function Hero() {
         {/* Left: headline */}
         <div className="lg:col-span-8">
 
-          <h1 className="mt-7 font-black leading-[0.86] tracking-[-0.045em] text-[#222]">
+          <h1 className="mt-7 font-black leading-[0.98] tracking-[-0.045em] text-[#222] sm:leading-[0.92] lg:leading-[0.86]">
             <Reveal delay={180} as="span" className="block text-[16vw] sm:text-[13vw] lg:text-[10.5vw] xl:text-[11.5rem]">
               Ένα άγγιγμα.
             </Reveal>
