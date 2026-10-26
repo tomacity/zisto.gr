@@ -1146,15 +1146,13 @@ function CaseStudy() {
         return;
       }
 
-      const progress =
-        Math.min(
-          1,
-          Math.max(
-            0,
-            -rect.top /
-              scrollableDistance,
-          ),
-        );
+      const progress = Math.min(
+        1,
+        Math.max(
+          0,
+          -rect.top / scrollableDistance,
+        ),
+      );
 
       setScrollProgress(progress);
     }
@@ -1177,38 +1175,71 @@ function CaseStudy() {
     };
   }, []);
 
-  const scale =
-    1 + scrollProgress * 0.14;
+  const backgroundScale =
+    1 + scrollProgress * 0.08;
 
-  const translateY =
-    scrollProgress * -18;
+  const handY =
+    130 - scrollProgress * 260;
+
+  const handScale =
+    0.94 + scrollProgress * 0.1;
+
+  const handRotate =
+    -2 + scrollProgress * 4;
 
   return (
     <section
       ref={sectionRef}
       id="case"
-      className="relative h-[180vh] w-full bg-black"
+      className="relative h-[200vh] w-full bg-black"
     >
-      <div className="sticky top-0 h-screen w-full overflow-hidden">
-        <img
-          src="/images/zisto-nfc-fullwidth.png"
-          alt="Zisto NFC card"
-          draggable={false}
-          className="h-full w-full object-cover will-change-transform"
+      <div className="sticky top-0 h-screen w-full overflow-hidden [perspective:1200px]">
+
+        {/* Spatial background */}
+        <div
+          className="absolute inset-0 will-change-transform"
           style={{
             transform:
-              `scale(${scale}) translateY(${translateY}px)`,
-            transition:
-              "transform 80ms linear",
+              `scale(${backgroundScale})`,
+            background:
+              "radial-gradient(circle at 50% -10%, rgba(220,39,39,0.32) 0%, rgba(40,10,10,0.18) 24%, #161616 58%, #090909 100%)",
           }}
         />
 
+        {/* Soft depth glow */}
         <div
-          className="pointer-events-none absolute inset-0 bg-black"
+          className="pointer-events-none absolute left-1/2 top-[45%] h-[65vw] w-[65vw] max-h-[900px] max-w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#DC2727]/10 blur-[120px]"
+        />
+
+        {/* 3D foreground hand */}
+        <img
+          src="/images/zisto-hand.png"
+          alt="Zisto NFC card"
+          draggable={false}
+          className="pointer-events-none absolute left-1/2 top-1/2 w-[92vw] max-w-[1050px] select-none will-change-transform"
           style={{
-            opacity:
-              0.08 +
-              scrollProgress * 0.12,
+            transform: `
+              translate3d(
+                -50%,
+                calc(-50% + ${handY}px),
+                80px
+              )
+              scale(${handScale})
+              rotateZ(${handRotate}deg)
+            `,
+            transformOrigin:
+              "50% 70%",
+            filter:
+              "drop-shadow(0 45px 45px rgba(0,0,0,0.42))",
+          }}
+        />
+
+        {/* Cinematic vignette */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at center, transparent 42%, rgba(0,0,0,0.42) 100%)",
           }}
         />
       </div>
