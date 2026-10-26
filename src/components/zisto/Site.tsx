@@ -5879,8 +5879,37 @@ function CookieConsent() {
       window.localStorage.getItem(
         "zisto_cookie_consent",
       );
-
-    if (!consent) {
+  
+    const consentDate =
+      window.localStorage.getItem(
+        "zisto_cookie_consent_date",
+      );
+  
+    const SIX_MONTHS =
+      1000 * 60 * 60 * 24 * 30 * 6;
+  
+    if (!consent || !consentDate) {
+      setVisible(true);
+      return;
+    }
+  
+    const consentTime =
+      new Date(consentDate).getTime();
+  
+    const isExpired =
+      Number.isNaN(consentTime) ||
+      Date.now() - consentTime >
+        SIX_MONTHS;
+  
+    if (isExpired) {
+      window.localStorage.removeItem(
+        "zisto_cookie_consent",
+      );
+  
+      window.localStorage.removeItem(
+        "zisto_cookie_consent_date",
+      );
+  
       setVisible(true);
     }
   }, []);
