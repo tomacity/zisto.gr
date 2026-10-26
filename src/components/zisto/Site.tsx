@@ -1266,15 +1266,15 @@ function CaseStudy() {
             {/* INTERACTIVE CARD ONLY */}
             <div
               className="pointer-events-auto absolute overflow-hidden"
-              style={{
-                left: "36%",
-                top: "24%",
-                width: "36%",
-                height: "31%",
-
-                clipPath:
-                  "polygon(6% 18%, 94% 0%, 100% 78%, 10% 100%)",
-              }}
+             style={{
+              left: "38%",
+              top: "25%",
+              width: "41%",
+              height: "43%",
+            
+              clipPath:
+                "polygon(0% 28%, 88% 0%, 100% 79%, 7% 100%)",
+            }}
               onMouseEnter={() => {
                 setCardShine((current) => ({
                   ...current,
