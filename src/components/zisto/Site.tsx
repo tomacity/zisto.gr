@@ -1447,7 +1447,26 @@ function Footer() {
 
       <div className="relative mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-6 text-[10px] font-bold uppercase tracking-[0.24em] text-white/40 md:px-10">
         <span>© 2026 Zisto</span>
-        <span>Ένα άγγιγμα. Όλη η εικόνα σου.</span>
+      
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <span>
+            Ένα άγγιγμα. Όλη η εικόνα σου.
+          </span>
+      
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(
+                new Event(
+                  "zisto-open-cookie-settings",
+                ),
+              );
+            }}
+            className="transition-colors duration-300 hover:text-white"
+          >
+            Ρυθμίσεις cookies
+          </button>
+        </div>
       </div>
     </footer>
   );
@@ -5912,6 +5931,24 @@ function CookieConsent() {
   
       setVisible(true);
     }
+  }, []);
+
+    useEffect(() => {
+    const openCookieSettings = () => {
+      setVisible(true);
+    };
+  
+    window.addEventListener(
+      "zisto-open-cookie-settings",
+      openCookieSettings,
+    );
+  
+    return () => {
+      window.removeEventListener(
+        "zisto-open-cookie-settings",
+        openCookieSettings,
+      );
+    };
   }, []);
 
   if (!visible) {
