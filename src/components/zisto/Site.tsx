@@ -243,7 +243,9 @@ function Nav() {
             <img
               src={MONOGRAM}
               alt="Zisto"
-              className="h-8 w-auto md:hidden"
+              className={`h-8 w-auto transition duration-300 md:hidden ${
+                open ? "brightness-0 invert" : ""
+              }`}
               draggable={false}
             />
           </a>
