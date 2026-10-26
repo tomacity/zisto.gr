@@ -6010,6 +6010,198 @@ function CookieConsent() {
 }
 
 /* ================================================================== */
+
+function CookiePolicyPage() {
+  return (
+    <main className="min-h-screen bg-white font-sans text-[#222]">
+      <header className="border-b border-black/10">
+        <div className="mx-auto flex h-20 w-full max-w-[1100px] items-center justify-between px-5 md:px-10">
+          <a
+            href="/#/"
+            aria-label="Zisto — αρχική"
+          >
+            <img
+              src={WORDMARK}
+              alt="Zisto"
+              className="h-7 w-auto"
+              draggable={false}
+            />
+          </a>
+
+          <a
+            href="/#/"
+            className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#222]/60 transition hover:text-[#222]"
+          >
+            ← Πίσω
+          </a>
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-[900px] px-5 py-20 md:px-10 md:py-28">
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
+          Privacy
+        </p>
+
+        <h1 className="mt-5 text-[13vw] font-black leading-[0.9] tracking-[-0.045em] md:text-[64px]">
+          Cookies &
+          <br />
+          Privacy.
+        </h1>
+
+        <p className="mt-8 max-w-2xl text-[16px] leading-relaxed text-[#222]/60">
+          Η παρούσα σελίδα εξηγεί πώς το Zisto
+          χρησιμοποιεί cookies και παρόμοιες
+          τεχνολογίες αποθήκευσης στον browser.
+        </p>
+
+        <div className="mt-16 space-y-14 border-t border-black/10 pt-14">
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              01 — Απαραίτητα
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Απαραίτητες τεχνολογίες
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Χρησιμοποιούνται για βασικές
+              λειτουργίες του Zisto, όπως η
+              σύνδεση στον λογαριασμό, η
+              διατήρηση μιας ενεργής συνεδρίας
+              και η αποθήκευση των επιλογών
+              απορρήτου σου.
+            </p>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Οι τεχνολογίες αυτές είναι
+              απαραίτητες για τη λειτουργία της
+              υπηρεσίας και δεν χρησιμοποιούνται
+              για διαφημιστική παρακολούθηση.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              02 — Επιλογή cookies
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Η προτίμησή σου
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Όταν επιλέγεις «Αποδοχή» ή
+              «Απόρριψη», το Zisto αποθηκεύει
+              αυτή την επιλογή τοπικά στον
+              browser σου ώστε να μη χρειάζεται
+              να απαντάς σε κάθε επίσκεψη.
+            </p>
+
+            <div className="mt-6 overflow-hidden rounded-[14px] border border-black/10">
+              <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-black/10 p-4">
+                <div>
+                  <p className="text-[13px] font-bold">
+                    zisto_cookie_consent
+                  </p>
+                  <p className="mt-1 text-[12px] text-[#222]/50">
+                    Αποθηκεύει την επιλογή
+                    αποδοχής ή απόρριψης.
+                  </p>
+                </div>
+
+                <span className="text-[11px] font-bold text-[#222]/50">
+                  6 μήνες
+                </span>
+              </div>
+
+              <div className="grid grid-cols-[1fr_auto] gap-4 p-4">
+                <div>
+                  <p className="text-[13px] font-bold">
+                    zisto_cookie_consent_date
+                  </p>
+                  <p className="mt-1 text-[12px] text-[#222]/50">
+                    Αποθηκεύει πότε δόθηκε η
+                    τελευταία επιλογή.
+                  </p>
+                </div>
+
+                <span className="text-[11px] font-bold text-[#222]/50">
+                  6 μήνες
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              03 — Analytics
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Προαιρετικά analytics
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Αυτή τη στιγμή το δημόσιο landing
+              page του Zisto δεν χρησιμοποιεί
+              προαιρετικά cookies τρίτων όπως
+              Google Analytics ή Meta Pixel.
+            </p>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Αν στο μέλλον ενεργοποιηθούν
+              προαιρετικά analytics, δεν θα
+              ενεργοποιούνται πριν από τη
+              συγκατάθεσή σου.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              04 — Διαχείριση
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Αλλάζεις γνώμη;
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Μπορείς οποιαδήποτε στιγμή να
+              αλλάξεις την επιλογή σου μέσω του
+              «Ρυθμίσεις cookies» στο κάτω μέρος
+              της ιστοσελίδας.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              05 — Επικοινωνία
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Ερωτήσεις για το απόρρητο;
+            </h2>
+
+            <a
+              href="mailto:zisto.gr@gmail.com"
+              className="mt-5 inline-block text-[15px] font-bold underline decoration-[#DC2727] decoration-2 underline-offset-4"
+            >
+              zisto.gr@gmail.com
+            </a>
+          </section>
+        </div>
+
+        <p className="mt-20 border-t border-black/10 pt-6 text-[11px] uppercase tracking-[0.18em] text-[#222]/35">
+          Τελευταία ενημέρωση — Οκτώβριος 2026
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/* ================================================================== */
 /*  ROOT                                                              */
 /* ================================================================== */
 function LandingPage() {
@@ -6077,6 +6269,10 @@ const selectedBusinessId =
 
   if (isInvitationRoute()) {
     return <InvitationSetupPage />;
+  }
+
+  if (route === "/cookies") {
+    return <CookiePolicyPage />;
   }
 
   if (route === "/login") {
