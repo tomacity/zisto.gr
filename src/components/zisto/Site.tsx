@@ -1184,8 +1184,8 @@ function CaseStudy() {
   const handRotate =
     -1.5 + scrollProgress * 3;
 
-  const spatialBackground =
-    "linear-gradient(to bottom, #222222 0%, #222222 22%, #1E1E1E 38%, #161616 55%, #0B0B0B 76%, #000000 100%)";
+const spatialBackground =
+  "linear-gradient(to bottom, #222222 0%, #222222 30%, #202020 42%, #181818 58%, #0D0D0D 78%, #000000 100%)";
 
   return (
     <>
@@ -1212,14 +1212,7 @@ function CaseStudy() {
               "drop-shadow(0 30px 35px rgba(0,0,0,0.32))",
           }}
         />
-
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(circle at 50% 48%, transparent 55%, rgba(0,0,0,0.18) 100%)",
-          }}
-        />
+        
       </section>
 
       {/* DESKTOP — existing parallax */}
@@ -1256,14 +1249,6 @@ function CaseStudy() {
                 "50% 70%",
               filter:
                 "drop-shadow(0 45px 45px rgba(0,0,0,0.38))",
-            }}
-          />
-
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(circle at 50% 48%, transparent 48%, rgba(0,0,0,0.28) 100%)",
             }}
           />
         </div>
