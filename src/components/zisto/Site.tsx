@@ -4557,26 +4557,61 @@ if (loading) {
                 </h1>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="analytics-date"
-                  className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40"
-                >
-                  Επιλογή ημέρας
-                </label>
-              
-                <input
-                  id="analytics-date"
-                  type="date"
-                  value={selectedAnalyticsDate}
-                  onChange={(event) => {
-                    setSelectedAnalyticsDate(
-                      event.target.value,
-                    );
-                  }}
-                  className="rounded-[14px] border border-black/10 bg-white px-4 py-3 text-[13px] font-bold text-[#222] outline-none transition focus:border-[#222]"
-                />
-              </div>
+       <div className="mt-6 rounded-[20px] border border-black/10 bg-white p-4">
+        <DayPicker
+          mode="single"
+          month={analyticsCalendarMonth}
+          onMonthChange={
+            setAnalyticsCalendarMonth
+          }
+          selected={
+            selectedAnalyticsDate
+              ? new Date(
+                  `${selectedAnalyticsDate}T12:00:00`,
+                )
+              : undefined
+          }
+          onSelect={(date) => {
+            if (!date) {
+              setSelectedAnalyticsDate("");
+              return;
+            }
+      
+            const dateKey = [
+              date.getFullYear(),
+              String(
+                date.getMonth() + 1,
+              ).padStart(2, "0"),
+              String(
+                date.getDate(),
+              ).padStart(2, "0"),
+            ].join("-");
+      
+            setSelectedAnalyticsDate(
+              dateKey,
+            );
+          }}
+          modifiers={{
+            hasData: (
+              cardAnalytics?.activity_dates ??
+              []
+            ).map(
+              (date: string) =>
+                new Date(
+                  `${date}T12:00:00`,
+                ),
+            ),
+          }}
+          modifiersStyles={{
+            hasData: {
+              backgroundColor: "#DC2727",
+              color: "#FFFFFF",
+              borderRadius: "9999px",
+              fontWeight: 800,
+            },
+          }}
+        />
+      </div>
               
             </div>
           </div>
