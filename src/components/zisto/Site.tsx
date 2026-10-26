@@ -3963,6 +3963,9 @@ function NfcCardsTab({
   
   const [selectedAnalyticsDate, setSelectedAnalyticsDate] =
     useState("");
+
+  const [analyticsCalendarMonth, setAnalyticsCalendarMonth] =
+  useState(new Date());
   
   const [editingCard, setEditingCard] =
     useState<NfcCard | null>(null);
@@ -3992,6 +3995,18 @@ function NfcCardsTab({
         new URLSearchParams({
           card_id: analyticsCard.id,
         });
+
+      const calendarMonthKey = [
+        analyticsCalendarMonth.getFullYear(),
+        String(
+          analyticsCalendarMonth.getMonth() + 1,
+        ).padStart(2, "0"),
+      ].join("-");
+      
+      params.set(
+        "month",
+        calendarMonthKey,
+      );
 
       if (businessId) {
         params.set(
@@ -4061,6 +4076,7 @@ function NfcCardsTab({
 }, [
   analyticsCard?.id,
   selectedAnalyticsDate,
+  analyticsCalendarMonth,
   businessId,
 ]);
 
