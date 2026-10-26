@@ -245,22 +245,20 @@ function Nav() {
         }`}
       >
         <div className="mx-auto grid h-16 w-full max-w-[1400px] grid-cols-[1fr_auto] items-center gap-4 px-5 md:h-20 md:grid-cols-[auto_1fr_auto] md:px-10">
-          <a href="#top" className="flex items-center gap-2" aria-label="Zisto — αρχική">
-            <img
-              src={WORDMARK}
-              alt="Zisto"
-              className="hidden h-6 w-auto md:block"
-              draggable={false}
-            />
-            <img
-              src={MONOGRAM}
-              alt="Zisto"
-              className={`h-8 w-auto transition duration-300 md:hidden ${
-                open ? "brightness-0 invert" : ""
-              }`}
-              draggable={false}
-            />
-          </a>
+        <a
+          href="#top"
+          className="flex h-12 w-12 items-center justify-center"
+          aria-label="Zisto — αρχική"
+        >
+          <img
+            src={MONOGRAM}
+            alt="Zisto"
+            className={`h-10 w-auto transition duration-300 md:hidden ${
+              open ? "brightness-0 invert" : ""
+            }`}
+            draggable={false}
+          />
+        </a>
 
           <nav className="hidden justify-center md:flex">
             <div className="flex items-center gap-9">
