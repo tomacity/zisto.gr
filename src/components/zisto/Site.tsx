@@ -1128,6 +1128,13 @@ function CaseStudy() {
   const [scrollProgress, setScrollProgress] =
     useState(0);
 
+  const [cardShine, setCardShine] =
+    useState({
+      x: 50,
+      y: 50,
+      active: false,
+    });
+
   useEffect(() => {
     function handleScroll() {
       const section = sectionRef.current;
@@ -1184,12 +1191,12 @@ function CaseStudy() {
   const handRotate =
     -1.5 + scrollProgress * 3;
 
-const spatialBackground =
-  "linear-gradient(to bottom, #222222 0%, #222222 30%, #202020 42%, #181818 58%, #0D0D0D 78%, #000000 100%)";
+  const spatialBackground =
+    "linear-gradient(to bottom, #222222 0%, #222222 30%, #202020 42%, #181818 58%, #0D0D0D 78%, #000000 100%)";
 
   return (
     <>
-      {/* MOBILE — static, no parallax */}
+      {/* MOBILE — static */}
       <section
         id="case"
         className="relative h-[82svh] w-full overflow-hidden bg-[#222222] md:hidden"
@@ -1212,16 +1219,16 @@ const spatialBackground =
               "drop-shadow(0 30px 35px rgba(0,0,0,0.32))",
           }}
         />
-        
       </section>
 
-      {/* DESKTOP — existing parallax */}
+      {/* DESKTOP — parallax + card shine */}
       <section
         ref={sectionRef}
         id="case-desktop"
         className="relative hidden h-[200vh] w-full bg-[#222222] md:block"
       >
         <div className="sticky top-0 h-screen w-full overflow-hidden [perspective:1200px]">
+
           <div
             className="absolute inset-0"
             style={{
@@ -1230,10 +1237,8 @@ const spatialBackground =
             }}
           />
 
-          <img
-            src="/images/zisto-hand.png"
-            alt="Zisto NFC card"
-            draggable={false}
+          {/* HAND + CARD LAYER */}
+          <div
             className="pointer-events-none absolute left-[42%] top-[56%] w-[108vw] max-w-none select-none will-change-transform lg:w-[96vw]"
             style={{
               transform: `
@@ -1250,7 +1255,90 @@ const spatialBackground =
               filter:
                 "drop-shadow(0 45px 45px rgba(0,0,0,0.38))",
             }}
-          />
+          >
+            <img
+              src="/images/zisto-hand.png"
+              alt="Zisto NFC card"
+              draggable={false}
+              className="block w-full"
+            />
+
+            {/* INTERACTIVE CARD ONLY */}
+            <div
+              className="pointer-events-auto absolute overflow-hidden"
+              style={{
+                left: "36%",
+                top: "24%",
+                width: "36%",
+                height: "31%",
+
+                clipPath:
+                  "polygon(6% 18%, 94% 0%, 100% 78%, 10% 100%)",
+              }}
+              onMouseEnter={() => {
+                setCardShine((current) => ({
+                  ...current,
+                  active: true,
+                }));
+              }}
+              onMouseLeave={() => {
+                setCardShine((current) => ({
+                  ...current,
+                  active: false,
+                }));
+              }}
+              onMouseMove={(event) => {
+                const rect =
+                  event.currentTarget.getBoundingClientRect();
+
+                const x =
+                  ((event.clientX -
+                    rect.left) /
+                    rect.width) *
+                  100;
+
+                const y =
+                  ((event.clientY -
+                    rect.top) /
+                    rect.height) *
+                  100;
+
+                setCardShine({
+                  x,
+                  y,
+                  active: true,
+                });
+              }}
+            >
+              {/* SHINE */}
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  opacity:
+                    cardShine.active
+                      ? 1
+                      : 0,
+
+                  transition:
+                    "opacity 180ms ease",
+
+                  mixBlendMode:
+                    "screen",
+
+                  background: `
+                    radial-gradient(
+                      circle at ${cardShine.x}% ${cardShine.y}%,
+                      rgba(255,255,255,0.9) 0%,
+                      rgba(255,255,255,0.48) 9%,
+                      rgba(255,255,255,0.18) 20%,
+                      rgba(255,255,255,0.05) 32%,
+                      transparent 50%
+                    )
+                  `,
+                }}
+              />
+            </div>
+          </div>
         </div>
       </section>
     </>
