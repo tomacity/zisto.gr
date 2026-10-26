@@ -603,12 +603,6 @@ function Hero() {
       <div className="mx-auto grid w-full max-w-[1400px] grid-cols-1 items-center gap-12 px-5 pb-24 md:px-10 md:pb-32 lg:grid-cols-12 lg:gap-8">
         {/* Left: headline */}
         <div className="lg:col-span-8">
-          <Reveal delay={80}>
-            <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-[#222]/70 backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#DC2727]" />
-              Ζήσ' το · zisto
-            </div>
-          </Reveal>
 
           <h1 className="mt-7 font-black leading-[0.86] tracking-[-0.045em] text-[#222]">
             <Reveal delay={180} as="span" className="block text-[16vw] sm:text-[13vw] lg:text-[10.5vw] xl:text-[11.5rem]">
