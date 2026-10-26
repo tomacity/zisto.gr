@@ -1266,14 +1266,15 @@ function CaseStudy() {
             {/* INTERACTIVE CARD ONLY */}
             <div
               className="pointer-events-auto absolute overflow-hidden"
-             style={{
-              left: "38%",
-              top: "25%",
-              width: "41%",
-              height: "43%",
-            
-              clipPath:
-                "polygon(0% 28%, 88% 0%, 100% 79%, 7% 100%)",
+               style={{
+                left: "38%",
+                top: "18%",
+                width: "42%",
+                height: "44%",
+              
+                clipPath:
+                  "polygon(1% 24%, 90% 0%, 100% 78%, 8% 100%)",
+              }}
             }}
               onMouseEnter={() => {
                 setCardShine((current) => ({
@@ -1328,11 +1329,11 @@ function CaseStudy() {
                   background: `
                     radial-gradient(
                       circle at ${cardShine.x}% ${cardShine.y}%,
-                      rgba(255,255,255,0.9) 0%,
-                      rgba(255,255,255,0.48) 9%,
-                      rgba(255,255,255,0.18) 20%,
-                      rgba(255,255,255,0.05) 32%,
-                      transparent 50%
+                      rgba(255,255,255,0.8) 0%,
+                      rgba(255,255,255,0.38) 7%,
+                      rgba(255,255,255,0.14) 14%,
+                      rgba(255,255,255,0.04) 22%,
+                      transparent 32%
                     )
                   `,
                 }}
