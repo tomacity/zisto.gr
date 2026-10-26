@@ -838,26 +838,9 @@ function ServiceCard({
       />
 
       <div className="relative z-10 flex h-full flex-col justify-between gap-5 md:gap-8">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start">
           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] md:text-[11px]">
             {s.n}
-          </span>
-
-          <span className="grid h-7 w-7 place-items-center rounded-full border border-current opacity-70 transition-transform duration-500 md:h-8 md:w-8 md:group-hover:rotate-45">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M2 10L10 2M10 2H4M10 2V8"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
           </span>
         </div>
 
