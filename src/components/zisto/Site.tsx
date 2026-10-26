@@ -202,7 +202,6 @@ function Steam({
 const NAV_LINKS = [
   { label: "Υπηρεσίες", href: "#services" },
   { label: "Πώς δουλεύει", href: "#how" },
-  { label: "Παράδειγμα", href: "#case" },
   { label: "Τιμές", href: "#pricing" },
 ];
 
