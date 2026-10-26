@@ -1275,7 +1275,7 @@ function CaseStudy() {
                 clipPath:
                   "polygon(1% 24%, 90% 0%, 100% 78%, 8% 100%)",
               }}
-            }}
+              
               onMouseEnter={() => {
                 setCardShine((current) => ({
                   ...current,
