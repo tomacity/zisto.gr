@@ -6047,6 +6047,340 @@ function CookieConsent() {
 
 /* ================================================================== */
 
+function PrivacyPolicyPage() {
+  return (
+    <main className="min-h-screen bg-white font-sans text-[#222]">
+      <header className="border-b border-black/10">
+        <div className="mx-auto flex h-20 w-full max-w-[1100px] items-center justify-between px-5 md:px-10">
+          <a
+            href="/#/"
+            aria-label="Zisto — αρχική"
+          >
+            <img
+              src={WORDMARK}
+              alt="Zisto"
+              className="h-7 w-auto"
+              draggable={false}
+            />
+          </a>
+
+          <a
+            href="/#/"
+            className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#222]/60 transition hover:text-[#222]"
+          >
+            ← Πίσω
+          </a>
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-[900px] px-5 py-20 md:px-10 md:py-28">
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
+          Privacy
+        </p>
+
+        <h1 className="mt-5 text-[13vw] font-black leading-[0.9] tracking-[-0.045em] md:text-[64px]">
+          Πολιτική
+          <br />
+          Απορρήτου.
+        </h1>
+
+        <p className="mt-8 max-w-2xl text-[16px] leading-relaxed text-[#222]/60">
+          Η παρούσα Πολιτική Απορρήτου εξηγεί πώς
+          το Zisto συλλέγει, χρησιμοποιεί και
+          προστατεύει προσωπικά δεδομένα κατά τη
+          χρήση της ιστοσελίδας και των υπηρεσιών του.
+        </p>
+
+        <div className="mt-16 space-y-14 border-t border-black/10 pt-14">
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              01 — Υπεύθυνος επεξεργασίας
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Ποιος διαχειρίζεται τα δεδομένα
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Υπεύθυνος επεξεργασίας για τις
+              υπηρεσίες του Zisto είναι το Zisto.
+              Για θέματα σχετικά με προσωπικά
+              δεδομένα μπορείς να επικοινωνήσεις
+              στο:
+            </p>
+
+            <a
+              href="mailto:zisto.gr@gmail.com"
+              className="mt-4 inline-block text-[15px] font-bold underline decoration-[#DC2727] decoration-2 underline-offset-4"
+            >
+              zisto.gr@gmail.com
+            </a>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              02 — Δεδομένα
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Τι δεδομένα επεξεργαζόμαστε
+            </h2>
+
+            <div className="mt-5 space-y-4 text-[15px] leading-relaxed text-[#222]/65">
+              <p>
+                <strong className="text-[#222]">
+                  Στοιχεία λογαριασμού:
+                </strong>{" "}
+                email, στοιχεία σύνδεσης και
+                αναγνωριστικά που απαιτούνται για
+                authentication και διαχείριση του
+                λογαριασμού.
+              </p>
+
+              <p>
+                <strong className="text-[#222]">
+                  Στοιχεία επιχείρησης:
+                </strong>{" "}
+                όνομα επιχείρησης, τοποθεσίες,
+                projects, NFC κάρτες και ρυθμίσεις
+                που δημιουργούνται μέσα στην
+                πλατφόρμα.
+              </p>
+
+              <p>
+                <strong className="text-[#222]">
+                  Δεδομένα χρήσης:
+                </strong>{" "}
+                συμβάντα όπως επισκέψεις,
+                NFC taps, QR scans, ανοίγματα
+                μενού και review links όταν αυτά
+                καταγράφονται από υπηρεσίες Zisto.
+              </p>
+
+              <p>
+                <strong className="text-[#222]">
+                  Επικοινωνία:
+                </strong>{" "}
+                στοιχεία και περιεχόμενο που
+                αποστέλλεται όταν επικοινωνείς
+                μαζί μας ή λαμβάνεις πρόσκληση
+                για χρήση της υπηρεσίας.
+              </p>
+            </div>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              03 — Σκοποί
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Γιατί χρησιμοποιούνται
+            </h2>
+
+            <div className="mt-5 space-y-4 text-[15px] leading-relaxed text-[#222]/65">
+              <p>
+                Για τη δημιουργία και λειτουργία
+                λογαριασμών και την παροχή των
+                υπηρεσιών Zisto.
+              </p>
+
+              <p>
+                Για τη διαχείριση NFC καρτών,
+                projects, dashboard και
+                επιχειρηματικών ρυθμίσεων.
+              </p>
+
+              <p>
+                Για την ασφάλεια, την πρόληψη
+                κατάχρησης και την τεχνική
+                λειτουργία της πλατφόρμας.
+              </p>
+
+              <p>
+                Για την παροχή analytics στις
+                επιχειρήσεις σχετικά με τη χρήση
+                των δικών τους Zisto pages.
+              </p>
+
+              <p>
+                Για υποστήριξη και επικοινωνία
+                σχετικά με την υπηρεσία.
+              </p>
+            </div>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              04 — Νομική βάση
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Νομική βάση επεξεργασίας
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Ανάλογα με την περίπτωση, η
+              επεξεργασία βασίζεται στην εκτέλεση
+              της υπηρεσίας ή σε προσυμβατικά
+              μέτρα, σε νόμιμα συμφέροντα που
+              σχετίζονται με την ασφάλεια και
+              λειτουργία της πλατφόρμας, σε
+              νομικές υποχρεώσεις ή στη
+              συγκατάθεση του χρήστη όταν αυτή
+              απαιτείται.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              05 — Πάροχοι
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Ποιοι μπορεί να επεξεργάζονται δεδομένα
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Για τη λειτουργία της υπηρεσίας
+              χρησιμοποιούνται εξωτερικοί πάροχοι
+              τεχνολογικής υποδομής, hosting,
+              authentication, βάσεων δεδομένων
+              και αποστολής email.
+            </p>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Σήμερα η τεχνική υποδομή του Zisto
+              περιλαμβάνει υπηρεσίες όπως
+              Supabase, Vercel και Resend.
+              Οι πάροχοι αυτοί επεξεργάζονται
+              δεδομένα μόνο στο μέτρο που
+              απαιτείται για την παροχή των
+              αντίστοιχων υπηρεσιών.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              06 — Διατήρηση
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Για πόσο κρατάμε τα δεδομένα
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Τα δεδομένα διατηρούνται μόνο για
+              όσο είναι απαραίτητα για τους
+              σκοπούς για τους οποίους
+              συλλέχθηκαν, για όσο ο λογαριασμός
+              ή η υπηρεσία παραμένει ενεργή και
+              για όσο απαιτείται από τυχόν
+              νομικές ή συμβατικές υποχρεώσεις.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              07 — Δικαιώματα
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Τα δικαιώματά σου
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Σύμφωνα με τον GDPR, ανάλογα με την
+              περίπτωση μπορείς να ζητήσεις
+              πρόσβαση, διόρθωση, διαγραφή,
+              περιορισμό της επεξεργασίας,
+              φορητότητα των δεδομένων ή να
+              αντιταχθείς σε συγκεκριμένη
+              επεξεργασία.
+            </p>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Όταν η επεξεργασία βασίζεται στη
+              συγκατάθεση, μπορείς να την
+              ανακαλέσεις οποιαδήποτε στιγμή.
+            </p>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Για την άσκηση δικαιώματος μπορείς
+              να επικοινωνήσεις στο{" "}
+              <a
+                href="mailto:zisto.gr@gmail.com"
+                className="font-bold underline decoration-[#DC2727] decoration-2 underline-offset-4"
+              >
+                zisto.gr@gmail.com
+              </a>.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              08 — Καταγγελία
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Αρχή Προστασίας Δεδομένων
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Αν θεωρείς ότι η επεξεργασία των
+              προσωπικών σου δεδομένων παραβιάζει
+              τη νομοθεσία, έχεις δικαίωμα
+              υποβολής καταγγελίας στην Ελληνική
+              Αρχή Προστασίας Δεδομένων
+              Προσωπικού Χαρακτήρα.
+            </p>
+
+            <a
+              href="https://www.dpa.gr/"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-5 inline-block text-[15px] font-bold underline decoration-[#DC2727] decoration-2 underline-offset-4"
+            >
+              dpa.gr ↗
+            </a>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              09 — Cookies
+            </p>
+
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Cookies & παρόμοιες τεχνολογίες
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Περισσότερες πληροφορίες σχετικά
+              με cookies και τις επιλογές
+              συγκατάθεσης βρίσκονται στην
+              Πολιτική Cookies.
+            </p>
+
+            <a
+              href="/#/cookies"
+              className="mt-5 inline-block text-[15px] font-bold underline decoration-[#DC2727] decoration-2 underline-offset-4"
+            >
+              Πολιτική Cookies →
+            </a>
+          </section>
+        </div>
+
+        <p className="mt-20 border-t border-black/10 pt-6 text-[11px] uppercase tracking-[0.18em] text-[#222]/35">
+          Τελευταία ενημέρωση — Οκτώβριος 2026
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/* ================================================================== */
+
 function CookiePolicyPage() {
   return (
     <main className="min-h-screen bg-white font-sans text-[#222]">
@@ -6309,6 +6643,10 @@ const selectedBusinessId =
 
   if (route === "/cookies") {
     return <CookiePolicyPage />;
+  }
+
+  if (route === "/privacy") {
+    return <PrivacyPolicyPage />;
   }
 
   if (route === "/login") {
