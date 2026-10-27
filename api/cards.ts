@@ -188,6 +188,19 @@ function athensMidnightToUtc(
   ).toISOString();
 }
 
+function buildTrackingUrl(
+  baseUrl: string,
+  source: "nfc" | "qr",
+  cardToken: string,
+) {
+  const url = new URL(baseUrl);
+
+  url.searchParams.set("source", source);
+  url.searchParams.set("card", cardToken);
+
+  return url.toString();
+}
+
 export default async function handler(
   req: any,
   res: any,
@@ -360,6 +373,53 @@ export default async function handler(
       businessId =
         membership.business_id;
     }
+
+    /*
+ * Active Smart Link project της επιχείρησης.
+ */
+const projectQuery =
+  new URLSearchParams({
+    business_id:
+      `eq.${businessId}`,
+    status: "eq.active",
+    select:
+      "id,name,live_url,github_url,project_key",
+    order:
+      "created_at.desc",
+    limit: "1",
+  });
+
+const projectResponse =
+  await supabaseRequest({
+    supabaseUrl,
+    supabaseSecretKey,
+    path:
+      `/rest/v1/connected_projects?${projectQuery.toString()}`,
+  });
+
+if (!projectResponse.ok) {
+  const errorText =
+    await projectResponse.text();
+
+  console.error(
+    "Connected project query failed:",
+    errorText,
+  );
+
+  return res.status(500).json({
+    error:
+      "Failed to load connected Smart Link",
+  });
+}
+
+const connectedProjects =
+  await projectResponse.json();
+
+const connectedProject =
+  connectedProjects[0] ?? null;
+
+const smartLinkLiveUrl =
+  connectedProject?.live_url ?? null;
 
     /*
      * Locations της επιχείρησης.
@@ -906,6 +966,13 @@ const calendarEndKey = [
     }
 
     if (req.method === "POST") {
+      if (!smartLinkLiveUrl) {
+        return res.status(409).json({
+          error:
+            "Σύνδεσε πρώτα ένα ενεργό Smart Link project με αυτή την επιχείρηση.",
+        });
+      }
+    
       const name =
         typeof req.body?.name === "string"
           ? req.body.name.trim()
@@ -954,7 +1021,16 @@ const calendarEndKey = [
         await createResponse.json();
     
       return res.status(201).json({
-        card: created[0],
+        card: {
+          ...created[0],
+      
+          tracking_url:
+            buildTrackingUrl(
+              smartLinkLiveUrl,
+              "nfc",
+              created[0].public_token,
+            ),
+        },
       });
     }
 
@@ -1133,8 +1209,14 @@ const calendarEndKey = [
         location_name:
           location?.name ?? null,
   
-        tracking_url:
-          `https://tomacity.github.io/tsipouradiko-smart-link-/?source=${source}&card=${card.public_token}`,
+       tracking_url:
+        smartLinkLiveUrl
+          ? buildTrackingUrl(
+              smartLinkLiveUrl,
+              source,
+              card.public_token,
+            )
+          : null,
   
         analytics: {
           total_taps:
