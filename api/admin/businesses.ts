@@ -500,9 +500,38 @@ export default async function handler(
         });
       }
     
+      const {
+        data: activeProject,
+        error: activeProjectError,
+      } = await supabaseAdmin
+        .from("connected_projects")
+        .select(
+          "id, name, live_url, github_url, project_key",
+        )
+        .eq("business_id", business.id)
+        .eq("status", "active")
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeProjectError) {
+        console.error(
+          "Updated business Smart Link loading failed:",
+          activeProjectError,
+        );
+      }
+
       return response.status(200).json({
         success: true,
-        business,
+        business: {
+          ...business,
+          setup_status: activeProject
+            ? "active"
+            : "setup_required",
+          smart_link: activeProject ?? null,
+        },
       });
     }
 
@@ -642,7 +671,11 @@ export default async function handler(
 
     return response.status(201).json({
       success: true,
-      business,
+      business: {
+        ...business,
+        setup_status: "setup_required",
+        smart_link: null,
+      },
     });
   } catch (error) {
     console.error(
