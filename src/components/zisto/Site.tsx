@@ -1608,7 +1608,43 @@ function LoginPage() {
       
     } catch (error) {
       console.error("Login failed:", error);
-      setLoginError("Το email ή ο κωδικός δεν είναι σωστός.");
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "";
+
+      const normalizedMessage =
+        message.toLowerCase();
+
+      if (
+        normalizedMessage.includes(
+          "invalid login credentials",
+        )
+      ) {
+        setLoginError(
+          "Το email ή ο κωδικός δεν είναι σωστός.",
+        );
+      } else if (
+        normalizedMessage.includes(
+          "invalid api key",
+        ) ||
+        normalizedMessage.includes(
+          "api key",
+        )
+      ) {
+        setLoginError(
+          "Υπάρχει πρόβλημα με τη σύνδεση του Preview στο Supabase (API key).",
+        );
+      } else if (message) {
+        setLoginError(
+          `Σφάλμα σύνδεσης: ${message}`,
+        );
+      } else {
+        setLoginError(
+          "Δεν ήταν δυνατή η σύνδεση.",
+        );
+      }
     } finally {
       setLoading(false);
     }
