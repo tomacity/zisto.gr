@@ -60,6 +60,14 @@ type Business = {
   slug: string;
   timezone: string;
   status: "active" | "inactive";
+  setup_status: "active" | "setup_required";
+  smart_link: {
+    id: string;
+    name: string;
+    live_url: string;
+    github_url: string | null;
+    project_key: string;
+  } | null;
   created_at: string;
   updated_at: string;
 };
@@ -1334,7 +1342,9 @@ async function updateBusiness(
   }
   
   const activeBusinesses = businesses.filter(
-    (business) => business.status === "active",
+    (business) =>
+      business.status === "active" &&
+      business.setup_status === "active",
   ).length;
 
   if (loading) {
@@ -1578,7 +1588,12 @@ async function updateBusiness(
         <div className="grid gap-5">
           {businesses.map((business) => {
             const isActive =
-              business.status === "active";
+              business.status === "active" &&
+              business.setup_status === "active";
+
+            const setupRequired =
+              business.setup_status ===
+              "setup_required";
 
             return (
               <article
@@ -1603,9 +1618,11 @@ async function updateBusiness(
                           }`}
                         />
 
-                        {isActive
-                          ? "Active"
-                          : "Inactive"}
+                        {setupRequired
+                          ? "Setup required"
+                          : isActive
+                            ? "Active"
+                            : "Inactive"}
                       </span>
 
                       <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 font-mono text-[10px] font-bold text-[#666]">
@@ -1642,9 +1659,11 @@ async function updateBusiness(
                             }`}
                           />
 
-                          {isActive
-                            ? "Live"
-                            : "Paused"}
+                          {setupRequired
+                            ? "Setup required"
+                            : isActive
+                              ? "Live"
+                              : "Paused"}
                         </p>
                       </div>
                     </div>
