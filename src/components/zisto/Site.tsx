@@ -4510,8 +4510,7 @@ function NfcCardsTab({
           cards[0]?.location_name ??
           null,
         tracking_url:
-          result.card.tracking_url ??
-          `https://tomacity.github.io/tsipouradiko-smart-link-/?source=nfc&card=${result.card.public_token}`,
+          result.card.tracking_url,
       };
   
       onCardCreated(createdCard);
@@ -4769,18 +4768,109 @@ if (loading) {
   
   if (cards.length === 0) {
     return (
-      <section className="rounded-[22px] border border-black/10 bg-white px-6 py-16 text-center">
-        <p className="text-[42px]">⌁</p>
+      <div className="space-y-6">
+        <section className="rounded-[22px] border border-black/10 bg-white px-6 py-16 text-center">
+          <p className="text-[42px]">⌁</p>
 
-        <h2 className="mt-5 text-[28px] font-black tracking-[-0.04em]">
-          Δεν υπάρχουν ακόμη κάρτες
-        </h2>
+          <h2 className="mt-5 text-[28px] font-black tracking-[-0.04em]">
+            Δεν υπάρχουν ακόμη τραπέζια
+          </h2>
 
-        <p className="mx-auto mt-4 max-w-lg text-[13px] leading-relaxed text-[#222]/45">
-          Όταν δημιουργηθεί η πρώτη NFC ή QR κάρτα,
-          θα εμφανιστεί εδώ μαζί με το tracking URL της.
-        </p>
-      </section>
+          <p className="mx-auto mt-4 max-w-lg text-[13px] leading-relaxed text-[#222]/45">
+            Πρόσθεσε το πρώτο τραπέζι. Το Zisto θα
+            δημιουργήσει αυτόματα το μοναδικό tracking URL
+            που θα γράψεις στην NFC ή QR κάρτα.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowAddTable(true);
+              setCreateError(null);
+            }}
+            className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727]"
+          >
+            + Προσθήκη τραπεζιού
+          </button>
+        </section>
+
+        {showAddTable &&
+          createPortal(
+            <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-5 backdrop-blur-sm">
+              <section className="w-full max-w-[460px] rounded-[24px] bg-white p-7 shadow-2xl md:p-9">
+                <div className="flex items-start justify-between gap-5">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                      Νέα NFC κάρτα
+                    </p>
+
+                    <h2 className="mt-3 text-[30px] font-black tracking-[-0.04em]">
+                      Προσθήκη τραπεζιού
+                    </h2>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!creatingTable) {
+                        setShowAddTable(false);
+                        setTableName("");
+                        setCreateError(null);
+                      }
+                    }}
+                    className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#F4F4F2] text-lg font-bold"
+                    aria-label="Κλείσιμο"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={createTable}
+                  className="mt-8"
+                >
+                  <label className="block">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#222]/45">
+                      Όνομα τραπεζιού
+                    </span>
+
+                    <input
+                      type="text"
+                      value={tableName}
+                      onChange={(event) =>
+                        setTableName(event.target.value)
+                      }
+                      placeholder="π.χ. Τραπέζι 1"
+                      autoFocus
+                      disabled={creatingTable}
+                      className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]/35 disabled:opacity-60"
+                    />
+                  </label>
+
+                  {createError && (
+                    <p className="mt-4 rounded-[12px] bg-red-50 px-4 py-3 text-[12px] font-semibold text-red-700">
+                      {createError}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={
+                      creatingTable ||
+                      !tableName.trim()
+                    }
+                    className="mt-7 w-full rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {creatingTable
+                      ? "Δημιουργία..."
+                      : "Δημιουργία τραπεζιού"}
+                  </button>
+                </form>
+              </section>
+            </div>,
+            document.body,
+          )}
+      </div>
     );
   }
 
