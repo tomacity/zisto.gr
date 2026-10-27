@@ -165,8 +165,96 @@ export default async function handler(
         });
       }
 
+      const businessRows = businesses ?? [];
+
+      const businessIds = businessRows.map(
+        (business) => business.id,
+      );
+
+      let activeProjectsByBusiness = new Map<
+        string,
+        {
+          id: string;
+          name: string;
+          live_url: string;
+          github_url: string | null;
+          project_key: string;
+        }
+      >();
+
+      if (businessIds.length > 0) {
+        const {
+          data: activeProjects,
+          error: projectsError,
+        } = await supabaseAdmin
+          .from("connected_projects")
+          .select(`
+            id,
+            business_id,
+            name,
+            live_url,
+            github_url,
+            project_key,
+            created_at
+          `)
+          .in("business_id", businessIds)
+          .eq("status", "active")
+          .order("created_at", {
+            ascending: false,
+          });
+
+        if (projectsError) {
+          console.error(
+            "Business Smart Link loading failed:",
+            projectsError,
+          );
+
+          return response.status(500).json({
+            error:
+              "Could not load business Smart Link status",
+          });
+        }
+
+        for (const project of activeProjects ?? []) {
+          if (
+            !activeProjectsByBusiness.has(
+              project.business_id,
+            )
+          ) {
+            activeProjectsByBusiness.set(
+              project.business_id,
+              {
+                id: project.id,
+                name: project.name,
+                live_url: project.live_url,
+                github_url:
+                  project.github_url ?? null,
+                project_key:
+                  project.project_key,
+              },
+            );
+          }
+        }
+      }
+
+      const businessesWithSetupStatus =
+        businessRows.map((business) => {
+          const smartLink =
+            activeProjectsByBusiness.get(
+              business.id,
+            ) ?? null;
+
+          return {
+            ...business,
+            setup_status: smartLink
+              ? "active"
+              : "setup_required",
+            smart_link: smartLink,
+          };
+        });
+
       return response.status(200).json({
-        businesses: businesses ?? [],
+        businesses: businessesWithSetupStatus,
       });
     }
 
