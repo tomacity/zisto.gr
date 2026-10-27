@@ -972,6 +972,13 @@ const calendarEndKey = [
             "Σύνδεσε πρώτα ένα ενεργό Smart Link project με αυτή την επιχείρηση.",
         });
       }
+
+      if (landingPages.length === 0) {
+        return res.status(409).json({
+          error:
+            "Η επιχείρηση δεν έχει ακόμη ενεργό Landing Page. Ολοκλήρωσε πρώτα το Smart Link setup.",
+        });
+      }
     
       const name =
         typeof req.body?.name === "string"
@@ -1020,10 +1027,26 @@ const calendarEndKey = [
       const created =
         await createResponse.json();
     
+      const createdLandingPage =
+        landingPages.find(
+          (page: any) =>
+            page.id === created[0].landing_page_id,
+        ) ?? landingPages[0];
+
+      const createdLocation =
+        locations.find(
+          (location: any) =>
+            location.id ===
+            createdLandingPage?.location_id,
+        );
+
       return res.status(201).json({
         card: {
           ...created[0],
-      
+          landing_page_name:
+            createdLandingPage?.name ?? null,
+          location_name:
+            createdLocation?.name ?? null,
           tracking_url:
             buildTrackingUrl(
               smartLinkLiveUrl,
