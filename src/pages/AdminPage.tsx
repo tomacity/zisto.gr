@@ -32,7 +32,7 @@ const ADMIN_TABS: {
     id: "projects",
     label: "Projects",
     description:
-      "Σύνδεση και διαχείριση ανεξάρτητων React και Vite projects.",
+      "Σύνδεση και διαχείριση των public Smart Links και των GitHub repositories τους.",
   },
   {
     id: "clients",
@@ -762,6 +762,15 @@ useEffect(() => {
                       project,
                       ...currentProjects,
                     ]);
+                  }}
+                  onProjectUpdated={(updatedProject) => {
+                    setProjects((currentProjects) =>
+                      currentProjects.map((project) =>
+                        project.id === updatedProject.id
+                          ? updatedProject
+                          : project,
+                      ),
+                    );
                   }}
                 />
               )}
@@ -2036,7 +2045,7 @@ async function updateBusiness(
             <div className="mt-6 grid gap-5">
               <label className="block">
                 <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                  Live URL *
+                  Smart Link URL *
                 </span>
 
                 <input
@@ -2048,7 +2057,7 @@ async function updateBusiness(
                     )
                   }
                   required
-                  placeholder="https://your-smart-link.vercel.app"
+                  placeholder="https://username.github.io/project/"
                   className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
                 />
               </label>
@@ -2202,12 +2211,16 @@ function ProjectsPanel({
   loading,
   error,
   onProjectCreated,
+  onProjectUpdated,
 }: {
   projects: ConnectedProject[];
   businesses: Business[];
   loading: boolean;
   error: string;
   onProjectCreated: (
+    project: ConnectedProject,
+  ) => void;
+  onProjectUpdated: (
     project: ConnectedProject,
   ) => void;
 }) {
@@ -2232,6 +2245,18 @@ function ProjectsPanel({
 
   const [successMessage, setSuccessMessage] =
     useState("");
+
+  const [editingProject, setEditingProject] =
+    useState<ConnectedProject | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLiveUrl, setEditLiveUrl] = useState("");
+  const [editGithubUrl, setEditGithubUrl] =
+    useState("");
+  const [editStatus, setEditStatus] =
+    useState<ConnectedProject["status"]>("active");
+  const [editSaving, setEditSaving] =
+    useState(false);
+  const [editError, setEditError] = useState("");
 
   function resetForm() {
     setBusinessId("");
@@ -2348,6 +2373,109 @@ function ProjectsPanel({
     }
   }
 
+  function startEditingProject(
+    project: ConnectedProject,
+  ) {
+    setEditingProject(project);
+    setEditName(project.name);
+    setEditLiveUrl(project.live_url);
+    setEditGithubUrl(project.github_url ?? "");
+    setEditStatus(project.status);
+    setEditError("");
+  }
+
+  function cancelEditingProject() {
+    if (editSaving) {
+      return;
+    }
+
+    setEditingProject(null);
+    setEditName("");
+    setEditLiveUrl("");
+    setEditGithubUrl("");
+    setEditStatus("active");
+    setEditError("");
+  }
+
+  async function updateProject(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!editingProject) {
+      return;
+    }
+
+    try {
+      setEditSaving(true);
+      setEditError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/projects",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            id: editingProject.id,
+            name: editName.trim(),
+            live_url: editLiveUrl.trim(),
+            github_url: editGithubUrl.trim(),
+            status: editStatus,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Could not update connected project",
+        );
+      }
+
+      onProjectUpdated(result.project);
+      cancelEditingProject();
+    } catch (updateError) {
+      console.error(
+        "Project update failed:",
+        updateError,
+      );
+
+      setEditError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Δεν ήταν δυνατή η ενημέρωση του project.",
+      );
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   const activeProjects = projects.filter(
     (project) => project.status === "active",
   ).length;
@@ -2425,8 +2553,8 @@ function ProjectsPanel({
             </h3>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#666]">
-              Σύνδεσε ένα ανεξάρτητο React ή Vite
-              project με μία επιχείρηση του Zisto.
+              Σύνδεσε το public Smart Link URL και το GitHub
+              repository με μία επιχείρηση του Zisto.
             </p>
           </div>
 
@@ -2479,7 +2607,7 @@ function ProjectsPanel({
 
             <label className="block sm:col-span-2">
               <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                Live URL
+                Smart Link URL
               </span>
 
               <input
@@ -2489,7 +2617,7 @@ function ProjectsPanel({
                   setLiveUrl(event.target.value)
                 }
                 required
-                placeholder="https://project.vercel.app"
+                placeholder="https://username.github.io/project/"
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
               />
             </label>
@@ -2682,13 +2810,23 @@ function ProjectsPanel({
                   </div>
 
                   <div className="flex w-full flex-col gap-3 lg:w-auto">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startEditingProject(project)
+                      }
+                      className="w-full rounded-2xl border border-black/10 bg-white px-7 py-4 text-center text-sm font-bold transition hover:border-[#222] lg:w-auto"
+                    >
+                      Edit
+                    </button>
+
                     <a
                       href={project.live_url}
                       target="_blank"
                       rel="noreferrer"
                       className="w-full rounded-2xl bg-[#222] px-7 py-4 text-center text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
                     >
-                      Άνοιγμα Live Site →
+                      Άνοιγμα Smart Link →
                     </a>
 
                     {project.github_url && (
@@ -2712,6 +2850,151 @@ function ProjectsPanel({
               </article>
             );
           })}
+        </div>
+      )}
+
+      {editingProject && (
+        <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-5 backdrop-blur-sm">
+          <section className="w-full max-w-[560px] rounded-[28px] bg-white p-7 shadow-2xl md:p-9">
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
+                  Edit connected project
+                </p>
+
+                <h3 className="mt-3 text-3xl font-black tracking-[-0.04em]">
+                  Επεξεργασία Project
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={cancelEditingProject}
+                disabled={editSaving}
+                className="grid h-10 w-10 place-items-center rounded-full bg-[#F4F4F2] text-lg font-bold disabled:opacity-50"
+                aria-label="Κλείσιμο"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              onSubmit={updateProject}
+              className="mt-8 grid gap-5"
+            >
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                  Project name
+                </span>
+
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(event) =>
+                    setEditName(event.target.value)
+                  }
+                  required
+                  maxLength={120}
+                  disabled={editSaving}
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222] disabled:opacity-60"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                  Smart Link URL
+                </span>
+
+                <input
+                  type="url"
+                  value={editLiveUrl}
+                  onChange={(event) =>
+                    setEditLiveUrl(event.target.value)
+                  }
+                  required
+                  disabled={editSaving}
+                  placeholder="https://username.github.io/project/"
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222] disabled:opacity-60"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                  GitHub URL
+                </span>
+
+                <input
+                  type="url"
+                  value={editGithubUrl}
+                  onChange={(event) =>
+                    setEditGithubUrl(event.target.value)
+                  }
+                  disabled={editSaving}
+                  placeholder="https://github.com/username/project"
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222] disabled:opacity-60"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                  Status
+                </span>
+
+                <select
+                  value={editStatus}
+                  onChange={(event) =>
+                    setEditStatus(
+                      event.target
+                        .value as ConnectedProject["status"],
+                    )
+                  }
+                  disabled={editSaving}
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222] disabled:opacity-60"
+                >
+                  <option value="active">
+                    Active
+                  </option>
+
+                  <option value="inactive">
+                    Inactive
+                  </option>
+                </select>
+              </label>
+
+              {editError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-semibold text-red-700">
+                    {editError}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={cancelEditingProject}
+                  disabled={editSaving}
+                  className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
+                >
+                  Ακύρωση
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={
+                    editSaving ||
+                    !editName.trim() ||
+                    !editLiveUrl.trim()
+                  }
+                  className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {editSaving
+                    ? "Αποθήκευση..."
+                    : "Αποθήκευση αλλαγών"}
+                </button>
+              </div>
+            </form>
+          </section>
         </div>
       )}
     </div>
