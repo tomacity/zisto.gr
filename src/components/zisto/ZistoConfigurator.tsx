@@ -3,6 +3,7 @@ import {
   useMemo,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -104,7 +105,7 @@ function ChoiceButton({
   onClick,
 }: {
   selected: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -677,7 +678,7 @@ function StepShell({
   eyebrow: string;
   title: string;
   subtitle: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div>
