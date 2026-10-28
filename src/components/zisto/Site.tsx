@@ -6643,11 +6643,7 @@ useEffect(() => {
   }
   
   if (route === "/admin") {
-    return (
-      <DashboardAppear key="admin-dashboard" className="min-h-screen">
-        <AdminPage />
-      </DashboardAppear>
-    );
+    return <AdminPage />;
   }
 
   return <LandingPage />;
