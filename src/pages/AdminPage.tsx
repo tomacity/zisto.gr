@@ -2036,7 +2036,7 @@ async function updateBusiness(
             <div className="mt-6 grid gap-5">
               <label className="block">
                 <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                  Live URL *
+                  Smart Link URL *
                 </span>
 
                 <input
@@ -2048,7 +2048,7 @@ async function updateBusiness(
                     )
                   }
                   required
-                  placeholder="https://your-smart-link.vercel.app"
+                  placeholder="https://username.github.io/project/"
                   className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
                 />
               </label>
@@ -2425,8 +2425,8 @@ function ProjectsPanel({
             </h3>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#666]">
-              Σύνδεσε ένα ανεξάρτητο React ή Vite
-              project με μία επιχείρηση του Zisto.
+              Σύνδεσε το public Smart Link URL και το GitHub
+              repository με μία επιχείρηση του Zisto.
             </p>
           </div>
 
@@ -2479,7 +2479,7 @@ function ProjectsPanel({
 
             <label className="block sm:col-span-2">
               <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                Live URL
+                Smart Link URL
               </span>
 
               <input
@@ -2489,7 +2489,7 @@ function ProjectsPanel({
                   setLiveUrl(event.target.value)
                 }
                 required
-                placeholder="https://project.vercel.app"
+                placeholder="https://username.github.io/project/"
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
               />
             </label>
@@ -2688,7 +2688,7 @@ function ProjectsPanel({
                       rel="noreferrer"
                       className="w-full rounded-2xl bg-[#222] px-7 py-4 text-center text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
                     >
-                      Άνοιγμα Live Site →
+                      Άνοιγμα Smart Link →
                     </a>
 
                     {project.github_url && (
