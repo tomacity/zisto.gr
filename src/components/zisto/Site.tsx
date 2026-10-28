@@ -926,15 +926,18 @@ function HowItWorks() {
                         >
                           {s.title}
                         </h3>
-                        <p
-                          className={`mt-3 max-w-md text-[14px] leading-relaxed transition-all duration-500 md:text-[15px] ${
-                            isActive
-                              ? "max-h-40 opacity-90"
-                              : "max-h-0 overflow-hidden opacity-0"
-                          } text-white/70`}
-                        >
-                          {s.body}
-                        </p>
+                        <div className="mt-3 min-h-[66px] max-w-md md:min-h-[72px]">
+                          <p
+                            className={`text-[14px] leading-relaxed transition-opacity duration-500 md:text-[15px] ${
+                              isActive
+                                ? "opacity-90"
+                                : "pointer-events-none opacity-0"
+                            } text-white/70`}
+                            aria-hidden={!isActive}
+                          >
+                            {s.body}
+                          </p>
+                        </div>
                       </div>
                     </button>
                   </li>
@@ -6643,11 +6646,7 @@ useEffect(() => {
   }
   
   if (route === "/admin") {
-    return (
-      <DashboardAppear key="admin-dashboard" className="min-h-screen">
-        <AdminPage />
-      </DashboardAppear>
-    );
+    return <AdminPage />;
   }
 
   return <LandingPage />;

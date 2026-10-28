@@ -1,5 +1,5 @@
 import { GlobalLoader } from "../components/ui/GlobalLoader";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { InviteClientPanel } from "../components/admin/InviteClientPanel";
 
@@ -147,6 +147,7 @@ type Invitation = {
 
 export function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const lockedScrollYRef = useRef(0);
   const [projects, setProjects] =
     useState<ConnectedProject[]>([]);
   
@@ -351,6 +352,42 @@ const [invitationsError, setInvitationsError] =
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!sidebarOpen) {
+      return;
+    }
+
+    lockedScrollYRef.current = window.scrollY;
+
+    const body = document.body;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+
+    body.style.position = "fixed";
+    body.style.top = `-${lockedScrollYRef.current}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+
+    return () => {
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      body.style.overflow = previous.overflow;
+
+      window.scrollTo(0, lockedScrollYRef.current);
+    };
+  }, [sidebarOpen]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -832,13 +869,13 @@ function AdminSidebar({
 }) {
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col overflow-y-auto bg-[#222] text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:translate-x-0 lg:shadow-none ${
+      className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[280px] flex-col overflow-y-auto overscroll-contain bg-[#222] text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:inset-y-0 lg:h-screen lg:overflow-hidden lg:overscroll-none lg:translate-x-0 lg:shadow-none ${
         sidebarOpen
           ? "translate-x-0"
           : "-translate-x-full"
       }`}
     >
-      <div className="flex h-full flex-col p-5 sm:p-7">
+      <div className="flex min-h-0 flex-1 flex-col p-5 sm:p-7 lg:h-screen">
        <div>
         <div className="flex items-center justify-between">
           <a
