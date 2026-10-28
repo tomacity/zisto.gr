@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -58,15 +59,6 @@ const PLACEMENTS = [
   "Διαφορετικά σημεία",
 ];
 
-const QUANTITIES = [
-  "1–5",
-  "6–10",
-  "11–20",
-  "21–50",
-  "50+",
-  "Δεν ξέρω ακόμη",
-];
-
 const TRACKING_OPTIONS = [
   "Όλες στο ίδιο Smart Link",
   "Ξεχωριστό tracking ανά κάρτα",
@@ -83,7 +75,7 @@ const INITIAL_ANSWERS: ConfiguratorAnswers = {
   businessType: "",
   goals: [],
   placements: [],
-  quantity: "",
+  quantity: "1",
   tracking: "",
   customization: "",
   fullName: "",
@@ -98,6 +90,137 @@ function toggleValue(values: string[], value: string) {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
+}
+
+const CARD_COUNTS = Array.from(
+  { length: 200 },
+  (_, index) => index + 1,
+);
+
+function CardCountWheel({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const itemHeight = 56;
+  const selectedValue = Math.min(
+    200,
+    Math.max(1, Number(value) || 1),
+  );
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      scroller.scrollTop =
+        (selectedValue - 1) * itemHeight;
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  function handleScroll() {
+    const scroller = scrollerRef.current;
+
+    if (!scroller) {
+      return;
+    }
+
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+    }
+
+    frameRef.current = window.requestAnimationFrame(() => {
+      const nextValue = Math.min(
+        200,
+        Math.max(
+          1,
+          Math.round(scroller.scrollTop / itemHeight) + 1,
+        ),
+      );
+
+      if (nextValue !== selectedValue) {
+        onChange(String(nextValue));
+      }
+    });
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-[360px]">
+      <div className="relative overflow-hidden rounded-[28px] border border-black/10 bg-white px-5">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-5 top-1/2 z-10 h-14 -translate-y-1/2 rounded-[16px] border border-[#DC2727]/15 bg-[#DC2727]/[0.055]"
+        />
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-gradient-to-b from-white via-white/90 to-transparent"
+        />
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-white via-white/90 to-transparent"
+        />
+
+        <div
+          ref={scrollerRef}
+          onScroll={handleScroll}
+          role="listbox"
+          aria-label="Αριθμός καρτών"
+          aria-activedescendant={`card-count-${selectedValue}`}
+          tabIndex={0}
+          className="relative z-0 h-[280px] snap-y snap-mandatory overflow-y-auto py-[112px] text-center outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{
+            overscrollBehavior: "contain",
+          }}
+        >
+          {CARD_COUNTS.map((count) => {
+            const distance = Math.abs(
+              count - selectedValue,
+            );
+
+            return (
+              <div
+                key={count}
+                id={`card-count-${count}`}
+                role="option"
+                aria-selected={count === selectedValue}
+                className={`flex h-14 snap-center items-center justify-center transition-all duration-150 ${
+                  count === selectedValue
+                    ? "scale-110 text-[34px] font-black text-[#222]"
+                    : distance === 1
+                      ? "text-[22px] font-bold text-[#222]/35"
+                      : "text-[18px] font-semibold text-[#222]/15"
+                }`}
+              >
+                {count}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+          {selectedValue === 1 ? "κάρτα" : "κάρτες"}
+        </p>
+        <p className="mt-2 text-[12px] text-[#222]/40">
+          Σύρε πάνω ή κάτω για να αλλάξεις αριθμό.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function ChoiceButton({
@@ -477,24 +600,17 @@ export function ZistoConfigurator({
                 <StepShell
                   eyebrow="Μέγεθος"
                   title="Πόσες κάρτες περίπου χρειάζεσαι;"
-                  subtitle="Δεν χρειάζεται να είναι ο τελικός αριθμός."
+                  subtitle="Διάλεξε έναν αριθμό από 1 έως 200. Μπορούμε να τον προσαρμόσουμε αργότερα."
                 >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {QUANTITIES.map((item) => (
-                      <ChoiceButton
-                        key={item}
-                        selected={answers.quantity === item}
-                        onClick={() =>
-                          setAnswers((current) => ({
-                            ...current,
-                            quantity: item,
-                          }))
-                        }
-                      >
-                        {item}
-                      </ChoiceButton>
-                    ))}
-                  </div>
+                  <CardCountWheel
+                    value={answers.quantity}
+                    onChange={(value) =>
+                      setAnswers((current) => ({
+                        ...current,
+                        quantity: value,
+                      }))
+                    }
+                  />
                 </StepShell>
               )}
 
