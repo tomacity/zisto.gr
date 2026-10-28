@@ -54,7 +54,7 @@ export function ZistoConfiguratorSection() {
                 <button
                   type="button"
                   onClick={() => setOpen(true)}
-                  className="group inline-flex items-center gap-3 rounded-full bg-[#222] px-7 py-4 text-[12px] font-bold uppercase tracking-[0.16em] text-white shadow-[0_24px_50px_-24px_rgba(34,34,34,0.65)] transition-all duration-300 hover:bg-[#DC2727] hover:shadow-[0_28px_60px_-24px_rgba(220,39,39,0.55)]"
+                  className="group inline-flex items-center gap-3 rounded-full bg-[#DC2727] px-7 py-4 text-[12px] font-bold uppercase tracking-[0.16em] text-white shadow-[0_24px_50px_-24px_rgba(220,39,39,0.55)] transition-all duration-300 hover:bg-[#222] hover:shadow-[0_28px_60px_-24px_rgba(34,34,34,0.55)]"
                 >
                   Ξεκίνα το δικό σου Zisto
                   <span className="transition-transform duration-300 group-hover:translate-x-1">
