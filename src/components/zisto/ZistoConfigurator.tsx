@@ -218,12 +218,15 @@ export function ZistoConfigurator({
       setSubmitting(true);
       setSubmitError("");
 
-      const response = await fetch("/api/lead", {
+      const response = await fetch("/api/track", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(answers),
+        body: JSON.stringify({
+          action: "lead",
+          ...answers,
+        }),
       });
 
       const result = await response.json();
