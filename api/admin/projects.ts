@@ -15,6 +15,14 @@ type CreateProjectBody = {
   status?: unknown;
 };
 
+type UpdateProjectBody = {
+  id?: unknown;
+  name?: unknown;
+  live_url?: unknown;
+  github_url?: unknown;
+  status?: unknown;
+};
+
 const ALLOWED_STATUSES = new Set<ProjectStatus>([
   "active",
   "inactive",
@@ -41,7 +49,7 @@ export default async function handler(
 
   response.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, OPTIONS",
+    "GET, POST, PATCH, OPTIONS",
   );
 
   response.setHeader(
@@ -55,7 +63,8 @@ export default async function handler(
 
   if (
     request.method !== "GET" &&
-    request.method !== "POST"
+    request.method !== "POST" &&
+    request.method !== "PATCH"
   ) {
     return response.status(405).json({
       error: "Method not allowed",
@@ -229,6 +238,216 @@ export default async function handler(
     
       return response.status(200).json({
         projects: projectsWithBusinesses,
+      });
+    }
+
+    if (request.method === "PATCH") {
+      const body = (request.body ??
+        {}) as UpdateProjectBody;
+
+      const projectId =
+        typeof body.id === "string"
+          ? body.id.trim()
+          : "";
+
+      const name =
+        typeof body.name === "string"
+          ? body.name.trim()
+          : "";
+
+      const liveUrl =
+        typeof body.live_url === "string"
+          ? body.live_url.trim()
+          : "";
+
+      const githubUrl =
+        typeof body.github_url === "string"
+          ? body.github_url.trim()
+          : "";
+
+      const status =
+        typeof body.status === "string"
+          ? body.status.trim()
+          : "";
+
+      if (!projectId) {
+        return response.status(400).json({
+          error: "Project ID is required",
+        });
+      }
+
+      if (!name) {
+        return response.status(400).json({
+          error: "Project name is required",
+        });
+      }
+
+      if (name.length > 120) {
+        return response.status(400).json({
+          error:
+            "Project name must be 120 characters or fewer",
+        });
+      }
+
+      if (!liveUrl) {
+        return response.status(400).json({
+          error: "Smart Link URL is required",
+        });
+      }
+
+      if (!isValidHttpUrl(liveUrl)) {
+        return response.status(400).json({
+          error:
+            "Smart Link URL must be a valid HTTP or HTTPS URL",
+        });
+      }
+
+      if (
+        githubUrl &&
+        !isValidHttpUrl(githubUrl)
+      ) {
+        return response.status(400).json({
+          error:
+            "GitHub URL must be a valid HTTP or HTTPS URL",
+        });
+      }
+
+      if (
+        !ALLOWED_STATUSES.has(
+          status as ProjectStatus,
+        )
+      ) {
+        return response.status(400).json({
+          error: "Invalid project status",
+        });
+      }
+
+      const {
+        data: existingProject,
+        error: existingProjectError,
+      } = await supabaseAdmin
+        .from("connected_projects")
+        .select("id, business_id")
+        .eq("id", projectId)
+        .maybeSingle();
+
+      if (existingProjectError) {
+        console.error(
+          "Project verification failed:",
+          existingProjectError,
+        );
+
+        return response.status(500).json({
+          error: "Could not verify connected project",
+        });
+      }
+
+      if (!existingProject) {
+        return response.status(404).json({
+          error: "Connected project not found",
+        });
+      }
+
+      const {
+        data: duplicateProject,
+        error: duplicateProjectError,
+      } = await supabaseAdmin
+        .from("connected_projects")
+        .select("id")
+        .eq(
+          "business_id",
+          existingProject.business_id,
+        )
+        .eq("live_url", liveUrl)
+        .neq("id", projectId)
+        .maybeSingle();
+
+      if (duplicateProjectError) {
+        console.error(
+          "Project duplication check failed:",
+          duplicateProjectError,
+        );
+
+        return response.status(500).json({
+          error: "Could not verify Smart Link URL",
+        });
+      }
+
+      if (duplicateProject) {
+        return response.status(409).json({
+          error:
+            "This Smart Link URL is already connected to the selected business",
+        });
+      }
+
+      const {
+        data: updatedProject,
+        error: updateError,
+      } = await supabaseAdmin
+        .from("connected_projects")
+        .update({
+          name,
+          live_url: liveUrl,
+          github_url: githubUrl || null,
+          status,
+        })
+        .eq("id", projectId)
+        .select(`
+          id,
+          business_id,
+          name,
+          live_url,
+          github_url,
+          project_key,
+          status,
+          created_at,
+          updated_at
+        `)
+        .single();
+
+      if (updateError) {
+        console.error(
+          "Project update failed:",
+          updateError,
+        );
+
+        if (updateError.code === "23505") {
+          return response.status(409).json({
+            error:
+              "A connected project with these details already exists",
+          });
+        }
+
+        return response.status(500).json({
+          error: "Could not update connected project",
+        });
+      }
+
+      const {
+        data: business,
+        error: businessError,
+      } = await supabaseAdmin
+        .from("businesses")
+        .select("id, name, slug")
+        .eq(
+          "id",
+          existingProject.business_id,
+        )
+        .maybeSingle();
+
+      if (businessError) {
+        console.error(
+          "Updated project business loading failed:",
+          businessError,
+        );
+      }
+
+      return response.status(200).json({
+        success: true,
+        project: {
+          ...updatedProject,
+          businesses: business ?? null,
+        },
       });
     }
 
