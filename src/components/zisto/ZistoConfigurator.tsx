@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { ConfettiBurst } from "./ConfettiBurst";
 
 type ConfiguratorAnswers = {
   businessType: string;
@@ -145,6 +146,8 @@ export function ZistoConfigurator({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [showSuccessConfetti, setShowSuccessConfetti] =
+    useState(false);
 
   const totalSteps = 7;
   const progress = submitted
@@ -178,8 +181,25 @@ export function ZistoConfigurator({
       setSubmitting(false);
       setSubmitError("");
       setSubmitted(false);
+      setShowSuccessConfetti(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!submitted) {
+      return;
+    }
+
+    setShowSuccessConfetti(true);
+
+    const timer = window.setTimeout(() => {
+      setShowSuccessConfetti(false);
+    }, 2400);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [submitted]);
 
   const canContinue = useMemo(() => {
     if (step === 0) return Boolean(answers.businessType);
@@ -266,6 +286,7 @@ export function ZistoConfigurator({
         }
       }}
     >
+      {showSuccessConfetti && <ConfettiBurst />}
       <section className="relative flex max-h-[94vh] w-full max-w-[820px] flex-col overflow-hidden rounded-t-[28px] bg-[#F7F5F1] shadow-2xl md:max-h-[90vh] md:rounded-[32px]">
         <div className="h-1.5 w-full bg-black/5">
           <div
