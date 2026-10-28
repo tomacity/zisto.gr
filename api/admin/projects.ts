@@ -281,13 +281,13 @@ export default async function handler(
 
     if (!liveUrl) {
       return response.status(400).json({
-        error: "Live URL is required",
+        error: "Smart Link URL is required",
       });
     }
 
     if (!isValidHttpUrl(liveUrl)) {
       return response.status(400).json({
-        error: "Live URL must be a valid HTTP or HTTPS URL",
+        error: "Smart Link URL must be a valid HTTP or HTTPS URL",
       });
     }
 
@@ -361,7 +361,7 @@ export default async function handler(
     if (existingProject) {
       return response.status(409).json({
         error:
-          "This live URL is already connected to the selected business",
+          "This Smart Link URL is already connected to the selected business",
       });
     }
 
