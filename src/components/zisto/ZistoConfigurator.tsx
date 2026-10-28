@@ -345,7 +345,7 @@ export function ZistoConfigurator({
               </p>
 
               <p className="mt-2 text-[13px] leading-relaxed text-[#222]/50">
-                Η πρότασή σου στάλθηκε στην ομάδα Zisto στο{" "}
+                Στείλαμε και μια επιβεβαίωση στο{" "}
                 <strong className="text-[#222]">
                   {answers.email}
                 </strong>
