@@ -192,7 +192,7 @@ export function ZistoConfigurator({
     return (
       answers.fullName.trim().length >= 2 &&
       answers.businessName.trim().length >= 2 &&
-      /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
         answers.email.trim(),
       )
     );
