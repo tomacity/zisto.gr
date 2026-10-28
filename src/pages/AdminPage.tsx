@@ -60,6 +60,14 @@ type Business = {
   slug: string;
   timezone: string;
   status: "active" | "inactive";
+  setup_status: "active" | "setup_required";
+  smart_link: {
+    id: string;
+    name: string;
+    live_url: string;
+    github_url: string | null;
+    project_key: string;
+  } | null;
   created_at: string;
   updated_at: string;
 };
@@ -726,6 +734,12 @@ useEffect(() => {
                       ),
                     );
                   }}
+                  onProjectCreated={(project) => {
+                    setProjects((currentProjects) => [
+                      project,
+                      ...currentProjects,
+                    ]);
+                  }}
                   onBusinessDeleted={(businessId) => {
                     setBusinesses((currentBusinesses) =>
                       currentBusinesses.filter(
@@ -1008,12 +1022,16 @@ function BusinessesPanel({
   error,
   onBusinessCreated,
   onBusinessUpdated,
+  onProjectCreated,
 }: {
   businesses: Business[];
   loading: boolean;
   error: string;
   onBusinessCreated: (business: Business) => void;
   onBusinessUpdated: (business: Business) => void;
+  onProjectCreated: (
+    project: ConnectedProject,
+  ) => void;
 }) {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -1049,6 +1067,133 @@ function BusinessesPanel({
     useState(false);
   const [deleteError, setDeleteError] =
     useState("");
+
+  const [connectingBusiness, setConnectingBusiness] =
+    useState<Business | null>(null);
+  const [smartLinkLiveUrl, setSmartLinkLiveUrl] =
+    useState("");
+  const [smartLinkGithubUrl, setSmartLinkGithubUrl] =
+    useState("");
+  const [smartLinkSaving, setSmartLinkSaving] =
+    useState(false);
+  const [smartLinkError, setSmartLinkError] =
+    useState("");
+
+  function startConnectingSmartLink(
+    business: Business,
+  ) {
+    setConnectingBusiness(business);
+    setSmartLinkLiveUrl("");
+    setSmartLinkGithubUrl("");
+    setSmartLinkError("");
+  }
+
+  function cancelConnectingSmartLink() {
+    if (smartLinkSaving) {
+      return;
+    }
+
+    setConnectingBusiness(null);
+    setSmartLinkLiveUrl("");
+    setSmartLinkGithubUrl("");
+    setSmartLinkError("");
+  }
+
+  async function connectSmartLink(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!connectingBusiness) {
+      return;
+    }
+
+    try {
+      setSmartLinkSaving(true);
+      setSmartLinkError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/projects",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            business_id: connectingBusiness.id,
+            name:
+              `${connectingBusiness.name} Smart Link`,
+            live_url: smartLinkLiveUrl.trim(),
+            github_url:
+              smartLinkGithubUrl.trim(),
+            status: "active",
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Could not connect Smart Link",
+        );
+      }
+
+      onProjectCreated(result.project);
+
+      onBusinessUpdated({
+        ...connectingBusiness,
+        setup_status: "active",
+        smart_link: {
+          id: result.project.id,
+          name: result.project.name,
+          live_url: result.project.live_url,
+          github_url:
+            result.project.github_url,
+          project_key:
+            result.project.project_key,
+        },
+      });
+
+      cancelConnectingSmartLink();
+    } catch (connectError) {
+      console.error(
+        "Smart Link connection failed:",
+        connectError,
+      );
+
+      setSmartLinkError(
+        connectError instanceof Error
+          ? connectError.message
+          : "Δεν ήταν δυνατή η σύνδεση του Smart Link.",
+      );
+    } finally {
+      setSmartLinkSaving(false);
+    }
+  }
 
   function generateSlug(value: string) {
     return value
@@ -1334,7 +1479,9 @@ async function updateBusiness(
   }
   
   const activeBusinesses = businesses.filter(
-    (business) => business.status === "active",
+    (business) =>
+      business.status === "active" &&
+      business.setup_status === "active",
   ).length;
 
   if (loading) {
@@ -1578,7 +1725,12 @@ async function updateBusiness(
         <div className="grid gap-5">
           {businesses.map((business) => {
             const isActive =
-              business.status === "active";
+              business.status === "active" &&
+              business.setup_status === "active";
+
+            const setupRequired =
+              business.setup_status ===
+              "setup_required";
 
             return (
               <article
@@ -1603,9 +1755,11 @@ async function updateBusiness(
                           }`}
                         />
 
-                        {isActive
-                          ? "Active"
-                          : "Inactive"}
+                        {setupRequired
+                          ? "Setup required"
+                          : isActive
+                            ? "Active"
+                            : "Inactive"}
                       </span>
 
                       <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 font-mono text-[10px] font-bold text-[#666]">
@@ -1642,15 +1796,31 @@ async function updateBusiness(
                             }`}
                           />
 
-                          {isActive
-                            ? "Live"
-                            : "Paused"}
+                          {setupRequired
+                            ? "Setup required"
+                            : isActive
+                              ? "Live"
+                              : "Paused"}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex w-full flex-col gap-3 lg:w-auto">
+                    {setupRequired && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          startConnectingSmartLink(
+                            business,
+                          )
+                        }
+                        className="w-full rounded-2xl bg-[#DC2727] px-7 py-4 text-sm font-bold text-white transition hover:bg-red-700 lg:w-auto"
+                      >
+                        + Σύνδεση Smart Link
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() =>
@@ -1838,6 +2008,102 @@ async function updateBusiness(
               </article>
             );
           })}
+        </div>
+      )}
+
+      {connectingBusiness && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5 py-8">
+          <form
+            onSubmit={connectSmartLink}
+            className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl sm:p-8"
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Smart Link setup
+            </p>
+
+            <h3 className="mt-4 text-3xl font-black tracking-[-0.04em]">
+              Σύνδεση Smart Link
+            </h3>
+
+            <p className="mt-3 text-sm leading-6 text-[#666]">
+              Συνδέεις το custom Smart Link με την επιχείρηση{" "}
+              <strong className="text-[#222]">
+                {connectingBusiness.name}
+              </strong>
+              .
+            </p>
+
+            <div className="mt-6 grid gap-5">
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                  Live URL *
+                </span>
+
+                <input
+                  type="url"
+                  value={smartLinkLiveUrl}
+                  onChange={(event) =>
+                    setSmartLinkLiveUrl(
+                      event.target.value,
+                    )
+                  }
+                  required
+                  placeholder="https://your-smart-link.vercel.app"
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                  GitHub URL
+                </span>
+
+                <input
+                  type="url"
+                  value={smartLinkGithubUrl}
+                  onChange={(event) =>
+                    setSmartLinkGithubUrl(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="https://github.com/username/project"
+                  className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition placeholder:text-[#AAA] focus:border-[#222]"
+                />
+              </label>
+            </div>
+
+            {smartLinkError && (
+              <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-red-700">
+                  {smartLinkError}
+                </p>
+              </div>
+            )}
+
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={cancelConnectingSmartLink}
+                disabled={smartLinkSaving}
+                className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
+              >
+                Ακύρωση
+              </button>
+
+              <button
+                type="submit"
+                disabled={
+                  smartLinkSaving ||
+                  !smartLinkLiveUrl.trim()
+                }
+                className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {smartLinkSaving
+                  ? "Σύνδεση..."
+                  : "Σύνδεση Smart Link"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

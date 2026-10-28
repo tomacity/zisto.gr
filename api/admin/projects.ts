@@ -316,7 +316,7 @@ export default async function handler(
       error: businessError,
     } = await supabaseAdmin
       .from("businesses")
-      .select("id, name, slug, status")
+      .select("id, name, slug, timezone, status")
       .eq("id", businessId)
       .maybeSingle();
 
@@ -414,19 +414,174 @@ export default async function handler(
       });
     }
 
-    const project = {
-      ...createdProject,
-      businesses: {
-        id: business.id,
-        name: business.name,
-        slug: business.slug,
-      },
-    };
-    
-    return response.status(201).json({
-      success: true,
-      project,
-    });
+    let createdLocationId: string | null = null;
+    let createdLandingPageId: string | null = null;
+
+    try {
+      const {
+        data: existingLocations,
+        error: locationsLookupError,
+      } = await supabaseAdmin
+        .from("locations")
+        .select("id, name, slug, timezone")
+        .eq("business_id", businessId)
+        .order("created_at", {
+          ascending: true,
+        })
+        .limit(1);
+
+      if (locationsLookupError) {
+        throw locationsLookupError;
+      }
+
+      let location =
+        existingLocations?.[0] ?? null;
+
+      if (!location) {
+        const {
+          data: newLocation,
+          error: locationCreateError,
+        } = await supabaseAdmin
+          .from("locations")
+          .insert({
+            business_id: businessId,
+            name: "Κεντρικό κατάστημα",
+            slug: "main",
+            timezone:
+              business.timezone ||
+              "Europe/Athens",
+          })
+          .select("id, name, slug, timezone")
+          .single();
+
+        if (locationCreateError) {
+          throw locationCreateError;
+        }
+
+        location = newLocation;
+        createdLocationId = newLocation.id;
+      }
+
+      const {
+        data: existingLandingPages,
+        error: landingPageLookupError,
+      } = await supabaseAdmin
+        .from("landing_pages")
+        .select(
+          "id, location_id, name, slug, page_type, is_active",
+        )
+        .eq("location_id", location.id)
+        .order("created_at", {
+          ascending: true,
+        })
+        .limit(1);
+
+      if (landingPageLookupError) {
+        throw landingPageLookupError;
+      }
+
+      let landingPage =
+        existingLandingPages?.[0] ?? null;
+
+      if (!landingPage) {
+        const {
+          data: newLandingPage,
+          error: landingPageCreateError,
+        } = await supabaseAdmin
+          .from("landing_pages")
+          .insert({
+            location_id: location.id,
+            name: "Κύριο Smart Link",
+            slug: "smart-link",
+            page_type: "combined",
+            title: business.name,
+            is_active: true,
+          })
+          .select(
+            "id, location_id, name, slug, page_type, is_active",
+          )
+          .single();
+
+        if (landingPageCreateError) {
+          throw landingPageCreateError;
+        }
+
+        landingPage = newLandingPage;
+        createdLandingPageId =
+          newLandingPage.id;
+      }
+
+      const project = {
+        ...createdProject,
+        businesses: {
+          id: business.id,
+          name: business.name,
+          slug: business.slug,
+        },
+      };
+
+      return response.status(201).json({
+        success: true,
+        project,
+        provisioning: {
+          location,
+          landing_page: landingPage,
+        },
+      });
+    } catch (provisioningError) {
+      console.error(
+        "Business provisioning failed:",
+        provisioningError,
+      );
+
+      if (createdLandingPageId) {
+        const { error: cleanupLandingPageError } =
+          await supabaseAdmin
+            .from("landing_pages")
+            .delete()
+            .eq("id", createdLandingPageId);
+
+        if (cleanupLandingPageError) {
+          console.error(
+            "Landing page cleanup failed:",
+            cleanupLandingPageError,
+          );
+        }
+      }
+
+      if (createdLocationId) {
+        const { error: cleanupLocationError } =
+          await supabaseAdmin
+            .from("locations")
+            .delete()
+            .eq("id", createdLocationId);
+
+        if (cleanupLocationError) {
+          console.error(
+            "Location cleanup failed:",
+            cleanupLocationError,
+          );
+        }
+      }
+
+      const { error: cleanupProjectError } =
+        await supabaseAdmin
+          .from("connected_projects")
+          .delete()
+          .eq("id", createdProject.id);
+
+      if (cleanupProjectError) {
+        console.error(
+          "Connected project cleanup failed:",
+          cleanupProjectError,
+        );
+      }
+
+      return response.status(500).json({
+        error:
+          "Το Smart Link δεν ενεργοποιήθηκε επειδή δεν ολοκληρώθηκε η αρχική ρύθμιση της επιχείρησης.",
+      });
+    }
     
   } catch (error) {
     console.error(
