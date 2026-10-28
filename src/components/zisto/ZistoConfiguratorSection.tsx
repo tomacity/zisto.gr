@@ -33,15 +33,6 @@ export function ZistoConfiguratorSection() {
               μέχρι NFC κάρτες, tracking και custom Smart Link.
             </p>
 
-            <a
-              href="#zisto-form"
-              className="group mt-8 inline-flex items-center gap-3 rounded-full bg-[#DC2727] px-7 py-4 text-[12px] font-bold uppercase tracking-[0.16em] text-white shadow-[0_24px_50px_-24px_rgba(220,39,39,0.55)] transition-all duration-300 hover:bg-[#222] hover:shadow-[0_28px_60px_-24px_rgba(34,34,34,0.55)] lg:hidden"
-            >
-              Ξεκίνα το δικό σου Zisto
-              <span className="transition-transform duration-300 group-hover:translate-x-1">
-                →
-              </span>
-            </a>
           </div>
 
           <div className="w-full">
