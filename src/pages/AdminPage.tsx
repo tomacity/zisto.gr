@@ -869,13 +869,13 @@ function AdminSidebar({
 }) {
   return (
     <aside
-      className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[280px] flex-col overflow-y-auto overscroll-contain bg-[#222] text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:inset-y-0 lg:h-auto lg:translate-x-0 lg:shadow-none ${
+      className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[280px] flex-col overflow-y-auto overscroll-contain bg-[#222] text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:inset-y-0 lg:h-screen lg:overflow-hidden lg:overscroll-none lg:translate-x-0 lg:shadow-none ${
         sidebarOpen
           ? "translate-x-0"
           : "-translate-x-full"
       }`}
     >
-      <div className="flex h-full flex-col p-5 sm:p-7">
+      <div className="flex min-h-0 flex-1 flex-col p-5 sm:p-7 lg:h-screen">
        <div>
         <div className="flex items-center justify-between">
           <a
