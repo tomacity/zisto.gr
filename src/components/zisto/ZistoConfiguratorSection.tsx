@@ -62,9 +62,6 @@ export function ZistoConfiguratorSection() {
                   </span>
                 </button>
 
-                <span className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/30">
-                  7 βήματα · περίπου 2 λεπτά
-                </span>
               </div>
             </div>
 
