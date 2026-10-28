@@ -28,6 +28,7 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { supabase } from "../../lib/supabase";
 import { AdminPage } from "../../pages/AdminPage";
+import { ZistoConfiguratorSection } from "./ZistoConfiguratorSection";
 
 const WORDMARK = "/images/zisto-wordmark.png";
 const WORDMARKWHITE = "/images/zisto-wordmark-white.png";
@@ -211,9 +212,9 @@ const NAV_LINKS = [
     description: "Η εμπειρία βήμα-βήμα",
   },
   {
-    label: "Τιμές",
-    href: "#pricing",
-    description: "Δες τα διαθέσιμα πακέτα",
+    label: "Φτιάξε το Zisto σου",
+    href: "#configure",
+    description: "Βρες τη σωστή λύση για την επιχείρησή σου",
   },
 ];
 
@@ -630,7 +631,7 @@ function Hero() {
             <div className="mt-10 flex flex-wrap items-center gap-4">
               <Magnetic>
                 <a
-                  href="#contact"
+                  href="#configure"
                   className="group inline-flex items-center gap-3 rounded-full bg-[#222] px-7 py-4 text-[13px] font-bold uppercase tracking-[0.16em] text-white shadow-[0_20px_40px_-15px_rgba(34,34,34,0.55)] transition-all duration-300 hover:bg-[#DC2727] hover:shadow-[0_30px_60px_-15px_rgba(220,39,39,0.55)]"
                 >
                   Ξεκίνα το δικό σου kit
@@ -1271,147 +1272,8 @@ function CaseStudy() {
 }
 
 /* ================================================================== */
-/*  PRICING                                                           */
+/*  CONFIGURATOR                                                     */
 /* ================================================================== */
-const PACKAGES = [
-  {
-    tier: "Starter",
-    title: "Κάρτα + Smart Link",
-    features: ["Custom NFC κάρτα", "Smart link σελίδα", "Routing σε review & menu"],
-    featured: false,
-  },
-  {
-    tier: "Growth",
-    title: "+ Ψηφιακό Μενού",
-    features: [
-      "Ό,τι έχει το Starter",
-      "Πλήρες δίγλωσσο μενού",
-      "Sticky πλοήγηση κατηγοριών",
-    ],
-    featured: true,
-  },
-  {
-    tier: "Custom",
-    title: "+ Πλήρες Branding",
-    features: [
-      "Ό,τι έχει το Growth",
-      "Όνομα & λογότυπο από το μηδέν",
-      "Πολλαπλά καταστήματα",
-    ],
-    featured: false,
-  },
-];
-
-function Pricing() {
-  return (
-    <section id="pricing" className="relative bg-white py-28 md:py-40">
-      <div className="mx-auto w-full max-w-[1400px] px-5 md:px-10">
-        <Reveal>
-          <div className="flex flex-wrap items-end justify-between gap-6">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
-                Τιμές
-              </p>
-              <h2 className="mt-5 max-w-[16ch] text-[10vw] font-black leading-[0.9] tracking-[-0.035em] text-[#222] md:text-[6.2vw] lg:text-[5vw]">
-                Τρία πακέτα, ανάλογα με το πόσο μακριά θες να πας.
-              </h2>
-            </div>
-          </div>
-        </Reveal>
-
-        <div className="mt-16 grid grid-cols-1 gap-5 md:mt-24 md:grid-cols-3">
-          {PACKAGES.map((p, i) => (
-            <PriceCard key={p.tier} p={p} i={i} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PriceCard({
-  p,
-  i,
-}: {
-  p: (typeof PACKAGES)[number];
-  i: number;
-}) {
-  const { ref, on } = useReveal<HTMLDivElement>();
-  const isFeatured = p.featured;
-  return (
-    <div
-      ref={ref}
-      className={`group relative flex flex-col justify-between overflow-hidden rounded-[10px] border p-8 transition-all duration-500 md:p-10 ${
-        isFeatured
-          ? "border-[#222] bg-[#222] text-white md:-my-4 md:py-14"
-          : "border-black/10 bg-white text-[#222] hover:border-[#222]"
-      }`}
-      style={{
-        opacity: on ? 1 : 0,
-        transform: on ? "translateY(0)" : "translateY(28px)",
-        transition: `opacity 800ms cubic-bezier(0.22,1,0.36,1) ${i * 100}ms, transform 800ms cubic-bezier(0.22,1,0.36,1) ${i * 100}ms, border-color 300ms ease, background-color 300ms ease`,
-        minHeight: 420,
-      }}
-    >
-      {isFeatured && (
-        <span
-          aria-hidden
-          className="absolute -right-16 -top-16 h-56 w-56 rounded-full opacity-70 blur-3xl"
-          style={{ background: "radial-gradient(circle, #DC2727 0%, transparent 65%)" }}
-        />
-      )}
-
-      <div className="relative">
-        <div className="flex items-center justify-between">
-          <span
-            className={`text-[10px] font-bold uppercase tracking-[0.28em] ${
-              isFeatured ? "text-[#DC2727]" : "text-[#DC2727]"
-            }`}
-          >
-            {p.tier}
-          </span>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.24em] opacity-40">
-            0{i + 1} / 03
-          </span>
-        </div>
-        <h3
-          className={`mt-6 text-[8vw] font-black leading-[0.95] tracking-[-0.025em] md:text-[2.6vw] lg:text-[2vw]`}
-        >
-          {p.title}
-        </h3>
-
-        <ul className="mt-8 flex flex-col gap-3.5">
-          {p.features.map((f) => (
-            <li key={f} className="flex items-start gap-3 text-[14px] leading-relaxed">
-              <span
-                className={`mt-2 block h-[2px] w-4 flex-shrink-0 ${
-                  isFeatured ? "bg-[#DC2727]" : "bg-[#DC2727]"
-                }`}
-              />
-              <span className={isFeatured ? "text-white/85" : "text-[#222]/70"}>{f}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="relative mt-10">
-        <Magnetic strength={0.2}>
-          <a
-            href="#contact"
-            className={`group/btn inline-flex items-center gap-3 rounded-full px-6 py-3.5 text-[12px] font-bold uppercase tracking-[0.16em] transition-all duration-300 ${
-              isFeatured
-                ? "bg-[#DC2727] text-white hover:bg-white hover:text-[#222]"
-                : "border border-[#222]/20 bg-white text-[#222] hover:border-[#222] hover:bg-[#222] hover:text-white"
-            }`}
-          >
-            Ρώτα μας
-            <span className="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
-          </a>
-        </Magnetic>
-      </div>
-    </div>
-  );
-}
 
 /* ================================================================== */
 /*  FOOTER                                                            */
@@ -6753,7 +6615,7 @@ function LandingPage() {
       <Services />
       <HowItWorks />
       <CaseStudy />
-      <Pricing />
+      <ZistoConfiguratorSection />
       <Footer />
     </div>
   );
@@ -6798,7 +6660,7 @@ useEffect(() => {
   const handleHashChange = () => {
     const nextLocation = getHashLocation();
   
-    // Landing-page anchors όπως #services, #how, #pricing
+    // Landing-page anchors όπως #services, #how, #configure
     // δεν είναι routes και δεν πρέπει να κάνουν scroll στην κορυφή.
     if (!nextLocation.pathname.startsWith("/")) {
       setHashLocation({
