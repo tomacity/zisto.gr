@@ -179,7 +179,6 @@ export default async function handler(
 
   if (
     req.method !== "GET" &&
-    req.method !== "POST" &&
     req.method !== "PATCH"
   ) {
     return res.status(405).json({
@@ -465,106 +464,6 @@ export default async function handler(
             await servicesResponse.json(),
           staff:
             await staffResponse.json(),
-        });
-      }
-
-      if (req.method === "POST") {
-        const body = req.body ?? {};
-
-        const customerName =
-          typeof body.customer_name === "string"
-            ? body.customer_name.trim()
-            : "";
-
-        const startsAt =
-          typeof body.starts_at === "string"
-            ? body.starts_at
-            : "";
-
-        const endsAt =
-          typeof body.ends_at === "string"
-            ? body.ends_at
-            : "";
-
-        if (
-          !customerName ||
-          !startsAt ||
-          !endsAt
-        ) {
-          return res.status(400).json({
-            error:
-              "Customer name, start and end are required",
-          });
-        }
-
-        const insertResponse =
-          await supabaseRequest({
-            supabaseUrl,
-            supabaseSecretKey,
-            path:
-              "/rest/v1/appointments?select=*",
-            method: "POST",
-            headers: {
-              Prefer: "return=representation",
-            },
-            body: {
-              business_id: businessId,
-              service_id:
-                typeof body.service_id ===
-                  "string" &&
-                body.service_id
-                  ? body.service_id
-                  : null,
-              staff_id:
-                typeof body.staff_id ===
-                  "string" &&
-                body.staff_id
-                  ? body.staff_id
-                  : null,
-              customer_name: customerName,
-              customer_email:
-                typeof body.customer_email ===
-                "string"
-                  ? body.customer_email.trim() ||
-                    null
-                  : null,
-              customer_phone:
-                typeof body.customer_phone ===
-                "string"
-                  ? body.customer_phone.trim() ||
-                    null
-                  : null,
-              starts_at: startsAt,
-              ends_at: endsAt,
-              status: "confirmed",
-              source: "admin",
-              notes:
-                typeof body.notes === "string"
-                  ? body.notes.trim() || null
-                  : null,
-            },
-          });
-
-        if (!insertResponse.ok) {
-          const errorText =
-            await insertResponse.text();
-
-          console.error(
-            "Appointment creation failed:",
-            errorText,
-          );
-
-          return res.status(500).json({
-            error:
-              "Failed to create appointment",
-          });
-        }
-
-        const rows =
-          await insertResponse.json();
-
-        return res.status(201).json({
-          appointment: rows[0] ?? null,
         });
       }
 
