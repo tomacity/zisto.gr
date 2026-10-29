@@ -1374,8 +1374,6 @@ async function handleAppointmentManage(
     return response.status(200).json({
       appointment: {
         id: appointment.id,
-        public_token:
-          appointment.public_token,
         starts_at:
           appointment.starts_at,
         ends_at:
