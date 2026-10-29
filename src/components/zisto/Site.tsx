@@ -5659,6 +5659,19 @@ function DashboardPage({
     enabledModules.join("|"),
   ]);
 
+  if (
+    analyticsLoading &&
+    !analytics &&
+    !awaitingApproval
+  ) {
+    return (
+      <GlobalLoader
+        fullScreen
+        message="Φόρτωση dashboard..."
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#F6F6F4] font-sans text-[#222]">
       {/* Sidebar */}
