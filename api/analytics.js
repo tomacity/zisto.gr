@@ -341,7 +341,7 @@ export default async function handler(
         id: `eq.${businessId}`,
 
         select:
-          "id,name,slug,timezone",
+          "id,name,slug,timezone,dashboard_modules",
 
         limit: "1",
       });
@@ -636,6 +636,11 @@ export default async function handler(
 
         location_name:
           locations[0]?.name ?? null,
+
+        dashboard_modules:
+          Array.isArray(business.dashboard_modules)
+            ? business.dashboard_modules
+            : ["analytics", "reviews", "menu", "nfc"],
       },
 
       totals: {
