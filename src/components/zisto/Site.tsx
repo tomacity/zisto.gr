@@ -1918,6 +1918,7 @@ type AnalyticsResponse = {
   business: {
     name: string;
     location_name: string | null;
+    dashboard_modules: DashboardModule[];
   };
   totals: {
     page_views_today: number;
@@ -5114,6 +5115,51 @@ if (loading) {
   );
 }
 
+function AppointmentsPlaceholder() {
+  return (
+    <section className="relative overflow-hidden rounded-[24px] border border-black/10 bg-[#222] p-8 text-white md:p-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#DC2727]/20 blur-3xl"
+      />
+
+      <div className="relative">
+        <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
+          Appointments
+        </p>
+
+        <h1 className="mt-5 max-w-[12ch] text-[11vw] font-black leading-[0.9] tracking-[-0.05em] sm:text-[7vw] lg:text-[4.6vw]">
+          Το πρόγραμμα της ημέρας σου, σε ένα μέρος.
+        </h1>
+
+        <p className="mt-7 max-w-2xl text-[15px] leading-relaxed text-white/55">
+          Το module είναι ήδη διαθέσιμο σαν dashboard tab. Στο επόμενο στάδιο θα συνδέσουμε booking από το Smart Link, live ημερολόγιο, availability, πελάτες και υπενθυμίσεις.
+        </p>
+
+        <div className="mt-10 grid gap-3 sm:grid-cols-3">
+          {[
+            ["09:30", "Πρώτο ραντεβού"],
+            ["13:00", "Διαθεσιμότητα"],
+            ["18:30", "Τελευταίο ραντεβού"],
+          ].map(([time, label]) => (
+            <div
+              key={time}
+              className="rounded-[18px] border border-white/10 bg-white/[0.05] p-5"
+            >
+              <p className="font-mono text-[22px] font-black text-white">
+                {time}
+              </p>
+              <p className="mt-2 text-[11px] text-white/40">
+                {label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DashboardTabPlaceholder({
   tab,
   analytics,
@@ -5148,6 +5194,12 @@ function DashboardTabPlaceholder({
       title: "Διαχείριση καρτών",
       description:
         "Εδώ θα προστεθούν οι κάρτες, η κατάστασή τους και τα taps ανά κάρτα ή τοποθεσία.",
+    },
+    appointments: {
+      eyebrow: "Ραντεβού",
+      title: "Ημερολόγιο ραντεβού",
+      description:
+        "Το booking module του Zisto θα συγκεντρώνει διαθεσιμότητα, ραντεβού, πελάτες και υπενθυμίσεις σε ένα live ημερολόγιο.",
     },
     settings: {
       eyebrow: "Ρυθμίσεις",
@@ -5370,13 +5422,31 @@ function DashboardTutorial({
   );
 }
 
-type DashboardTab =
-  | "overview"
+type DashboardModule =
   | "analytics"
   | "reviews"
   | "menu"
   | "nfc"
+  | "appointments";
+
+type DashboardTab =
+  | "overview"
+  | DashboardModule
   | "settings";
+
+const DASHBOARD_NAV_ITEMS: {
+  id: DashboardTab;
+  icon: string;
+  label: string;
+  system?: boolean;
+}[] = [
+  { id: "analytics", icon: "↗", label: "Analytics" },
+  { id: "reviews", icon: "★", label: "Αξιολογήσεις" },
+  { id: "menu", icon: "☰", label: "Μενού" },
+  { id: "nfc", icon: "⌁", label: "NFC κάρτες" },
+  { id: "appointments", icon: "◷", label: "Ραντεβού" },
+  { id: "settings", icon: "⚙", label: "Ρυθμίσεις", system: true },
+];
 
 function DashboardPage({
   businessId,
@@ -5598,6 +5668,41 @@ function DashboardPage({
   const businessLocation =
     analytics?.business.location_name ?? "Zisto client";
 
+  const enabledModules: DashboardModule[] =
+    analytics?.business.dashboard_modules?.length
+      ? analytics.business.dashboard_modules
+      : ["analytics", "reviews", "menu", "nfc"];
+
+  const visibleNavItems = DASHBOARD_NAV_ITEMS.filter(
+    (item) =>
+      item.system ||
+      enabledModules.includes(
+        item.id as DashboardModule,
+      ),
+  );
+
+  useEffect(() => {
+    if (!analytics || awaitingApproval) {
+      return;
+    }
+
+    if (
+      activeTab !== "settings" &&
+      !enabledModules.includes(
+        activeTab as DashboardModule,
+      )
+    ) {
+      setActiveTab(
+        enabledModules[0] ?? "settings",
+      );
+    }
+  }, [
+    analytics,
+    awaitingApproval,
+    activeTab,
+    enabledModules.join("|"),
+  ]);
+
   return (
     <main className="min-h-screen bg-[#F6F6F4] font-sans text-[#222]">
       {/* Sidebar */}
@@ -5646,13 +5751,7 @@ function DashboardPage({
         </div>
 
         <nav className="mt-10 flex flex-col gap-2">
-          {[
-            { id: "analytics" as const, icon: "↗", label: "Analytics" },
-            { id: "reviews" as const, icon: "★", label: "Αξιολογήσεις" },
-            { id: "menu" as const, icon: "☰", label: "Μενού" },
-            { id: "nfc" as const, icon: "⌁", label: "NFC κάρτες" },
-            { id: "settings" as const, icon: "⚙", label: "Ρυθμίσεις" },
-          ].map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = activeTab === item.id;
 
             return (
@@ -5797,6 +5896,8 @@ function DashboardPage({
                       );
                     }}
                   />
+                ) : activeTab === "appointments" ? (
+                  <AppointmentsPlaceholder />
                 ) : activeTab === "settings" &&
                   analytics ? (
                   <SettingsTab
