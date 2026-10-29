@@ -70,17 +70,6 @@ const DAY_LABELS = [
   "Κυρ",
 ];
 
-const STATUS_LABELS: Record<
-  AppointmentStatus,
-  string
-> = {
-  pending: "Αναμονή",
-  confirmed: "Επιβεβαιωμένο",
-  completed: "Ολοκληρώθηκε",
-  cancelled: "Ακυρώθηκε",
-  no_show: "Δεν εμφανίστηκε",
-};
-
 export function AppointmentsTab({
   businessId,
 }: {
@@ -96,6 +85,12 @@ export function AppointmentsTab({
     useState<AppointmentStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] =
+    useState<string | null>(null);
+  const [cancelError, setCancelError] =
+    useState<string | null>(null);
+  const [cancelNotice, setCancelNotice] =
+    useState<string | null>(null);
+  const [cancellingId, setCancellingId] =
     useState<string | null>(null);
 
   const weekStart = useMemo(
@@ -116,18 +111,29 @@ export function AppointmentsTab({
 
   const dayAppointments = useMemo(
     () =>
-      appointments.filter((appointment) =>
-        isSameDay(
-          new Date(appointment.starts_at),
-          selectedDate,
-        ),
+      appointments.filter(
+        (appointment) =>
+          appointment.status !==
+            "cancelled" &&
+          isSameDay(
+            new Date(
+              appointment.starts_at,
+            ),
+            selectedDate,
+          ),
       ),
     [appointments, selectedDate],
   );
 
   const weekAppointments = useMemo(
     () =>
-      [...appointments].sort(
+      appointments
+        .filter(
+          (appointment) =>
+            appointment.status !==
+            "cancelled",
+        )
+        .sort(
         (a, b) =>
           new Date(a.starts_at).getTime() -
           new Date(b.starts_at).getTime(),
@@ -243,21 +249,28 @@ export function AppointmentsTab({
     weekStart.getDate(),
   ]);
 
-  async function updateStatus(
+  async function cancelAppointment(
     appointment: Appointment,
-    status: AppointmentStatus,
   ) {
-    const previous = appointments;
+    const confirmed =
+      window.confirm(
+        `Να ακυρωθεί το ραντεβού του/της ${appointment.customer_name} στις ${format(
+          new Date(
+            appointment.starts_at,
+          ),
+          "dd/MM/yyyy HH:mm",
+        )};`,
+      );
 
-    setAppointments((current) =>
-      current.map((item) =>
-        item.id === appointment.id
-          ? { ...item, status }
-          : item,
-      ),
-    );
+    if (!confirmed) {
+      return;
+    }
 
     try {
+      setCancellingId(appointment.id);
+      setCancelError(null);
+      setCancelNotice(null);
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -272,7 +285,10 @@ export function AppointmentsTab({
       });
 
       if (businessId) {
-        params.set("business_id", businessId);
+        params.set(
+          "business_id",
+          businessId,
+        );
       }
 
       const response = await fetch(
@@ -280,27 +296,56 @@ export function AppointmentsTab({
         {
           method: "PATCH",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
             Authorization:
               `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             id: appointment.id,
-            status,
+            action: "cancel",
           }),
         },
       );
 
+      const result =
+        await response.json();
+
       if (!response.ok) {
-        const result = await response.json();
         throw new Error(
           result.error ||
-            "Δεν αποθηκεύτηκε η αλλαγή.",
+            "Δεν ήταν δυνατή η ακύρωση.",
         );
       }
-    } catch (statusError) {
-      console.error(statusError);
-      setAppointments(previous);
+
+      setAppointments((current) =>
+        current.map((item) =>
+          item.id === appointment.id
+            ? {
+                ...item,
+                status: "cancelled",
+              }
+            : item,
+        ),
+      );
+
+      if (result.email_sent) {
+        setCancelNotice(
+          "Το ραντεβού ακυρώθηκε και ο πελάτης ενημερώθηκε με email.",
+        );
+      } else {
+        setCancelNotice(
+          "Το ραντεβού ακυρώθηκε, αλλά το email ενημέρωσης δεν εστάλη.",
+        );
+      }
+    } catch (cancelError) {
+      setCancelError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Δεν ήταν δυνατή η ακύρωση.",
+      );
+    } finally {
+      setCancellingId(null);
     }
   }
 
@@ -317,6 +362,18 @@ export function AppointmentsTab({
           Τα ραντεβού δημιουργούνται από τους πελάτες μέσω του Smart Link και εμφανίζονται αυτόματα εδώ.
         </p>
       </div>
+
+      {cancelNotice && (
+        <div className="mt-6 rounded-2xl border border-black/8 bg-[#F6F6F4] px-4 py-3 text-sm font-semibold text-[#222]">
+          {cancelNotice}
+        </div>
+      )}
+
+      {cancelError && (
+        <div className="mt-6 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {cancelError}
+        </div>
+      )}
 
       <div className="mt-8 grid gap-3 sm:grid-cols-3">
         <AppointmentMetric
@@ -512,11 +569,14 @@ export function AppointmentsTab({
                         member.id ===
                         appointment.staff_id,
                     )}
-                    onStatusChange={(status) =>
-                      updateStatus(
+                    onCancel={() =>
+                      cancelAppointment(
                         appointment,
-                        status,
                       )
+                    }
+                    cancelling={
+                      cancellingId ===
+                      appointment.id
                     }
                   />
                 ),
@@ -629,13 +689,14 @@ export function AppointmentsTab({
                               member.id ===
                               appointment.staff_id,
                           )}
-                          onStatusChange={(
-                            status,
-                          ) =>
-                            updateStatus(
+                          onCancel={() =>
+                            cancelAppointment(
                               appointment,
-                              status,
                             )
+                          }
+                          cancelling={
+                            cancellingId ===
+                            appointment.id
                           }
                         />
                       ),
@@ -679,14 +740,14 @@ function AppointmentRow({
   appointment,
   service,
   staffMember,
-  onStatusChange,
+  onCancel,
+  cancelling,
 }: {
   appointment: Appointment;
   service?: AppointmentService;
   staffMember?: AppointmentStaff;
-  onStatusChange: (
-    status: AppointmentStatus,
-  ) => void;
+  onCancel: () => void;
+  cancelling: boolean;
 }) {
   return (
     <article className="grid gap-4 rounded-[18px] border border-black/8 bg-[#F6F6F4] p-4 sm:grid-cols-[90px_1fr_auto] sm:items-center">
@@ -729,28 +790,16 @@ function AppointmentRow({
         )}
       </div>
 
-      <select
-        value={appointment.status}
-        onChange={(event) =>
-          onStatusChange(
-            event.target.value as AppointmentStatus,
-          )
-        }
-        className="rounded-xl border border-black/10 bg-white px-3 py-2.5 text-[10px] font-bold outline-none"
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={cancelling}
+        className="rounded-xl border border-[#DC2727]/30 bg-red-50 px-3 py-2.5 text-[10px] font-bold text-[#DC2727] transition hover:bg-[#DC2727] hover:text-white disabled:cursor-wait disabled:opacity-50"
       >
-        {(
-          Object.keys(
-            STATUS_LABELS,
-          ) as AppointmentStatus[]
-        ).map((status) => (
-          <option
-            key={status}
-            value={status}
-          >
-            {STATUS_LABELS[status]}
-          </option>
-        ))}
-      </select>
+        {cancelling
+          ? "Ακύρωση..."
+          : "Ακύρωση ραντεβού"}
+      </button>
     </article>
   );
 }
