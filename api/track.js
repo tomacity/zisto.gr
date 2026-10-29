@@ -616,8 +616,8 @@ async function handleAppointmentBootstrap(
         )
         .eq("business_id", business.id)
         .neq("status", "cancelled")
-        .gte(
-          "starts_at",
+        .gt(
+          "ends_at",
           busyWindowStart.toISOString(),
         )
         .lt(
@@ -1344,8 +1344,8 @@ async function handleAppointmentManage(
       )
       .neq("id", appointment.id)
       .neq("status", "cancelled")
-      .gte(
-        "starts_at",
+      .gt(
+        "ends_at",
         new Date().toISOString(),
       )
       .lt(
