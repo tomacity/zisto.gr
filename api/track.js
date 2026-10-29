@@ -226,6 +226,607 @@ async function handleLead(body, response) {
   }
 }
 
+
+async function resolveBookingProject(
+  supabaseAdmin,
+  projectKey,
+) {
+  const { data: project, error } =
+    await supabaseAdmin
+      .from("connected_projects")
+      .select(`
+        id,
+        business_id,
+        status,
+        live_url,
+        businesses (
+          id,
+          name,
+          timezone,
+          dashboard_modules
+        )
+      `)
+      .eq("project_key", projectKey)
+      .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!project || project.status !== "active") {
+    return null;
+  }
+
+  const business = project.businesses;
+
+  if (
+    !business ||
+    !Array.isArray(business.dashboard_modules) ||
+    !business.dashboard_modules.includes(
+      "appointments",
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    project,
+    business,
+  };
+}
+
+function getZonedDayAndMinutes(
+  date,
+  timeZone,
+) {
+  const formatter =
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+
+  const parts =
+    formatter.formatToParts(date);
+
+  const weekday =
+    parts.find(
+      (part) => part.type === "weekday",
+    )?.value ?? "Sun";
+
+  const hour = Number(
+    parts.find(
+      (part) => part.type === "hour",
+    )?.value ?? 0,
+  );
+
+  const minute = Number(
+    parts.find(
+      (part) => part.type === "minute",
+    )?.value ?? 0,
+  );
+
+  const dayMap = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return {
+    weekday: dayMap[weekday] ?? 0,
+    minutes: hour * 60 + minute,
+  };
+}
+
+function timeStringToMinutes(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const [hours, minutes] =
+    value.split(":").map(Number);
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes)
+  ) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+async function handleAppointmentBootstrap(
+  supabaseAdmin,
+  body,
+  response,
+) {
+  const projectKey =
+    cleanText(body.project_key, 100);
+
+  if (!projectKey) {
+    return response.status(400).json({
+      error: "project_key is required",
+    });
+  }
+
+  try {
+    const resolved =
+      await resolveBookingProject(
+        supabaseAdmin,
+        projectKey,
+      );
+
+    if (!resolved) {
+      return response.status(404).json({
+        error:
+          "Appointments are not enabled for this Smart Link",
+      });
+    }
+
+    const { business } = resolved;
+
+    const [
+      servicesResult,
+      staffResult,
+      availabilityResult,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("appointment_services")
+        .select(
+          "id,name,duration_minutes,price_cents,currency,sort_order",
+        )
+        .eq("business_id", business.id)
+        .eq("is_active", true)
+        .order("sort_order", {
+          ascending: true,
+        }),
+      supabaseAdmin
+        .from("appointment_staff")
+        .select(
+          "id,name,sort_order",
+        )
+        .eq("business_id", business.id)
+        .eq("is_active", true)
+        .order("sort_order", {
+          ascending: true,
+        }),
+      supabaseAdmin
+        .from("appointment_availability")
+        .select(
+          "id,staff_id,weekday,starts_at,ends_at",
+        )
+        .eq("business_id", business.id)
+        .eq("is_active", true)
+        .order("weekday", {
+          ascending: true,
+        }),
+    ]);
+
+    if (
+      servicesResult.error ||
+      staffResult.error ||
+      availabilityResult.error
+    ) {
+      console.error(
+        "Appointment bootstrap failed",
+        {
+          services:
+            servicesResult.error,
+          staff: staffResult.error,
+          availability:
+            availabilityResult.error,
+        },
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not load booking configuration",
+      });
+    }
+
+    return response.status(200).json({
+      business: {
+        id: business.id,
+        name: business.name,
+        timezone:
+          business.timezone ||
+          "Europe/Athens",
+      },
+      services:
+        servicesResult.data ?? [],
+      staff:
+        staffResult.data ?? [],
+      availability:
+        availabilityResult.data ?? [],
+    });
+  } catch (error) {
+    console.error(
+      "Appointment bootstrap error:",
+      error,
+    );
+
+    return response.status(500).json({
+      error:
+        "Could not load booking configuration",
+    });
+  }
+}
+
+async function handleAppointmentBooking(
+  supabaseAdmin,
+  body,
+  response,
+) {
+  const projectKey =
+    cleanText(body.project_key, 100);
+
+  const serviceId =
+    cleanText(body.service_id, 100);
+
+  const staffId =
+    cleanText(body.staff_id, 100);
+
+  const customerName =
+    cleanText(body.customer_name, 160);
+
+  const customerEmail =
+    cleanText(body.customer_email, 180);
+
+  const customerPhone =
+    cleanText(body.customer_phone, 80);
+
+  const notes =
+    cleanText(body.notes, 1200);
+
+  const startsAtRaw =
+    cleanText(body.starts_at, 100);
+
+  if (
+    !projectKey ||
+    !serviceId ||
+    !customerName ||
+    !startsAtRaw
+  ) {
+    return response.status(400).json({
+      error:
+        "project_key, service_id, customer_name and starts_at are required",
+    });
+  }
+
+  const startsAt =
+    new Date(startsAtRaw);
+
+  if (
+    Number.isNaN(startsAt.getTime()) ||
+    startsAt <= new Date()
+  ) {
+    return response.status(400).json({
+      error:
+        "Appointment start must be a valid future date",
+    });
+  }
+
+  try {
+    const resolved =
+      await resolveBookingProject(
+        supabaseAdmin,
+        projectKey,
+      );
+
+    if (!resolved) {
+      return response.status(404).json({
+        error:
+          "Appointments are not enabled for this Smart Link",
+      });
+    }
+
+    const { business } = resolved;
+
+    const {
+      data: service,
+      error: serviceError,
+    } = await supabaseAdmin
+      .from("appointment_services")
+      .select(
+        "id,name,duration_minutes,is_active",
+      )
+      .eq("id", serviceId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    if (
+      serviceError ||
+      !service ||
+      !service.is_active
+    ) {
+      return response.status(400).json({
+        error:
+          "Invalid appointment service",
+      });
+    }
+
+    const {
+      data: activeStaff,
+      error: activeStaffError,
+    } = await supabaseAdmin
+      .from("appointment_staff")
+      .select("id")
+      .eq("business_id", business.id)
+      .eq("is_active", true);
+
+    if (activeStaffError) {
+      return response.status(500).json({
+        error:
+          "Could not validate appointment staff",
+      });
+    }
+
+    const requiresStaff =
+      (activeStaff ?? []).length > 0;
+
+    if (
+      requiresStaff &&
+      !staffId
+    ) {
+      return response.status(400).json({
+        error:
+          "A staff member is required",
+      });
+    }
+
+    if (staffId) {
+      const validStaff =
+        (activeStaff ?? []).some(
+          (member) =>
+            member.id === staffId,
+        );
+
+      if (!validStaff) {
+        return response.status(400).json({
+          error:
+            "Invalid appointment staff member",
+        });
+      }
+    }
+
+    const durationMinutes =
+      Number(service.duration_minutes);
+
+    const endsAt =
+      new Date(
+        startsAt.getTime() +
+          durationMinutes * 60_000,
+      );
+
+    const timeZone =
+      business.timezone ||
+      "Europe/Athens";
+
+    const startLocal =
+      getZonedDayAndMinutes(
+        startsAt,
+        timeZone,
+      );
+
+    const endLocal =
+      getZonedDayAndMinutes(
+        endsAt,
+        timeZone,
+      );
+
+    if (
+      startLocal.weekday !==
+      endLocal.weekday
+    ) {
+      return response.status(400).json({
+        error:
+          "Appointment must fit inside one availability window",
+      });
+    }
+
+    let availabilityQuery =
+      supabaseAdmin
+        .from("appointment_availability")
+        .select(
+          "staff_id,weekday,starts_at,ends_at",
+        )
+        .eq("business_id", business.id)
+        .eq(
+          "weekday",
+          startLocal.weekday,
+        )
+        .eq("is_active", true);
+
+    if (staffId) {
+      availabilityQuery =
+        availabilityQuery.or(
+          `staff_id.eq.${staffId},staff_id.is.null`,
+        );
+    } else {
+      availabilityQuery =
+        availabilityQuery.is(
+          "staff_id",
+          null,
+        );
+    }
+
+    const {
+      data: windows,
+      error: availabilityError,
+    } = await availabilityQuery;
+
+    if (availabilityError) {
+      console.error(
+        "Availability validation failed:",
+        availabilityError,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not validate availability",
+      });
+    }
+
+    const fitsAvailability =
+      (windows ?? []).some((window) => {
+        const windowStart =
+          timeStringToMinutes(
+            window.starts_at,
+          );
+
+        const windowEnd =
+          timeStringToMinutes(
+            window.ends_at,
+          );
+
+        if (
+          windowStart === null ||
+          windowEnd === null
+        ) {
+          return false;
+        }
+
+        return (
+          startLocal.minutes >=
+            windowStart &&
+          endLocal.minutes <= windowEnd
+        );
+      });
+
+    if (!fitsAvailability) {
+      return response.status(409).json({
+        error:
+          "The selected time is outside available booking hours",
+      });
+    }
+
+    let conflictQuery =
+      supabaseAdmin
+        .from("appointments")
+        .select("id")
+        .eq("business_id", business.id)
+        .neq("status", "cancelled")
+        .lt(
+          "starts_at",
+          endsAt.toISOString(),
+        )
+        .gt(
+          "ends_at",
+          startsAt.toISOString(),
+        )
+        .limit(1);
+
+    if (staffId) {
+      conflictQuery =
+        conflictQuery.eq(
+          "staff_id",
+          staffId,
+        );
+    } else {
+      conflictQuery =
+        conflictQuery.is(
+          "staff_id",
+          null,
+        );
+    }
+
+    const {
+      data: conflicts,
+      error: conflictError,
+    } = await conflictQuery;
+
+    if (conflictError) {
+      console.error(
+        "Booking conflict lookup failed:",
+        conflictError,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not verify appointment availability",
+      });
+    }
+
+    if ((conflicts ?? []).length > 0) {
+      return response.status(409).json({
+        error:
+          "This time is no longer available",
+      });
+    }
+
+    const {
+      data: appointment,
+      error: insertError,
+    } = await supabaseAdmin
+      .from("appointments")
+      .insert({
+        business_id: business.id,
+        service_id: service.id,
+        staff_id: staffId || null,
+        customer_name: customerName,
+        customer_email:
+          customerEmail || null,
+        customer_phone:
+          customerPhone || null,
+        starts_at:
+          startsAt.toISOString(),
+        ends_at:
+          endsAt.toISOString(),
+        status: "confirmed",
+        source: "smart_link",
+        notes: notes || null,
+      })
+      .select(
+        "id,public_token,starts_at,ends_at,status",
+      )
+      .single();
+
+    if (insertError) {
+      console.error(
+        "Appointment insert failed:",
+        insertError,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not create appointment",
+      });
+    }
+
+    return response.status(201).json({
+      success: true,
+      appointment,
+      service: {
+        id: service.id,
+        name: service.name,
+        duration_minutes:
+          service.duration_minutes,
+      },
+      business: {
+        name: business.name,
+        timezone: timeZone,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Appointment booking error:",
+      error,
+    );
+
+    return response.status(500).json({
+      error:
+        "Could not create appointment",
+    });
+  }
+}
+
 export default async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
 
@@ -262,6 +863,58 @@ export default async function handler(request, response) {
 
   if (incomingBody.action === "lead") {
     return handleLead(incomingBody, response);
+  }
+
+
+  const appointmentAction =
+    incomingBody.action ===
+      "appointment_bootstrap" ||
+    incomingBody.action ===
+      "appointment_book";
+
+  if (appointmentAction) {
+    const supabaseUrl =
+      process.env.SUPABASE_URL;
+
+    const supabaseSecretKey =
+      process.env.SUPABASE_SECRET_KEY;
+
+    if (!supabaseUrl || !supabaseSecretKey) {
+      return response.status(500).json({
+        error:
+          "Missing server configuration",
+      });
+    }
+
+    const supabaseAdmin =
+      createClient(
+        supabaseUrl,
+        supabaseSecretKey,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        },
+      );
+
+    if (
+      incomingBody.action ===
+      "appointment_bootstrap"
+    ) {
+      return handleAppointmentBootstrap(
+        supabaseAdmin,
+        incomingBody,
+        response,
+      );
+    }
+
+    return handleAppointmentBooking(
+      supabaseAdmin,
+      incomingBody,
+      response,
+    );
   }
 
   const supabaseUrl =
