@@ -543,11 +543,15 @@ async function handleAppointmentBooking(
     (!projectKey && !liveUrl) ||
     !serviceId ||
     !customerName ||
+    !customerEmail ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+      customerEmail,
+    ) ||
     !startsAtRaw
   ) {
     return response.status(400).json({
       error:
-        "project_key or live_url, plus service_id, customer_name and starts_at are required",
+        "project_key or live_url, plus service_id, customer_name, valid customer_email and starts_at are required",
     });
   }
 
