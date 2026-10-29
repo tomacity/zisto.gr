@@ -360,6 +360,119 @@ function timeStringToMinutes(value) {
   return hours * 60 + minutes;
 }
 
+async function sendAppointmentEmail({
+  to,
+  subject,
+  html,
+}) {
+  const resendApiKey =
+    process.env.RESEND_API_KEY;
+
+  if (!resendApiKey || !to) {
+    return {
+      sent: false,
+      error:
+        !resendApiKey
+          ? "Email service is not configured"
+          : "Missing recipient email",
+    };
+  }
+
+  try {
+    const emailResponse =
+      await fetch(
+        "https://api.resend.com/emails",
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${resendApiKey}`,
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            from:
+              process.env.ZISTO_FROM_EMAIL ||
+              "Zisto <hello@mail.zisto.app>",
+            to: [to],
+            subject,
+            html,
+          }),
+        },
+      );
+
+    if (!emailResponse.ok) {
+      const error =
+        await emailResponse.text();
+
+      console.error(
+        "Appointment email failed:",
+        error,
+      );
+
+      return {
+        sent: false,
+        error,
+      };
+    }
+
+    return {
+      sent: true,
+      error: null,
+    };
+  } catch (error) {
+    console.error(
+      "Appointment email error:",
+      error,
+    );
+
+    return {
+      sent: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Email delivery failed",
+    };
+  }
+}
+
+function appointmentManageUrl(
+  liveUrl,
+  token,
+  action,
+) {
+  try {
+    const url = new URL(liveUrl);
+
+    url.searchParams.set(
+      "appointment_token",
+      token,
+    );
+    url.searchParams.set(
+      "appointment_action",
+      action,
+    );
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function escapeAppointmentHtml(value) {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      })[char] ?? char,
+  );
+}
+
 async function handleAppointmentBootstrap(
   supabaseAdmin,
   body,
@@ -395,7 +508,7 @@ async function handleAppointmentBootstrap(
       });
     }
 
-    const { business } = resolved;
+    const { business, project } = resolved;
 
     const [
       servicesResult,
@@ -858,8 +971,93 @@ async function handleAppointmentBooking(
       });
     }
 
+    const changeUrl =
+      appointmentManageUrl(
+        project.live_url,
+        appointment.public_token,
+        "reschedule",
+      );
+
+    const cancelUrl =
+      appointmentManageUrl(
+        project.live_url,
+        appointment.public_token,
+        "cancel",
+      );
+
+    const formattedDate =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          timeZone,
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        },
+      ).format(startsAt);
+
+    const formattedTime =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          timeZone,
+          hour: "2-digit",
+          minute: "2-digit",
+        },
+      ).format(startsAt);
+
+    const safeBusinessName =
+      escapeAppointmentHtml(
+        business.name,
+      );
+
+    const safeCustomerName =
+      escapeAppointmentHtml(
+        customerName,
+      );
+
+    const safeServiceName =
+      escapeAppointmentHtml(
+        service.name,
+      );
+
+    const confirmationEmail =
+      await sendAppointmentEmail({
+        to: customerEmail,
+        subject:
+          `Επιβεβαίωση ραντεβού — ${business.name}`,
+        html: `
+          <div style="font-family:Arial,sans-serif;background:#f4f4f2;padding:36px 16px;color:#222;">
+            <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:24px;padding:36px;">
+              <div style="font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#DC2727;">ZISTO APPOINTMENTS</div>
+              <h1 style="margin:12px 0 0;font-size:32px;line-height:1.08;">Το ραντεβού σου επιβεβαιώθηκε.</h1>
+              <p style="margin:22px 0 0;color:#555;line-height:1.7;">Γεια σου ${safeCustomerName}, το ραντεβού σου στο <strong>${safeBusinessName}</strong> καταχωρήθηκε επιτυχώς.</p>
+
+              <div style="margin:26px 0;padding:20px;background:#f6f6f4;border-radius:16px;line-height:1.8;">
+                <div><strong>Υπηρεσία:</strong> ${safeServiceName}</div>
+                <div><strong>Ημερομηνία:</strong> ${formattedDate}</div>
+                <div><strong>Ώρα:</strong> ${formattedTime}</div>
+              </div>
+
+              <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#555;">Χρειάζεσαι κάποια αλλαγή;</p>
+
+              <div style="display:block;margin-top:12px;">
+                ${changeUrl ? `<a href="${escapeAppointmentHtml(changeUrl)}" style="display:block;text-align:center;text-decoration:none;background:#222;color:#fff;padding:15px 18px;border-radius:12px;font-weight:800;margin-bottom:10px;">Αλλαγή ημερομηνίας</a>` : ""}
+                ${cancelUrl ? `<a href="${escapeAppointmentHtml(cancelUrl)}" style="display:block;text-align:center;text-decoration:none;background:#fff;color:#DC2727;padding:14px 18px;border-radius:12px;font-weight:800;border:1px solid #DC2727;">Ακύρωση ραντεβού</a>` : ""}
+              </div>
+
+              <p style="margin:26px 0 0;color:#999;font-size:12px;line-height:1.6;">Τα παραπάνω links είναι προσωπικά για το συγκεκριμένο ραντεβού. Μην τα προωθήσεις σε τρίτους.</p>
+              <div style="margin-top:28px;padding-top:18px;border-top:1px solid #eee;color:#999;font-size:12px;">Εστάλη μέσω Zisto.</div>
+            </div>
+          </div>
+        `,
+      });
+
     return response.status(201).json({
       success: true,
+      email_sent:
+        confirmationEmail.sent,
       appointment,
       service: {
         id: service.id,
