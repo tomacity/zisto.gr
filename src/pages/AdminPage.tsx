@@ -54,12 +54,52 @@ const ADMIN_TABS: {
   },
 ];
 
+type DashboardModule =
+  | "analytics"
+  | "reviews"
+  | "menu"
+  | "nfc"
+  | "appointments";
+
+const DASHBOARD_MODULE_OPTIONS: {
+  id: DashboardModule;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "analytics",
+    label: "Analytics",
+    description: "Επισκέψεις, conversions και δραστηριότητα.",
+  },
+  {
+    id: "reviews",
+    label: "Αξιολογήσεις",
+    description: "Review clicks και review performance.",
+  },
+  {
+    id: "menu",
+    label: "Μενού",
+    description: "Ψηφιακό menu και menu analytics.",
+  },
+  {
+    id: "nfc",
+    label: "NFC κάρτες",
+    description: "Κάρτες, tracking URLs και taps ανά κάρτα.",
+  },
+  {
+    id: "appointments",
+    label: "Ραντεβού",
+    description: "Booking, ημερολόγιο και υπενθυμίσεις.",
+  },
+];
+
 type Business = {
   id: string;
   name: string;
   slug: string;
   timezone: string;
   status: "active" | "inactive";
+  dashboard_modules: DashboardModule[];
   setup_status: "active" | "setup_required";
   smart_link: {
     id: string;
@@ -1101,6 +1141,9 @@ function BusinessesPanel({
   const [editStatus, setEditStatus] =
     useState<Business["status"]>("active");
   
+  const [editDashboardModules, setEditDashboardModules] =
+    useState<DashboardModule[]>([]);
+  
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -1301,6 +1344,12 @@ function BusinessesPanel({
           slug: slug.trim(),
           timezone: timezone.trim(),
           status,
+          dashboard_modules: [
+            "analytics",
+            "reviews",
+            "menu",
+            "nfc",
+          ],
         }),
       });
 
@@ -1355,6 +1404,14 @@ function BusinessesPanel({
   setEditSlug(business.slug);
   setEditTimezone(business.timezone);
   setEditStatus(business.status);
+  setEditDashboardModules(
+    business.dashboard_modules ?? [
+      "analytics",
+      "reviews",
+      "menu",
+      "nfc",
+    ],
+  );
   setEditError("");
 }
 
@@ -1364,6 +1421,7 @@ function cancelEditingBusiness() {
   setEditSlug("");
   setEditTimezone("Europe/Athens");
   setEditStatus("active");
+  setEditDashboardModules([]);
   setEditError("");
 }
 
@@ -1402,6 +1460,7 @@ async function updateBusiness(
           slug: editSlug.trim(),
           timezone: editTimezone.trim(),
           status: editStatus,
+          dashboard_modules: editDashboardModules,
         }),
       },
     );
@@ -2005,6 +2064,84 @@ async function updateBusiness(
                         <option value="inactive">Inactive</option>
                       </select>
                     </label>
+
+                    <div className="sm:col-span-2">
+                      <div className="flex items-end justify-between gap-4">
+                        <div>
+                          <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                            Dashboard modules
+                          </span>
+                          <p className="mt-2 text-sm leading-6 text-[#888]">
+                            Διάλεξε ακριβώς ποιες ενότητες θα βλέπει ο client στο dashboard του.
+                          </p>
+                        </div>
+
+                        <span className="rounded-full bg-[#222] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+                          {editDashboardModules.length} ενεργά
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {DASHBOARD_MODULE_OPTIONS.map((module) => {
+                          const enabled =
+                            editDashboardModules.includes(
+                              module.id,
+                            );
+
+                          return (
+                            <button
+                              key={module.id}
+                              type="button"
+                              onClick={() => {
+                                setEditDashboardModules((current) =>
+                                  current.includes(module.id)
+                                    ? current.filter(
+                                        (item) =>
+                                          item !== module.id,
+                                      )
+                                    : [...current, module.id],
+                                );
+                              }}
+                              className={`rounded-2xl border p-4 text-left transition ${
+                                enabled
+                                  ? "border-[#222] bg-[#222] text-white"
+                                  : "border-black/10 bg-[#F7F5F1] text-[#222] hover:border-[#222]/40"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-black">
+                                  {module.label}
+                                </p>
+
+                                <span
+                                  className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-black ${
+                                    enabled
+                                      ? "bg-[#DC2727] text-white"
+                                      : "border border-black/10 text-transparent"
+                                  }`}
+                                >
+                                  ✓
+                                </span>
+                              </div>
+
+                              <p
+                                className={`mt-2 text-xs leading-5 ${
+                                  enabled
+                                    ? "text-white/55"
+                                    : "text-[#777]"
+                                }`}
+                              >
+                                {module.description}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <p className="mt-3 text-xs leading-5 text-[#999]">
+                        Οι Ρυθμίσεις παραμένουν πάντα διαθέσιμες ως system tab.
+                      </p>
+                    </div>
                   </div>
               
                   {editError && (
