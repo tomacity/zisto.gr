@@ -6,17 +6,57 @@ import { createClient } from "@supabase/supabase-js";
 
 type BusinessStatus = "active" | "inactive";
 
+type DashboardModule =
+  | "analytics"
+  | "reviews"
+  | "menu"
+  | "nfc"
+  | "appointments";
+
+const DEFAULT_DASHBOARD_MODULES: DashboardModule[] = [
+  "analytics",
+  "reviews",
+  "menu",
+  "nfc",
+];
+
+const ALLOWED_DASHBOARD_MODULES = new Set<DashboardModule>([
+  ...DEFAULT_DASHBOARD_MODULES,
+  "appointments",
+]);
+
 type CreateBusinessBody = {
   name?: unknown;
   slug?: unknown;
   timezone?: unknown;
   status?: unknown;
+  dashboard_modules?: unknown;
 };
 
 const ALLOWED_STATUSES = new Set<BusinessStatus>([
   "active",
   "inactive",
 ]);
+
+function normalizeDashboardModules(
+  value: unknown,
+): DashboardModule[] {
+  if (!Array.isArray(value)) {
+    return [...DEFAULT_DASHBOARD_MODULES];
+  }
+
+  return Array.from(
+    new Set(
+      value.filter(
+        (item): item is DashboardModule =>
+          typeof item === "string" &&
+          ALLOWED_DASHBOARD_MODULES.has(
+            item as DashboardModule,
+          ),
+      ),
+    ),
+  );
+}
 
 function createSlug(value: string) {
   return value
@@ -147,6 +187,7 @@ export default async function handler(
           slug,
           timezone,
           status,
+          dashboard_modules,
           created_at,
           updated_at
         `)
@@ -354,6 +395,7 @@ export default async function handler(
         slug?: unknown;
         timezone?: unknown;
         status?: unknown;
+        dashboard_modules?: unknown;
       };
     
       const id =
@@ -380,6 +422,11 @@ export default async function handler(
         typeof body.status === "string"
           ? body.status.trim()
           : "";
+
+      const dashboardModules =
+        normalizeDashboardModules(
+          body.dashboard_modules,
+        );
     
       if (!id) {
         return response.status(400).json({
@@ -469,6 +516,7 @@ export default async function handler(
           slug,
           timezone,
           status,
+          dashboard_modules: dashboardModules,
         })
         .eq("id", id)
         .select(`
@@ -477,6 +525,7 @@ export default async function handler(
           slug,
           timezone,
           status,
+          dashboard_modules,
           created_at,
           updated_at
         `)
@@ -557,6 +606,11 @@ export default async function handler(
       typeof body.status === "string"
         ? body.status.trim()
         : "active";
+
+    const dashboardModules =
+      normalizeDashboardModules(
+        body.dashboard_modules,
+      );
 
     if (!name) {
       return response.status(400).json({
@@ -639,6 +693,7 @@ export default async function handler(
         slug,
         timezone,
         status,
+        dashboard_modules: dashboardModules,
       })
       .select(`
         id,
