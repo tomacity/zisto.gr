@@ -1921,7 +1921,27 @@ export default async function handler(request, response) {
     });
   }
 
-  const incomingBody = request.body ?? {};
+  let incomingBody = request.body ?? {};
+
+  if (typeof incomingBody === "string") {
+    try {
+      incomingBody = JSON.parse(incomingBody);
+    } catch {
+      return response.status(400).json({
+        error: "Invalid JSON body",
+      });
+    }
+  }
+
+  if (
+    !incomingBody ||
+    typeof incomingBody !== "object" ||
+    Array.isArray(incomingBody)
+  ) {
+    return response.status(400).json({
+      error: "Invalid request body",
+    });
+  }
 
   if (incomingBody.action === "lead") {
     return handleLead(incomingBody, response);
