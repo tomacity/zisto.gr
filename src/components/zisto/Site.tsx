@@ -30,6 +30,7 @@ import { supabase } from "../../lib/supabase";
 import { AdminPage } from "../../pages/AdminPage";
 import { ZistoConfiguratorSection } from "./ZistoConfiguratorSection";
 import { ConfettiBurst } from "./ConfettiBurst";
+import { AppointmentsTab } from "./AppointmentsTab";
 
 const WORDMARK = "/images/zisto-wordmark.png";
 const WORDMARKWHITE = "/images/zisto-wordmark-white.png";
@@ -5115,51 +5116,6 @@ if (loading) {
   );
 }
 
-function AppointmentsPlaceholder() {
-  return (
-    <section className="relative overflow-hidden rounded-[24px] border border-black/10 bg-[#222] p-8 text-white md:p-12">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#DC2727]/20 blur-3xl"
-      />
-
-      <div className="relative">
-        <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
-          Appointments
-        </p>
-
-        <h1 className="mt-5 max-w-[12ch] text-[11vw] font-black leading-[0.9] tracking-[-0.05em] sm:text-[7vw] lg:text-[4.6vw]">
-          Το πρόγραμμα της ημέρας σου, σε ένα μέρος.
-        </h1>
-
-        <p className="mt-7 max-w-2xl text-[15px] leading-relaxed text-white/55">
-          Το module είναι ήδη διαθέσιμο σαν dashboard tab. Στο επόμενο στάδιο θα συνδέσουμε booking από το Smart Link, live ημερολόγιο, availability, πελάτες και υπενθυμίσεις.
-        </p>
-
-        <div className="mt-10 grid gap-3 sm:grid-cols-3">
-          {[
-            ["09:30", "Πρώτο ραντεβού"],
-            ["13:00", "Διαθεσιμότητα"],
-            ["18:30", "Τελευταίο ραντεβού"],
-          ].map(([time, label]) => (
-            <div
-              key={time}
-              className="rounded-[18px] border border-white/10 bg-white/[0.05] p-5"
-            >
-              <p className="font-mono text-[22px] font-black text-white">
-                {time}
-              </p>
-              <p className="mt-2 text-[11px] text-white/40">
-                {label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function DashboardTabPlaceholder({
   tab,
   analytics,
@@ -5897,7 +5853,9 @@ function DashboardPage({
                     }}
                   />
                 ) : activeTab === "appointments" ? (
-                  <AppointmentsPlaceholder />
+                  <AppointmentsTab
+                    businessId={businessId}
+                  />
                 ) : activeTab === "settings" &&
                   analytics ? (
                   <SettingsTab
