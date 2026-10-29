@@ -465,7 +465,7 @@ async function handleAppointmentBootstrap(
 
       return response.status(500).json({
         error:
-          `Booking setup error: ${failedResource}`,
+          `Booking setup error: ${failedResource}${failedCode ? ` (${failedCode})` : ""}`,
         diagnostic: {
           resource: failedResource,
           code: failedCode,
