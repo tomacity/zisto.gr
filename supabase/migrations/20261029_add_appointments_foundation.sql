@@ -78,6 +78,24 @@ alter table public.appointment_staff enable row level security;
 alter table public.appointment_availability enable row level security;
 alter table public.appointments enable row level security;
 
+grant usage on schema public to service_role;
+
+grant select, insert, update, delete
+  on table public.appointment_services
+  to service_role;
+
+grant select, insert, update, delete
+  on table public.appointment_staff
+  to service_role;
+
+grant select, insert, update, delete
+  on table public.appointment_availability
+  to service_role;
+
+grant select, insert, update, delete
+  on table public.appointments
+  to service_role;
+
 comment on table public.appointment_services is 'Bookable services configured per business.';
 comment on table public.appointment_staff is 'Team members/resources who can receive appointments.';
 comment on table public.appointment_availability is 'Weekly availability windows per business or staff member.';
