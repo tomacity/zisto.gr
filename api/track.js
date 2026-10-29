@@ -698,7 +698,7 @@ async function handleAppointmentBooking(
       });
     }
 
-    const { business } = resolved;
+    const { business, project } = resolved;
 
     const {
       data: service,
