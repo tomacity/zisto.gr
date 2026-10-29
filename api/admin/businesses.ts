@@ -701,6 +701,7 @@ export default async function handler(
         slug,
         timezone,
         status,
+        dashboard_modules,
         created_at,
         updated_at
       `)
