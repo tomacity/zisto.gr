@@ -662,7 +662,7 @@ export default async function handler(
 
           const fromEmail =
             process.env.ZISTO_FROM_EMAIL ||
-            "Zisto <appointments@zisto.app>";
+            "Zisto <hello@mail.zisto.app>";
 
           if (!resendApiKey) {
             emailError =
