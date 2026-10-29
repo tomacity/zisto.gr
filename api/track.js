@@ -360,6 +360,60 @@ function timeStringToMinutes(value) {
   return hours * 60 + minutes;
 }
 
+function getRequestIp(request) {
+  const forwarded =
+    cleanText(
+      request.headers["x-forwarded-for"],
+      300,
+    );
+
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+
+  return (
+    cleanText(
+      request.headers["x-real-ip"],
+      120,
+    ) ||
+    cleanText(
+      request.headers["x-vercel-forwarded-for"],
+      120,
+    ) ||
+    "unknown"
+  );
+}
+
+async function checkAppointmentRateLimit(
+  supabaseAdmin,
+  rateKey,
+  limit,
+  windowSeconds,
+) {
+  const { data, error } =
+    await supabaseAdmin.rpc(
+      "check_appointment_rate_limit",
+      {
+        p_key: rateKey,
+        p_limit: limit,
+        p_window_seconds:
+          windowSeconds,
+      },
+    );
+
+  if (error) {
+    console.error(
+      "Appointment rate-limit check failed:",
+      error,
+    );
+
+    // Fail closed for anonymous booking creation.
+    return false;
+  }
+
+  return data === true;
+}
+
 async function sendAppointmentEmail({
   to,
   subject,
@@ -510,10 +564,20 @@ async function handleAppointmentBootstrap(
 
     const { business, project } = resolved;
 
+    const busyWindowStart =
+      new Date();
+
+    const busyWindowEnd =
+      new Date(
+        busyWindowStart.getTime() +
+          35 * 24 * 60 * 60 * 1000,
+      );
+
     const [
       servicesResult,
       staffResult,
       availabilityResult,
+      busyResult,
     ] = await Promise.all([
       supabaseAdmin
         .from("appointment_services")
@@ -545,12 +609,31 @@ async function handleAppointmentBootstrap(
         .order("weekday", {
           ascending: true,
         }),
+      supabaseAdmin
+        .from("appointments")
+        .select(
+          "staff_id,starts_at,ends_at",
+        )
+        .eq("business_id", business.id)
+        .neq("status", "cancelled")
+        .gte(
+          "starts_at",
+          busyWindowStart.toISOString(),
+        )
+        .lt(
+          "starts_at",
+          busyWindowEnd.toISOString(),
+        )
+        .order("starts_at", {
+          ascending: true,
+        }),
     ]);
 
     if (
       servicesResult.error ||
       staffResult.error ||
-      availabilityResult.error
+      availabilityResult.error ||
+      busyResult.error
     ) {
       console.error(
         "Appointment bootstrap failed",
@@ -560,6 +643,8 @@ async function handleAppointmentBootstrap(
           staff: staffResult.error,
           availability:
             availabilityResult.error,
+          busy:
+            busyResult.error,
         },
       );
 
@@ -568,12 +653,15 @@ async function handleAppointmentBootstrap(
           ? "appointment_services"
           : staffResult.error
             ? "appointment_staff"
-            : "appointment_availability";
+            : availabilityResult.error
+            ? "appointment_availability"
+            : "appointments";
 
       const failedCode =
         servicesResult.error?.code ||
         staffResult.error?.code ||
         availabilityResult.error?.code ||
+        busyResult.error?.code ||
         null;
 
       return response.status(500).json({
@@ -600,6 +688,8 @@ async function handleAppointmentBootstrap(
         staffResult.data ?? [],
       availability:
         availabilityResult.data ?? [],
+      busy:
+        busyResult.data ?? [],
     });
   } catch (error) {
     console.error(
@@ -623,6 +713,7 @@ async function handleAppointmentBootstrap(
 async function handleAppointmentBooking(
   supabaseAdmin,
   body,
+  request,
   response,
 ) {
   const projectKey =
@@ -699,6 +790,35 @@ async function handleAppointmentBooking(
     }
 
     const { business, project } = resolved;
+
+    const requestIp =
+      getRequestIp(request);
+
+    const normalizedEmail =
+      customerEmail.toLowerCase();
+
+    const [ipAllowed, emailAllowed] =
+      await Promise.all([
+        checkAppointmentRateLimit(
+          supabaseAdmin,
+          `booking:ip:${business.id}:${requestIp}`,
+          12,
+          15 * 60,
+        ),
+        checkAppointmentRateLimit(
+          supabaseAdmin,
+          `booking:email:${business.id}:${normalizedEmail}`,
+          6,
+          60 * 60,
+        ),
+      ]);
+
+    if (!ipAllowed || !emailAllowed) {
+      return response.status(429).json({
+        error:
+          "Too many booking attempts. Please try again later.",
+      });
+    }
 
     const {
       data: service,
@@ -965,6 +1085,15 @@ async function handleAppointmentBooking(
         insertError,
       );
 
+      if (
+        insertError.code === "23P01"
+      ) {
+        return response.status(409).json({
+          error:
+            "This time is no longer available",
+        });
+      }
+
       return response.status(500).json({
         error:
           "Could not create appointment",
@@ -1166,6 +1295,17 @@ async function handleAppointmentManage(
     const business =
       appointment.businesses;
 
+    const startsAt =
+      new Date(
+        appointment.starts_at,
+      );
+
+    const canManage =
+      ["pending", "confirmed"].includes(
+        appointment.status,
+      ) &&
+      startsAt > new Date();
+
     const timeZone =
       business?.timezone ||
       "Europe/Athens";
@@ -1184,10 +1324,45 @@ async function handleAppointmentManage(
       )
       .eq("is_active", true);
 
-    if (availabilityError) {
+    const busyWindowEnd =
+      new Date(
+        Date.now() +
+          35 * 24 * 60 * 60 * 1000,
+      );
+
+    const {
+      data: busy,
+      error: busyError,
+    } = await supabaseAdmin
+      .from("appointments")
+      .select(
+        "staff_id,starts_at,ends_at",
+      )
+      .eq(
+        "business_id",
+        appointment.business_id,
+      )
+      .neq("id", appointment.id)
+      .neq("status", "cancelled")
+      .gte(
+        "starts_at",
+        new Date().toISOString(),
+      )
+      .lt(
+        "starts_at",
+        busyWindowEnd.toISOString(),
+      )
+      .order("starts_at", {
+        ascending: true,
+      });
+
+    if (
+      availabilityError ||
+      busyError
+    ) {
       console.error(
         "Manage appointment availability failed:",
-        availabilityError,
+        availabilityError || busyError,
       );
 
       return response.status(500).json({
@@ -1221,6 +1396,8 @@ async function handleAppointmentManage(
       },
       availability:
         availability ?? [],
+      busy: busy ?? [],
+      can_manage: canManage,
     });
   } catch (error) {
     console.error(
@@ -1274,6 +1451,20 @@ async function handleAppointmentPublicCancel(
       return response.status(200).json({
         success: true,
         already_cancelled: true,
+      });
+    }
+
+    if (
+      !["pending", "confirmed"].includes(
+        appointment.status,
+      ) ||
+      new Date(
+        appointment.starts_at,
+      ) <= new Date()
+    ) {
+      return response.status(409).json({
+        error:
+          "This appointment can no longer be cancelled",
       });
     }
 
@@ -1378,12 +1569,16 @@ async function handleAppointmentPublicReschedule(
     }
 
     if (
-      appointment.status ===
-      "cancelled"
+      !["pending", "confirmed"].includes(
+        appointment.status,
+      ) ||
+      new Date(
+        appointment.starts_at,
+      ) <= new Date()
     ) {
       return response.status(409).json({
         error:
-          "Cancelled appointments cannot be changed",
+          "This appointment can no longer be changed",
       });
     }
 
@@ -1607,14 +1802,80 @@ async function handleAppointmentPublicReschedule(
         updateError,
       );
 
+      if (
+        updateError.code === "23P01"
+      ) {
+        return response.status(409).json({
+          error:
+            "This time is no longer available",
+        });
+      }
+
       return response.status(500).json({
         error:
           "Could not change appointment",
       });
     }
 
+    const businessName =
+      appointment.businesses?.name ||
+      "η επιχείρηση";
+
+    const formattedDate =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          timeZone,
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        },
+      ).format(startsAt);
+
+    const formattedTime =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          timeZone,
+          hour: "2-digit",
+          minute: "2-digit",
+        },
+      ).format(startsAt);
+
+    const rescheduleEmail =
+      appointment.customer_email
+        ? await sendAppointmentEmail({
+            to:
+              appointment.customer_email,
+            subject:
+              `Αλλαγή ραντεβού — ${businessName}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;background:#f4f4f2;padding:36px 16px;color:#222;">
+                <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:24px;padding:36px;">
+                  <div style="font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#DC2727;">ZISTO APPOINTMENTS</div>
+                  <h1 style="margin:12px 0 0;font-size:32px;line-height:1.08;">Το ραντεβού σου άλλαξε.</h1>
+                  <p style="margin:22px 0 0;color:#555;line-height:1.7;">Η νέα ημερομηνία και ώρα για το ραντεβού σου στο <strong>${escapeAppointmentHtml(businessName)}</strong> είναι:</p>
+                  <div style="margin:26px 0;padding:20px;background:#f6f6f4;border-radius:16px;line-height:1.8;">
+                    <div><strong>Υπηρεσία:</strong> ${escapeAppointmentHtml(service.name)}</div>
+                    <div><strong>Ημερομηνία:</strong> ${formattedDate}</div>
+                    <div><strong>Ώρα:</strong> ${formattedTime}</div>
+                  </div>
+                  <div style="margin-top:28px;padding-top:18px;border-top:1px solid #eee;color:#999;font-size:12px;">Εστάλη μέσω Zisto.</div>
+                </div>
+              </div>
+            `,
+          })
+        : {
+            sent: false,
+            error:
+              "Missing recipient email",
+          };
+
     return response.status(200).json({
       success: true,
+      email_sent:
+        rescheduleEmail.sent,
       appointment: updated,
     });
   } catch (error) {
@@ -1755,6 +2016,7 @@ export default async function handler(request, response) {
     return handleAppointmentBooking(
       supabaseAdmin,
       incomingBody,
+      request,
       response,
     );
   }
@@ -1789,6 +2051,9 @@ export default async function handler(request, response) {
     const projectKey =
       cleanText(body.project_key, 100);
 
+    const liveUrl =
+      cleanText(body.live_url, 1000);
+
     const eventType =
       cleanText(body.event_type, 50) ??
       "page_view";
@@ -1802,9 +2067,10 @@ export default async function handler(request, response) {
     const pageUrl =
       cleanText(body.page_url, 1500);
 
-    if (!projectKey) {
+    if (!projectKey && !liveUrl) {
       return response.status(400).json({
-        error: "project_key is required",
+        error:
+          "project_key or live_url is required",
       });
     }
 
@@ -1824,19 +2090,34 @@ export default async function handler(request, response) {
      * Βρίσκουμε το project αποκλειστικά από το project_key.
      * Το frontend δεν επιλέγει μόνο του business_id/project_id.
      */
+    let projectQuery =
+      supabaseAdmin
+        .from("connected_projects")
+        .select(`
+          id,
+          business_id,
+          status,
+          live_url
+        `);
+
+    if (projectKey) {
+      projectQuery =
+        projectQuery.eq(
+          "project_key",
+          projectKey,
+        );
+    } else {
+      projectQuery =
+        projectQuery.eq(
+          "live_url",
+          liveUrl,
+        );
+    }
+
     const {
       data: project,
       error: projectError,
-    } = await supabaseAdmin
-      .from("connected_projects")
-      .select(`
-        id,
-        business_id,
-        status,
-        live_url
-      `)
-      .eq("project_key", projectKey)
-      .maybeSingle();
+    } = await projectQuery.maybeSingle();
 
     if (projectError) {
       console.error(
