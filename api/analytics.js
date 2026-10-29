@@ -18,7 +18,7 @@ function setCorsHeaders(req, res) {
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, OPTIONS",
+    "GET, POST, PATCH, OPTIONS",
   );
 
   res.setHeader(
@@ -38,6 +38,7 @@ async function supabaseRequest({
   path,
   method = "GET",
   headers = {},
+  body,
 }) {
   return fetch(`${supabaseUrl}${path}`, {
     method,
@@ -52,6 +53,11 @@ async function supabaseRequest({
 
       ...headers,
     },
+
+    body:
+      body === undefined
+        ? undefined
+        : JSON.stringify(body),
   });
 }
 
@@ -171,7 +177,10 @@ export default async function handler(
     return res.status(204).end();
   }
 
-  if (req.method !== "GET") {
+  if (
+    req.method !== "GET" &&
+    req.method !== "PATCH"
+  ) {
     return res.status(405).json({
       error: "Method not allowed",
     });
@@ -201,6 +210,11 @@ export default async function handler(
     typeof req.query.business_id ===
     "string"
       ? req.query.business_id
+      : null;
+
+  const requestedView =
+    typeof req.query.view === "string"
+      ? req.query.view
       : null;
 
   if (!accessToken) {
@@ -332,6 +346,463 @@ export default async function handler(
         membership.business_id;
     }
 
+    if (requestedView === "appointments") {
+      const start =
+        typeof req.query.start === "string"
+          ? req.query.start
+          : null;
+
+      const end =
+        typeof req.query.end === "string"
+          ? req.query.end
+          : null;
+
+      if (req.method === "GET") {
+        const appointmentParams =
+          new URLSearchParams({
+            business_id: `eq.${businessId}`,
+            select: [
+              "id",
+              "public_token",
+              "business_id",
+              "service_id",
+              "staff_id",
+              "customer_name",
+              "customer_email",
+              "customer_phone",
+              "starts_at",
+              "ends_at",
+              "status",
+              "source",
+              "notes",
+              "created_at",
+            ].join(","),
+            order: "starts_at.asc",
+            limit: "1000",
+          });
+
+        if (start) {
+          appointmentParams.set(
+            "starts_at",
+            `gte.${start}`,
+          );
+        }
+
+        if (end) {
+          appointmentParams.append(
+            "starts_at",
+            `lt.${end}`,
+          );
+        }
+
+        const serviceParams =
+          new URLSearchParams({
+            business_id: `eq.${businessId}`,
+            select:
+              "id,name,duration_minutes,price_cents,currency,is_active,sort_order",
+            order: "sort_order.asc",
+          });
+
+        const staffParams =
+          new URLSearchParams({
+            business_id: `eq.${businessId}`,
+            select:
+              "id,name,email,phone,is_active,sort_order",
+            order: "sort_order.asc",
+          });
+
+        const [
+          appointmentsResponse,
+          servicesResponse,
+          staffResponse,
+        ] = await Promise.all([
+          supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/appointments?${appointmentParams.toString()}`,
+          }),
+          supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/appointment_services?${serviceParams.toString()}`,
+          }),
+          supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/appointment_staff?${staffParams.toString()}`,
+          }),
+        ]);
+
+        if (
+          !appointmentsResponse.ok ||
+          !servicesResponse.ok ||
+          !staffResponse.ok
+        ) {
+          console.error("Appointments loading failed", {
+            appointments:
+              await appointmentsResponse.text(),
+            services:
+              await servicesResponse.text(),
+            staff:
+              await staffResponse.text(),
+          });
+
+          return res.status(500).json({
+            error:
+              "Failed to load appointments",
+          });
+        }
+
+        return res.status(200).json({
+          business_id: businessId,
+          appointments:
+            await appointmentsResponse.json(),
+          services:
+            await servicesResponse.json(),
+          staff:
+            await staffResponse.json(),
+        });
+      }
+
+      if (req.method === "PATCH") {
+        const body = req.body ?? {};
+        const appointmentId =
+          typeof body.id === "string"
+            ? body.id
+            : "";
+
+        const action =
+          typeof body.action === "string"
+            ? body.action
+            : "";
+
+        if (
+          !appointmentId ||
+          action !== "cancel"
+        ) {
+          return res.status(400).json({
+            error:
+              "Valid appointment id and cancel action are required",
+          });
+        }
+
+        const appointmentParams =
+          new URLSearchParams({
+            id: `eq.${appointmentId}`,
+            business_id:
+              `eq.${businessId}`,
+            select: [
+              "id",
+              "customer_name",
+              "customer_email",
+              "starts_at",
+              "service_id",
+              "status",
+            ].join(","),
+            limit: "1",
+          });
+
+        const businessParams =
+          new URLSearchParams({
+            id: `eq.${businessId}`,
+            select: "id,name,timezone",
+            limit: "1",
+          });
+
+        const [
+          appointmentResponse,
+          businessResponse,
+        ] = await Promise.all([
+          supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/appointments?${appointmentParams.toString()}`,
+          }),
+          supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/businesses?${businessParams.toString()}`,
+          }),
+        ]);
+
+        if (
+          !appointmentResponse.ok ||
+          !businessResponse.ok
+        ) {
+          console.error(
+            "Appointment cancellation lookup failed",
+            {
+              appointment:
+                await appointmentResponse.text(),
+              business:
+                await businessResponse.text(),
+            },
+          );
+
+          return res.status(500).json({
+            error:
+              "Failed to load appointment",
+          });
+        }
+
+        const [
+          appointmentRows,
+          businessRows,
+        ] = await Promise.all([
+          appointmentResponse.json(),
+          businessResponse.json(),
+        ]);
+
+        const appointment =
+          appointmentRows[0];
+
+        const business =
+          businessRows[0];
+
+        if (!appointment || !business) {
+          return res.status(404).json({
+            error:
+              "Appointment not found",
+          });
+        }
+
+        if (
+          appointment.status ===
+          "cancelled"
+        ) {
+          return res.status(409).json({
+            error:
+              "Appointment is already cancelled",
+          });
+        }
+
+        let serviceName =
+          "Ραντεβού";
+
+        if (appointment.service_id) {
+          const serviceParams =
+            new URLSearchParams({
+              id:
+                `eq.${appointment.service_id}`,
+              business_id:
+                `eq.${businessId}`,
+              select: "name",
+              limit: "1",
+            });
+
+          const serviceResponse =
+            await supabaseRequest({
+              supabaseUrl,
+              supabaseSecretKey,
+              path:
+                `/rest/v1/appointment_services?${serviceParams.toString()}`,
+            });
+
+          if (serviceResponse.ok) {
+            const serviceRows =
+              await serviceResponse.json();
+
+            serviceName =
+              serviceRows[0]?.name ||
+              serviceName;
+          }
+        }
+
+        const updateParams =
+          new URLSearchParams({
+            id: `eq.${appointmentId}`,
+            business_id:
+              `eq.${businessId}`,
+            select: "*",
+          });
+
+        const updateResponse =
+          await supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/appointments?${updateParams.toString()}`,
+            method: "PATCH",
+            headers: {
+              Prefer: "return=representation",
+            },
+            body: {
+              status: "cancelled",
+              updated_at:
+                new Date().toISOString(),
+            },
+          });
+
+        if (!updateResponse.ok) {
+          console.error(
+            "Appointment cancellation failed:",
+            await updateResponse.text(),
+          );
+
+          return res.status(500).json({
+            error:
+              "Failed to cancel appointment",
+          });
+        }
+
+        const rows =
+          await updateResponse.json();
+
+        let emailSent = false;
+        let emailError = null;
+
+        if (appointment.customer_email) {
+          const resendApiKey =
+            process.env.RESEND_API_KEY;
+
+          const fromEmail =
+            process.env.ZISTO_FROM_EMAIL ||
+            "Zisto <hello@mail.zisto.app>";
+
+          if (!resendApiKey) {
+            emailError =
+              "Email service is not configured";
+          } else {
+            const timezone =
+              business.timezone ||
+              "Europe/Athens";
+
+            const startsAt =
+              new Date(
+                appointment.starts_at,
+              );
+
+            const formattedDate =
+              new Intl.DateTimeFormat(
+                "el-GR",
+                {
+                  timeZone: timezone,
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                },
+              ).format(startsAt);
+
+            const formattedTime =
+              new Intl.DateTimeFormat(
+                "el-GR",
+                {
+                  timeZone: timezone,
+                  hour: "2-digit",
+                  minute: "2-digit",
+                },
+              ).format(startsAt);
+
+            const safeBusinessName =
+              String(business.name)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;");
+
+            const safeCustomerName =
+              String(
+                appointment.customer_name ||
+                "",
+              )
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;");
+
+            const safeServiceName =
+              String(serviceName)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;");
+
+            try {
+              const emailResponse =
+                await fetch(
+                  "https://api.resend.com/emails",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type":
+                        "application/json",
+                      Authorization:
+                        `Bearer ${resendApiKey}`,
+                    },
+                    body: JSON.stringify({
+                      from: fromEmail,
+                      to: [
+                        appointment.customer_email,
+                      ],
+                      subject:
+                        `Ακύρωση ραντεβού — ${business.name}`,
+                      html: `
+                        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222;line-height:1.6">
+                          <div style="padding:28px 0;border-bottom:3px solid #DC2727">
+                            <div style="font-size:12px;font-weight:700;letter-spacing:2px;color:#DC2727">ZISTO APPOINTMENTS</div>
+                            <h1 style="font-size:28px;margin:10px 0 0">Το ραντεβού σου ακυρώθηκε.</h1>
+                          </div>
+                          <div style="padding:28px 0">
+                            <p>Γεια σου ${safeCustomerName || "!"}</p>
+                            <p>Το <strong>${safeBusinessName}</strong> ακύρωσε το παρακάτω ραντεβού:</p>
+                            <div style="margin:24px 0;padding:18px;background:#f6f6f4;border-radius:14px">
+                              <div><strong>Υπηρεσία:</strong> ${safeServiceName}</div>
+                              <div><strong>Ημερομηνία:</strong> ${formattedDate}</div>
+                              <div><strong>Ώρα:</strong> ${formattedTime}</div>
+                            </div>
+                            <p>Αν θέλεις, μπορείς να επιστρέψεις στο Smart Link της επιχείρησης και να επιλέξεις νέο διαθέσιμο ραντεβού.</p>
+                          </div>
+                          <div style="padding:18px 0;border-top:1px solid #eee;color:#888;font-size:12px">
+                            Εστάλη μέσω Zisto.
+                          </div>
+                        </div>
+                      `,
+                    }),
+                  },
+                );
+
+              if (emailResponse.ok) {
+                emailSent = true;
+              } else {
+                emailError =
+                  await emailResponse.text();
+
+                console.error(
+                  "Cancellation email failed:",
+                  emailError,
+                );
+              }
+            } catch (error) {
+              emailError =
+                error instanceof Error
+                  ? error.message
+                  : "Email delivery failed";
+
+              console.error(
+                "Cancellation email error:",
+                error,
+              );
+            }
+          }
+        } else {
+          emailError =
+            "Customer has no email address";
+        }
+
+        return res.status(200).json({
+          appointment: rows[0] ?? null,
+          email_sent: emailSent,
+          email_error:
+            emailSent
+              ? null
+              : emailError,
+        });
+      }
+    }
+
     /*
      * 4. Queries για business, location
      *    και τα νέα analytics events.
@@ -341,7 +812,7 @@ export default async function handler(
         id: `eq.${businessId}`,
 
         select:
-          "id,name,slug,timezone",
+          "id,name,slug,timezone,dashboard_modules",
 
         limit: "1",
       });
@@ -636,6 +1107,11 @@ export default async function handler(
 
         location_name:
           locations[0]?.name ?? null,
+
+        dashboard_modules:
+          Array.isArray(business.dashboard_modules)
+            ? business.dashboard_modules
+            : ["analytics", "reviews", "menu", "nfc"],
       },
 
       totals: {

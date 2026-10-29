@@ -54,12 +54,52 @@ const ADMIN_TABS: {
   },
 ];
 
+type DashboardModule =
+  | "analytics"
+  | "reviews"
+  | "menu"
+  | "nfc"
+  | "appointments";
+
+const DASHBOARD_MODULE_OPTIONS: {
+  id: DashboardModule;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "analytics",
+    label: "Analytics",
+    description: "Επισκέψεις, conversions και δραστηριότητα.",
+  },
+  {
+    id: "reviews",
+    label: "Αξιολογήσεις",
+    description: "Review clicks και review performance.",
+  },
+  {
+    id: "menu",
+    label: "Μενού",
+    description: "Ψηφιακό menu και menu analytics.",
+  },
+  {
+    id: "nfc",
+    label: "NFC κάρτες",
+    description: "Κάρτες, tracking URLs και taps ανά κάρτα.",
+  },
+  {
+    id: "appointments",
+    label: "Ραντεβού",
+    description: "Booking, ημερολόγιο και υπενθυμίσεις.",
+  },
+];
+
 type Business = {
   id: string;
   name: string;
   slug: string;
   timezone: string;
   status: "active" | "inactive";
+  dashboard_modules: DashboardModule[];
   setup_status: "active" | "setup_required";
   smart_link: {
     id: string;
@@ -1101,6 +1141,9 @@ function BusinessesPanel({
   const [editStatus, setEditStatus] =
     useState<Business["status"]>("active");
   
+  const [editDashboardModules, setEditDashboardModules] =
+    useState<DashboardModule[]>([]);
+  
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -1301,6 +1344,12 @@ function BusinessesPanel({
           slug: slug.trim(),
           timezone: timezone.trim(),
           status,
+          dashboard_modules: [
+            "analytics",
+            "reviews",
+            "menu",
+            "nfc",
+          ],
         }),
       });
 
@@ -1355,6 +1404,14 @@ function BusinessesPanel({
   setEditSlug(business.slug);
   setEditTimezone(business.timezone);
   setEditStatus(business.status);
+  setEditDashboardModules(
+    business.dashboard_modules ?? [
+      "analytics",
+      "reviews",
+      "menu",
+      "nfc",
+    ],
+  );
   setEditError("");
 }
 
@@ -1364,6 +1421,7 @@ function cancelEditingBusiness() {
   setEditSlug("");
   setEditTimezone("Europe/Athens");
   setEditStatus("active");
+  setEditDashboardModules([]);
   setEditError("");
 }
 
@@ -1402,6 +1460,7 @@ async function updateBusiness(
           slug: editSlug.trim(),
           timezone: editTimezone.trim(),
           status: editStatus,
+          dashboard_modules: editDashboardModules,
         }),
       },
     );
@@ -1524,6 +1583,14 @@ async function updateBusiness(
     }
   }
   
+  const editingBusiness =
+    editingBusinessId
+      ? businesses.find(
+          (business) =>
+            business.id === editingBusinessId,
+        ) ?? null
+      : null;
+
   const activeBusinesses = businesses.filter(
     (business) =>
       business.status === "active" &&
@@ -1852,39 +1919,36 @@ async function updateBusiness(
                     </div>
                   </div>
 
-                  <div className="flex w-full flex-col gap-3 lg:w-auto">
-                    {setupRequired && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startConnectingSmartLink(
-                            business,
-                          )
-                        }
-                        className="w-full rounded-2xl bg-[#DC2727] px-7 py-4 text-sm font-bold text-white transition hover:bg-red-700 lg:w-auto"
-                      >
-                        + Σύνδεση Smart Link
-                      </button>
-                    )}
-
+                  <div className="flex w-full items-center gap-3 lg:w-auto">
                     <button
                       type="button"
                       onClick={() =>
                         startEditingBusiness(business)
                       }
-                      className="w-full rounded-2xl border border-black/10 bg-white px-7 py-4 text-sm font-bold transition hover:border-[#222] lg:w-auto"
+                      className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl border border-black/10 bg-white text-[#222] transition hover:border-[#222] hover:bg-[#F7F5F1]"
+                      aria-label={`Επεξεργασία ${business.name}`}
+                      title="Edit business"
                     >
-                      Edit
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        startDeletingBusiness(business)
-                      }
-                      className="w-full rounded-2xl border border-red-200 bg-red-50 px-7 py-4 text-sm font-bold text-[#DC2727] transition hover:border-[#DC2727] lg:w-auto"
-                    >
-                      Delete
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-5 w-5"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M4 20h4l11-11a2.828 2.828 0 0 0-4-4L4 16v4Z"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="m13.5 6.5 4 4"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
                     </button>
                   
                     <button
@@ -1893,158 +1957,12 @@ async function updateBusiness(
                         window.location.hash =
                           `/dashboard?business=${business.id}`;
                       }}
-                      className="w-full rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:w-auto"
+                      className="min-h-14 flex-1 rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:flex-none"
                     >
                       Άνοιγμα Dashboard →
                     </button>
                   </div>
                 </div>
-
-                {editingBusinessId === business.id && (
-                <div className="border-t border-black/10 bg-white p-6 sm:p-8">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                      Edit business
-                    </p>
-              
-                    <h4 className="mt-3 text-2xl font-black tracking-[-0.04em]">
-                      Επεξεργασία Επιχείρησης
-                    </h4>
-                  </div>
-              
-                  <div className="mt-6 grid gap-5 sm:grid-cols-2">
-                    <label className="block sm:col-span-2">
-                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                        Business name
-                      </span>
-              
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(event) =>
-                          setEditName(event.target.value)
-                        }
-                        maxLength={120}
-                        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
-                      />
-                    </label>
-              
-                    <label className="block">
-                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                        Slug
-                      </span>
-              
-                      <div className="mt-2 flex overflow-hidden rounded-2xl border border-black/10 bg-[#F7F5F1] focus-within:border-[#222]">
-                        <span className="flex items-center border-r border-black/10 px-4 font-mono text-sm text-[#888]">
-                          /
-                        </span>
-              
-                        <input
-                          type="text"
-                          value={editSlug}
-                          onChange={(event) =>
-                            setEditSlug(
-                              generateSlug(event.target.value),
-                            )
-                          }
-                          maxLength={100}
-                          className="min-w-0 flex-1 bg-transparent px-4 py-4 font-mono text-sm outline-none"
-                        />
-                      </div>
-                    </label>
-              
-                    <label className="block">
-                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                        Timezone
-                      </span>
-              
-                      <select
-                        value={editTimezone}
-                        onChange={(event) =>
-                          setEditTimezone(event.target.value)
-                        }
-                        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
-                      >
-                        <option value="Europe/Athens">
-                          Europe/Athens
-                        </option>
-              
-                        <option value="Europe/London">
-                          Europe/London
-                        </option>
-              
-                        <option value="Europe/Paris">
-                          Europe/Paris
-                        </option>
-              
-                        <option value="America/New_York">
-                          America/New_York
-                        </option>
-              
-                        <option value="America/Los_Angeles">
-                          America/Los_Angeles
-                        </option>
-                      </select>
-                    </label>
-              
-                    <label className="block sm:col-span-2">
-                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                        Status
-                      </span>
-              
-                      <select
-                        value={editStatus}
-                        onChange={(event) =>
-                          setEditStatus(
-                            event.target.value as Business["status"],
-                          )
-                        }
-                        className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </label>
-                  </div>
-              
-                  {editError && (
-                    <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
-                      <p className="text-sm font-semibold text-red-700">
-                        {editError}
-                      </p>
-                    </div>
-                  )}
-              
-                  <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={cancelEditingBusiness}
-                      disabled={editSaving}
-                      className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
-                    >
-                      Ακύρωση
-                    </button>
-              
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateBusiness(business.id)
-                      }
-                      disabled={
-                        editSaving ||
-                        !editName.trim() ||
-                        !editSlug.trim() ||
-                        !editTimezone.trim()
-                      }
-                      className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {editSaving
-                        ? "Αποθήκευση..."
-                        : "Αποθήκευση αλλαγών"}
-                    </button>
-                  </div>
-                </div>
-              )}
 
                 <div className="border-t border-black/8 bg-[#F7F5F1] px-6 py-4 sm:px-8">
                   <p className="font-mono text-[10px] text-[#999]">
@@ -2057,8 +1975,345 @@ async function updateBusiness(
         </div>
       )}
 
+      {editingBusiness && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              !editSaving
+            ) {
+              cancelEditingBusiness();
+            }
+          }}
+        >
+          <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-[30px] bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-5 border-b border-black/8 bg-white/95 px-6 py-5 backdrop-blur-xl sm:px-8">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                  Edit business
+                </p>
+
+                <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
+                  {editingBusiness.name}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={cancelEditingBusiness}
+                disabled={editSaving}
+                className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full border border-black/10 text-xl transition hover:bg-[#F7F5F1] disabled:opacity-50"
+                aria-label="Κλείσιμο"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 sm:p-8">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <label className="block sm:col-span-2">
+                  <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                    Business name
+                  </span>
+
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(event) =>
+                      setEditName(event.target.value)
+                    }
+                    maxLength={120}
+                    className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                    Slug
+                  </span>
+
+                  <div className="mt-2 flex overflow-hidden rounded-2xl border border-black/10 bg-[#F7F5F1] focus-within:border-[#222]">
+                    <span className="flex items-center border-r border-black/10 px-4 font-mono text-sm text-[#888]">
+                      /
+                    </span>
+
+                    <input
+                      type="text"
+                      value={editSlug}
+                      onChange={(event) =>
+                        setEditSlug(
+                          generateSlug(
+                            event.target.value,
+                          ),
+                        )
+                      }
+                      maxLength={100}
+                      className="min-w-0 flex-1 bg-transparent px-4 py-4 font-mono text-sm outline-none"
+                    />
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                    Timezone
+                  </span>
+
+                  <select
+                    value={editTimezone}
+                    onChange={(event) =>
+                      setEditTimezone(
+                        event.target.value,
+                      )
+                    }
+                    className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+                  >
+                    <option value="Europe/Athens">
+                      Europe/Athens
+                    </option>
+                    <option value="Europe/London">
+                      Europe/London
+                    </option>
+                    <option value="Europe/Paris">
+                      Europe/Paris
+                    </option>
+                    <option value="America/New_York">
+                      America/New_York
+                    </option>
+                    <option value="America/Los_Angeles">
+                      America/Los_Angeles
+                    </option>
+                  </select>
+                </label>
+
+                <label className="block sm:col-span-2">
+                  <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                    Status
+                  </span>
+
+                  <select
+                    value={editStatus}
+                    onChange={(event) =>
+                      setEditStatus(
+                        event.target
+                          .value as Business["status"],
+                      )
+                    }
+                    className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
+                  >
+                    <option value="active">
+                      Active
+                    </option>
+                    <option value="inactive">
+                      Inactive
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <section className="mt-8 border-t border-black/8 pt-7">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                      Dashboard modules
+                    </p>
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-[#888]">
+                      Διάλεξε ακριβώς ποιες ενότητες θα βλέπει ο client στο dashboard του.
+                    </p>
+                  </div>
+
+                  <span className="w-fit rounded-full bg-[#222] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+                    {editDashboardModules.length} ενεργά
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {DASHBOARD_MODULE_OPTIONS.map(
+                    (module) => {
+                      const enabled =
+                        editDashboardModules.includes(
+                          module.id,
+                        );
+
+                      return (
+                        <button
+                          key={module.id}
+                          type="button"
+                          onClick={() => {
+                            setEditDashboardModules(
+                              (current) =>
+                                current.includes(
+                                  module.id,
+                                )
+                                  ? current.filter(
+                                      (item) =>
+                                        item !==
+                                        module.id,
+                                    )
+                                  : [
+                                      ...current,
+                                      module.id,
+                                    ],
+                            );
+                          }}
+                          className={`rounded-2xl border p-4 text-left transition ${
+                            enabled
+                              ? "border-[#222] bg-[#222] text-white"
+                              : "border-black/10 bg-[#F7F5F1] text-[#222] hover:border-[#222]/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-black">
+                              {module.label}
+                            </p>
+
+                            <span
+                              className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-black ${
+                                enabled
+                                  ? "bg-[#DC2727] text-white"
+                                  : "border border-black/10 text-transparent"
+                              }`}
+                            >
+                              ✓
+                            </span>
+                          </div>
+
+                          <p
+                            className={`mt-2 text-xs leading-5 ${
+                              enabled
+                                ? "text-white/55"
+                                : "text-[#777]"
+                            }`}
+                          >
+                            {module.description}
+                          </p>
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
+
+                <p className="mt-3 text-xs leading-5 text-[#999]">
+                  Οι Ρυθμίσεις παραμένουν πάντα διαθέσιμες ως system tab.
+                </p>
+              </section>
+
+              <section className="mt-8 border-t border-black/8 pt-7">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
+                  Smart Link
+                </p>
+
+                {editingBusiness.setup_status ===
+                "setup_required" ? (
+                  <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[#F7F5F1] p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black">
+                        Δεν έχει συνδεθεί Smart Link
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[#777]">
+                        Σύνδεσέ το για να ενεργοποιηθεί πλήρως η επιχείρηση.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        startConnectingSmartLink(
+                          editingBusiness,
+                        );
+                      }}
+                      className="rounded-2xl bg-[#DC2727] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-red-700"
+                    >
+                      + Σύνδεση Smart Link
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl bg-[#F7F5F1] p-5">
+                    <p className="text-sm font-black">
+                      {editingBusiness.smart_link?.name ??
+                        "Smart Link connected"}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-[#777]">
+                      {editingBusiness.smart_link?.live_url}
+                    </p>
+                  </div>
+                )}
+              </section>
+
+              {editError && (
+                <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-semibold text-red-700">
+                    {editError}
+                  </p>
+                </div>
+              )}
+
+              <section className="mt-8 border-t border-red-100 pt-7">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#DC2727]">
+                  Danger zone
+                </p>
+
+                <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-red-700">
+                      Διαγραφή επιχείρησης
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-red-600/70">
+                      Η ενέργεια χρειάζεται επιβεβαίωση και δεν μπορεί να αναιρεθεί.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      startDeletingBusiness(
+                        editingBusiness,
+                      )
+                    }
+                    className="rounded-2xl border border-red-200 bg-white px-5 py-3.5 text-sm font-bold text-[#DC2727] transition hover:border-[#DC2727]"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </section>
+
+              <div className="mt-8 flex flex-col-reverse gap-3 border-t border-black/8 pt-6 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={cancelEditingBusiness}
+                  disabled={editSaving}
+                  className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
+                >
+                  Ακύρωση
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateBusiness(
+                      editingBusiness.id,
+                    )
+                  }
+                  disabled={
+                    editSaving ||
+                    !editName.trim() ||
+                    !editSlug.trim() ||
+                    !editTimezone.trim()
+                  }
+                  className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {editSaving
+                    ? "Αποθήκευση..."
+                    : "Αποθήκευση αλλαγών"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {connectingBusiness && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5 py-8">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-5 py-8">
           <form
             onSubmit={connectSmartLink}
             className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl sm:p-8"
@@ -2154,7 +2409,7 @@ async function updateBusiness(
       )}
 
       {deletingBusiness && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5 py-8">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-5 py-8">
           <div className="w-full max-w-lg rounded-[28px] bg-white p-6 shadow-2xl sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
               Permanent deletion

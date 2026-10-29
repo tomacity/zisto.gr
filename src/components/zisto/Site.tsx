@@ -30,6 +30,7 @@ import { supabase } from "../../lib/supabase";
 import { AdminPage } from "../../pages/AdminPage";
 import { ZistoConfiguratorSection } from "./ZistoConfiguratorSection";
 import { ConfettiBurst } from "./ConfettiBurst";
+import { AppointmentsTab } from "./AppointmentsTab";
 
 const WORDMARK = "/images/zisto-wordmark.png";
 const WORDMARKWHITE = "/images/zisto-wordmark-white.png";
@@ -1918,6 +1919,7 @@ type AnalyticsResponse = {
   business: {
     name: string;
     location_name: string | null;
+    dashboard_modules: DashboardModule[];
   };
   totals: {
     page_views_today: number;
@@ -5149,6 +5151,12 @@ function DashboardTabPlaceholder({
       description:
         "Εδώ θα προστεθούν οι κάρτες, η κατάστασή τους και τα taps ανά κάρτα ή τοποθεσία.",
     },
+    appointments: {
+      eyebrow: "Ραντεβού",
+      title: "Ημερολόγιο ραντεβού",
+      description:
+        "Το booking module του Zisto θα συγκεντρώνει διαθεσιμότητα, ραντεβού, πελάτες και υπενθυμίσεις σε ένα live ημερολόγιο.",
+    },
     settings: {
       eyebrow: "Ρυθμίσεις",
       title: "Ρυθμίσεις επιχείρησης",
@@ -5295,18 +5303,18 @@ function DashboardTutorial({
   const steps = [
     {
       eyebrow: "Βήμα 1 από 3",
-      title: "Καλωσήρθες στο Zisto.",
-      body: "Στην Επισκόπηση βλέπεις τις βασικές μετρήσεις της επιχείρησής σου σε πραγματικό χρόνο.",
+      title: "Καλωσήρθες στο δικό σου Zisto.",
+      body: "Το dashboard σου είναι προσαρμοσμένο στις λειτουργίες που χρειάζεται πραγματικά η επιχείρησή σου.",
     },
     {
       eyebrow: "Βήμα 2 από 3",
-      title: "Κατανόησε τη διαδρομή.",
-      body: "Οι επισκέψεις, τα ανοίγματα μενού και τα review clicks δείχνουν τι κάνει ο πελάτης μετά το NFC ή το QR.",
+      title: "Μόνο ό,τι χρειάζεσαι.",
+      body: "Στο αριστερό menu θα βλέπεις μόνο τα modules που έχουν ενεργοποιηθεί για την επιχείρησή σου.",
     },
     {
       eyebrow: "Βήμα 3 από 3",
-      title: "Βελτίωσε τα αποτελέσματα.",
-      body: "Χρησιμοποίησε τα Analytics και το Business Health για να εντοπίζεις ευκαιρίες και προβλήματα.",
+      title: "Το Zisto μεγαλώνει μαζί σου.",
+      body: "Νέα modules μπορούν να ενεργοποιηθούν αργότερα χωρίς να αλλάξει ο λογαριασμός ή το Smart Link σου.",
     },
   ];
 
@@ -5370,13 +5378,31 @@ function DashboardTutorial({
   );
 }
 
-type DashboardTab =
-  | "overview"
+type DashboardModule =
   | "analytics"
   | "reviews"
   | "menu"
   | "nfc"
+  | "appointments";
+
+type DashboardTab =
+  | "overview"
+  | DashboardModule
   | "settings";
+
+const DASHBOARD_NAV_ITEMS: {
+  id: DashboardTab;
+  icon: string;
+  label: string;
+  system?: boolean;
+}[] = [
+  { id: "analytics", icon: "↗", label: "Analytics" },
+  { id: "reviews", icon: "★", label: "Αξιολογήσεις" },
+  { id: "menu", icon: "☰", label: "Μενού" },
+  { id: "nfc", icon: "⌁", label: "NFC κάρτες" },
+  { id: "appointments", icon: "◷", label: "Ραντεβού" },
+  { id: "settings", icon: "⚙", label: "Ρυθμίσεις", system: true },
+];
 
 function DashboardPage({
   businessId,
@@ -5598,6 +5624,54 @@ function DashboardPage({
   const businessLocation =
     analytics?.business.location_name ?? "Zisto client";
 
+  const enabledModules: DashboardModule[] =
+    analytics?.business.dashboard_modules?.length
+      ? analytics.business.dashboard_modules
+      : ["analytics", "reviews", "menu", "nfc"];
+
+  const visibleNavItems = DASHBOARD_NAV_ITEMS.filter(
+    (item) =>
+      item.system ||
+      enabledModules.includes(
+        item.id as DashboardModule,
+      ),
+  );
+
+  useEffect(() => {
+    if (!analytics || awaitingApproval) {
+      return;
+    }
+
+    if (
+      activeTab !== "settings" &&
+      !enabledModules.includes(
+        activeTab as DashboardModule,
+      )
+    ) {
+      setActiveTab(
+        enabledModules[0] ?? "settings",
+      );
+    }
+  }, [
+    analytics,
+    awaitingApproval,
+    activeTab,
+    enabledModules.join("|"),
+  ]);
+
+  if (
+    analyticsLoading &&
+    !analytics &&
+    !awaitingApproval
+  ) {
+    return (
+      <GlobalLoader
+        fullScreen
+        message="Φόρτωση dashboard..."
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#F6F6F4] font-sans text-[#222]">
       {/* Sidebar */}
@@ -5646,13 +5720,7 @@ function DashboardPage({
         </div>
 
         <nav className="mt-10 flex flex-col gap-2">
-          {[
-            { id: "analytics" as const, icon: "↗", label: "Analytics" },
-            { id: "reviews" as const, icon: "★", label: "Αξιολογήσεις" },
-            { id: "menu" as const, icon: "☰", label: "Μενού" },
-            { id: "nfc" as const, icon: "⌁", label: "NFC κάρτες" },
-            { id: "settings" as const, icon: "⚙", label: "Ρυθμίσεις" },
-          ].map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = activeTab === item.id;
 
             return (
@@ -5796,6 +5864,10 @@ function DashboardPage({
                         ),
                       );
                     }}
+                  />
+                ) : activeTab === "appointments" ? (
+                  <AppointmentsTab
+                    businessId={businessId}
                   />
                 ) : activeTab === "settings" &&
                   analytics ? (
