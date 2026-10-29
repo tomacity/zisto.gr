@@ -1083,6 +1083,553 @@ async function handleAppointmentBooking(
   }
 }
 
+
+async function resolveAppointmentByToken(
+  supabaseAdmin,
+  token,
+) {
+  const {
+    data: appointment,
+    error,
+  } = await supabaseAdmin
+    .from("appointments")
+    .select(`
+      id,
+      public_token,
+      business_id,
+      service_id,
+      staff_id,
+      customer_name,
+      customer_email,
+      starts_at,
+      ends_at,
+      status,
+      appointment_services (
+        id,
+        name,
+        duration_minutes,
+        price_cents,
+        currency
+      ),
+      appointment_staff (
+        id,
+        name
+      ),
+      businesses (
+        id,
+        name,
+        timezone
+      )
+    `)
+    .eq("public_token", token)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return appointment ?? null;
+}
+
+async function handleAppointmentManage(
+  supabaseAdmin,
+  body,
+  response,
+) {
+  const token =
+    cleanText(
+      body.appointment_token,
+      100,
+    );
+
+  if (!token) {
+    return response.status(400).json({
+      error:
+        "appointment_token is required",
+    });
+  }
+
+  try {
+    const appointment =
+      await resolveAppointmentByToken(
+        supabaseAdmin,
+        token,
+      );
+
+    if (!appointment) {
+      return response.status(404).json({
+        error:
+          "Appointment not found",
+      });
+    }
+
+    const business =
+      appointment.businesses;
+
+    const timeZone =
+      business?.timezone ||
+      "Europe/Athens";
+
+    const {
+      data: availability,
+      error: availabilityError,
+    } = await supabaseAdmin
+      .from("appointment_availability")
+      .select(
+        "id,staff_id,weekday,starts_at,ends_at,is_active",
+      )
+      .eq(
+        "business_id",
+        appointment.business_id,
+      )
+      .eq("is_active", true);
+
+    if (availabilityError) {
+      console.error(
+        "Manage appointment availability failed:",
+        availabilityError,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not load appointment availability",
+      });
+    }
+
+    return response.status(200).json({
+      appointment: {
+        id: appointment.id,
+        public_token:
+          appointment.public_token,
+        starts_at:
+          appointment.starts_at,
+        ends_at:
+          appointment.ends_at,
+        status:
+          appointment.status,
+        service:
+          appointment.appointment_services,
+        staff:
+          appointment.appointment_staff,
+      },
+      business: {
+        id:
+          appointment.business_id,
+        name:
+          business?.name || "",
+        timezone: timeZone,
+      },
+      availability:
+        availability ?? [],
+    });
+  } catch (error) {
+    console.error(
+      "Appointment manage error:",
+      error,
+    );
+
+    return response.status(500).json({
+      error:
+        "Could not load appointment",
+    });
+  }
+}
+
+async function handleAppointmentPublicCancel(
+  supabaseAdmin,
+  body,
+  response,
+) {
+  const token =
+    cleanText(
+      body.appointment_token,
+      100,
+    );
+
+  if (!token) {
+    return response.status(400).json({
+      error:
+        "appointment_token is required",
+    });
+  }
+
+  try {
+    const appointment =
+      await resolveAppointmentByToken(
+        supabaseAdmin,
+        token,
+      );
+
+    if (!appointment) {
+      return response.status(404).json({
+        error:
+          "Appointment not found",
+      });
+    }
+
+    if (
+      appointment.status ===
+      "cancelled"
+    ) {
+      return response.status(200).json({
+        success: true,
+        already_cancelled: true,
+      });
+    }
+
+    const {
+      data: updated,
+      error,
+    } = await supabaseAdmin
+      .from("appointments")
+      .update({
+        status: "cancelled",
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", appointment.id)
+      .eq(
+        "public_token",
+        token,
+      )
+      .select(
+        "id,status,starts_at",
+      )
+      .single();
+
+    if (error) {
+      console.error(
+        "Public appointment cancellation failed:",
+        error,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not cancel appointment",
+      });
+    }
+
+    return response.status(200).json({
+      success: true,
+      appointment: updated,
+    });
+  } catch (error) {
+    console.error(
+      "Public appointment cancellation error:",
+      error,
+    );
+
+    return response.status(500).json({
+      error:
+        "Could not cancel appointment",
+    });
+  }
+}
+
+async function handleAppointmentPublicReschedule(
+  supabaseAdmin,
+  body,
+  response,
+) {
+  const token =
+    cleanText(
+      body.appointment_token,
+      100,
+    );
+
+  const startsAtRaw =
+    cleanText(
+      body.starts_at,
+      100,
+    );
+
+  if (!token || !startsAtRaw) {
+    return response.status(400).json({
+      error:
+        "appointment_token and starts_at are required",
+    });
+  }
+
+  const startsAt =
+    new Date(startsAtRaw);
+
+  if (
+    Number.isNaN(startsAt.getTime()) ||
+    startsAt <= new Date()
+  ) {
+    return response.status(400).json({
+      error:
+        "Appointment start must be a valid future date",
+    });
+  }
+
+  try {
+    const appointment =
+      await resolveAppointmentByToken(
+        supabaseAdmin,
+        token,
+      );
+
+    if (!appointment) {
+      return response.status(404).json({
+        error:
+          "Appointment not found",
+      });
+    }
+
+    if (
+      appointment.status ===
+      "cancelled"
+    ) {
+      return response.status(409).json({
+        error:
+          "Cancelled appointments cannot be changed",
+      });
+    }
+
+    const service =
+      appointment.appointment_services;
+
+    if (!service) {
+      return response.status(400).json({
+        error:
+          "Appointment service is unavailable",
+      });
+    }
+
+    const durationMinutes =
+      Number(
+        service.duration_minutes,
+      );
+
+    const endsAt =
+      new Date(
+        startsAt.getTime() +
+          durationMinutes * 60_000,
+      );
+
+    const timeZone =
+      appointment.businesses
+        ?.timezone ||
+      "Europe/Athens";
+
+    const startLocal =
+      getZonedDayAndMinutes(
+        startsAt,
+        timeZone,
+      );
+
+    const endLocal =
+      getZonedDayAndMinutes(
+        endsAt,
+        timeZone,
+      );
+
+    if (
+      startLocal.weekday !==
+      endLocal.weekday
+    ) {
+      return response.status(409).json({
+        error:
+          "Appointment must fit inside one availability window",
+      });
+    }
+
+    let availabilityQuery =
+      supabaseAdmin
+        .from(
+          "appointment_availability",
+        )
+        .select(
+          "staff_id,weekday,starts_at,ends_at",
+        )
+        .eq(
+          "business_id",
+          appointment.business_id,
+        )
+        .eq(
+          "weekday",
+          startLocal.weekday,
+        )
+        .eq("is_active", true);
+
+    if (appointment.staff_id) {
+      availabilityQuery =
+        availabilityQuery.or(
+          `staff_id.eq.${appointment.staff_id},staff_id.is.null`,
+        );
+    } else {
+      availabilityQuery =
+        availabilityQuery.is(
+          "staff_id",
+          null,
+        );
+    }
+
+    const {
+      data: windows,
+      error: availabilityError,
+    } = await availabilityQuery;
+
+    if (availabilityError) {
+      console.error(
+        "Reschedule availability validation failed:",
+        availabilityError,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not validate availability",
+      });
+    }
+
+    const fitsAvailability =
+      (windows ?? []).some(
+        (window) => {
+          const windowStart =
+            timeStringToMinutes(
+              window.starts_at,
+            );
+
+          const windowEnd =
+            timeStringToMinutes(
+              window.ends_at,
+            );
+
+          return (
+            windowStart !== null &&
+            windowEnd !== null &&
+            startLocal.minutes >=
+              windowStart &&
+            endLocal.minutes <=
+              windowEnd
+          );
+        },
+      );
+
+    if (!fitsAvailability) {
+      return response.status(409).json({
+        error:
+          "The selected time is outside available booking hours",
+      });
+    }
+
+    let conflictQuery =
+      supabaseAdmin
+        .from("appointments")
+        .select("id")
+        .eq(
+          "business_id",
+          appointment.business_id,
+        )
+        .neq(
+          "id",
+          appointment.id,
+        )
+        .neq(
+          "status",
+          "cancelled",
+        )
+        .lt(
+          "starts_at",
+          endsAt.toISOString(),
+        )
+        .gt(
+          "ends_at",
+          startsAt.toISOString(),
+        )
+        .limit(1);
+
+    if (appointment.staff_id) {
+      conflictQuery =
+        conflictQuery.eq(
+          "staff_id",
+          appointment.staff_id,
+        );
+    } else {
+      conflictQuery =
+        conflictQuery.is(
+          "staff_id",
+          null,
+        );
+    }
+
+    const {
+      data: conflicts,
+      error: conflictError,
+    } = await conflictQuery;
+
+    if (conflictError) {
+      console.error(
+        "Reschedule conflict lookup failed:",
+        conflictError,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not verify appointment availability",
+      });
+    }
+
+    if ((conflicts ?? []).length) {
+      return response.status(409).json({
+        error:
+          "This time is no longer available",
+      });
+    }
+
+    const {
+      data: updated,
+      error: updateError,
+    } = await supabaseAdmin
+      .from("appointments")
+      .update({
+        starts_at:
+          startsAt.toISOString(),
+        ends_at:
+          endsAt.toISOString(),
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", appointment.id)
+      .eq(
+        "public_token",
+        token,
+      )
+      .select(
+        "id,starts_at,ends_at,status",
+      )
+      .single();
+
+    if (updateError) {
+      console.error(
+        "Appointment reschedule failed:",
+        updateError,
+      );
+
+      return response.status(500).json({
+        error:
+          "Could not change appointment",
+      });
+    }
+
+    return response.status(200).json({
+      success: true,
+      appointment: updated,
+    });
+  } catch (error) {
+    console.error(
+      "Public appointment reschedule error:",
+      error,
+    );
+
+    return response.status(500).json({
+      error:
+        "Could not change appointment",
+    });
+  }
+}
+
 export default async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
 
@@ -1126,7 +1673,13 @@ export default async function handler(request, response) {
     incomingBody.action ===
       "appointment_bootstrap" ||
     incomingBody.action ===
-      "appointment_book";
+      "appointment_book" ||
+    incomingBody.action ===
+      "appointment_manage" ||
+    incomingBody.action ===
+      "appointment_public_cancel" ||
+    incomingBody.action ===
+      "appointment_public_reschedule";
 
   if (appointmentAction) {
     const supabaseUrl =
@@ -1160,6 +1713,39 @@ export default async function handler(request, response) {
       "appointment_bootstrap"
     ) {
       return handleAppointmentBootstrap(
+        supabaseAdmin,
+        incomingBody,
+        response,
+      );
+    }
+
+    if (
+      incomingBody.action ===
+      "appointment_manage"
+    ) {
+      return handleAppointmentManage(
+        supabaseAdmin,
+        incomingBody,
+        response,
+      );
+    }
+
+    if (
+      incomingBody.action ===
+      "appointment_public_cancel"
+    ) {
+      return handleAppointmentPublicCancel(
+        supabaseAdmin,
+        incomingBody,
+        response,
+      );
+    }
+
+    if (
+      incomingBody.action ===
+      "appointment_public_reschedule"
+    ) {
+      return handleAppointmentPublicReschedule(
         supabaseAdmin,
         incomingBody,
         response,
