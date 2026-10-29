@@ -229,10 +229,13 @@ async function handleLead(body, response) {
 
 async function resolveBookingProject(
   supabaseAdmin,
-  projectKey,
+  {
+    projectKey,
+    liveUrl,
+  },
 ) {
-  const { data: project, error } =
-    await supabaseAdmin
+  let query =
+    supabaseAdmin
       .from("connected_projects")
       .select(`
         id,
@@ -245,9 +248,24 @@ async function resolveBookingProject(
           timezone,
           dashboard_modules
         )
-      `)
-      .eq("project_key", projectKey)
-      .maybeSingle();
+      `);
+
+  if (projectKey) {
+    query = query.eq(
+      "project_key",
+      projectKey,
+    );
+  } else if (liveUrl) {
+    query = query.eq(
+      "live_url",
+      liveUrl,
+    );
+  } else {
+    return null;
+  }
+
+  const { data: project, error } =
+    await query.maybeSingle();
 
   if (error) {
     throw error;
@@ -350,9 +368,13 @@ async function handleAppointmentBootstrap(
   const projectKey =
     cleanText(body.project_key, 100);
 
-  if (!projectKey) {
+  const liveUrl =
+    cleanText(body.live_url, 1000);
+
+  if (!projectKey && !liveUrl) {
     return response.status(400).json({
-      error: "project_key is required",
+      error:
+        "project_key or live_url is required",
     });
   }
 
@@ -360,7 +382,10 @@ async function handleAppointmentBootstrap(
     const resolved =
       await resolveBookingProject(
         supabaseAdmin,
-        projectKey,
+        {
+          projectKey,
+          liveUrl,
+        },
       );
 
     if (!resolved) {
@@ -467,6 +492,9 @@ async function handleAppointmentBooking(
   const projectKey =
     cleanText(body.project_key, 100);
 
+  const liveUrl =
+    cleanText(body.live_url, 1000);
+
   const serviceId =
     cleanText(body.service_id, 100);
 
@@ -489,14 +517,14 @@ async function handleAppointmentBooking(
     cleanText(body.starts_at, 100);
 
   if (
-    !projectKey ||
+    (!projectKey && !liveUrl) ||
     !serviceId ||
     !customerName ||
     !startsAtRaw
   ) {
     return response.status(400).json({
       error:
-        "project_key, service_id, customer_name and starts_at are required",
+        "project_key or live_url, plus service_id, customer_name and starts_at are required",
     });
   }
 
@@ -517,7 +545,10 @@ async function handleAppointmentBooking(
     const resolved =
       await resolveBookingProject(
         supabaseAdmin,
-        projectKey,
+        {
+          projectKey,
+          liveUrl,
+        },
       );
 
     if (!resolved) {
