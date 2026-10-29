@@ -450,9 +450,26 @@ async function handleAppointmentBootstrap(
         },
       );
 
+      const failedResource =
+        servicesResult.error
+          ? "appointment_services"
+          : staffResult.error
+            ? "appointment_staff"
+            : "appointment_availability";
+
+      const failedCode =
+        servicesResult.error?.code ||
+        staffResult.error?.code ||
+        availabilityResult.error?.code ||
+        null;
+
       return response.status(500).json({
         error:
-          "Could not load booking configuration",
+          `Booking setup error: ${failedResource}`,
+        diagnostic: {
+          resource: failedResource,
+          code: failedCode,
+        },
       });
     }
 
@@ -479,7 +496,13 @@ async function handleAppointmentBootstrap(
 
     return response.status(500).json({
       error:
-        "Could not load booking configuration",
+        "Booking setup error: project resolution",
+      diagnostic: {
+        code:
+          typeof error?.code === "string"
+            ? error.code
+            : null,
+      },
     });
   }
 }
