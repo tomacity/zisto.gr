@@ -1950,19 +1950,45 @@ async function parseIncomingBody(request) {
   }
 
   if (typeof body === "string") {
-    return JSON.parse(body);
+    try {
+      return JSON.parse(body);
+    } catch {
+      const form =
+        new URLSearchParams(body);
+
+      const payload =
+        form.get("payload");
+
+      if (payload) {
+        return JSON.parse(payload);
+      }
+
+      return Object.fromEntries(
+        form.entries(),
+      );
+    }
   }
 
   if (
     typeof body === "object" &&
     !Array.isArray(body)
   ) {
-    if (
-      typeof body.payload === "string"
-    ) {
-      return JSON.parse(
-        body.payload,
-      );
+    if (body.payload) {
+      if (
+        typeof body.payload ===
+        "string"
+      ) {
+        return JSON.parse(
+          body.payload,
+        );
+      }
+
+      if (
+        typeof body.payload ===
+        "object"
+      ) {
+        return body.payload;
+      }
     }
 
     return body;
