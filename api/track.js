@@ -1889,6 +1889,82 @@ async function handleAppointmentPublicReschedule(
   }
 }
 
+async function parseIncomingBody(request) {
+  let body = request.body;
+
+  if (
+    typeof Buffer !== "undefined" &&
+    Buffer.isBuffer(body)
+  ) {
+    body = body.toString("utf8");
+  } else if (
+    body instanceof Uint8Array
+  ) {
+    body = new TextDecoder().decode(body);
+  } else if (
+    body &&
+    typeof body === "object" &&
+    body.type === "Buffer" &&
+    Array.isArray(body.data)
+  ) {
+    body = Buffer.from(body.data).toString("utf8");
+  }
+
+  if (
+    body == null ||
+    body === ""
+  ) {
+    const chunks = [];
+    let totalBytes = 0;
+
+    for await (const chunk of request) {
+      const buffer =
+        typeof chunk === "string"
+          ? Buffer.from(chunk)
+          : Buffer.from(chunk);
+
+      totalBytes += buffer.length;
+
+      if (totalBytes > 1_000_000) {
+        throw new Error(
+          "Request body too large",
+        );
+      }
+
+      chunks.push(buffer);
+    }
+
+    if (chunks.length) {
+      body =
+        Buffer.concat(chunks).toString(
+          "utf8",
+        );
+    }
+  }
+
+  if (
+    body == null ||
+    body === ""
+  ) {
+    return {};
+  }
+
+  if (typeof body === "string") {
+    return JSON.parse(body);
+  }
+
+  if (
+    typeof body === "object" &&
+    !Array.isArray(body)
+  ) {
+    return body;
+  }
+
+  throw new Error(
+    "Invalid request body",
+  );
+}
+
 export default async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
 
@@ -1921,16 +1997,20 @@ export default async function handler(request, response) {
     });
   }
 
-  let incomingBody = request.body ?? {};
+  let incomingBody;
 
-  if (typeof incomingBody === "string") {
-    try {
-      incomingBody = JSON.parse(incomingBody);
-    } catch {
-      return response.status(400).json({
-        error: "Invalid JSON body",
-      });
-    }
+  try {
+    incomingBody =
+      await parseIncomingBody(
+        request,
+      );
+  } catch (error) {
+    return response.status(400).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Invalid request body",
+    });
   }
 
   if (
