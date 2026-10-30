@@ -219,7 +219,7 @@ const [invitationsError, setInvitationsError] =
   const [businessesError, setBusinessesError] = useState("");
 
   useEffect(() => {
-    if (!isAdmin || activeAdminTab !== "projects") {
+    if (!isAdmin || (activeAdminTab !== "home" && activeAdminTab !== "projects")) {
       return;
     }
   
@@ -435,7 +435,7 @@ const [invitationsError, setInvitationsError] =
   }
 
   useEffect(() => {
-  if (!isAdmin || activeAdminTab !== "businesses") {
+  if (!isAdmin || (activeAdminTab !== "home" && activeAdminTab !== "businesses")) {
     return;
   }
 
@@ -509,7 +509,7 @@ const [invitationsError, setInvitationsError] =
 }, [isAdmin, activeAdminTab]);
 
 useEffect(() => {
-  if (!isAdmin || activeAdminTab !== "clients") {
+  if (!isAdmin || (activeAdminTab !== "home" && activeAdminTab !== "clients")) {
     return;
   }
 
@@ -584,7 +584,7 @@ useEffect(() => {
 }, [isAdmin, activeAdminTab]);
 
 useEffect(() => {
-  if (!isAdmin || activeAdminTab !== "invitations") {
+  if (!isAdmin || (activeAdminTab !== "home" && activeAdminTab !== "invitations")) {
     return;
   }
 
@@ -787,6 +787,10 @@ useEffect(() => {
                   clients={clients}
                   invitations={invitations}
                   projects={projects}
+                  businessesLoading={businessesLoading}
+                  clientsLoading={clientsLoading}
+                  invitationsLoading={invitationsLoading}
+                  projectsLoading={projectsLoading}
                   onTabChange={setActiveAdminTab}
                 />
               )}
@@ -1003,12 +1007,20 @@ function AdminOverview({
   clients,
   invitations,
   projects,
+  businessesLoading,
+  clientsLoading,
+  invitationsLoading,
+  projectsLoading,
   onTabChange,
 }: {
   businesses: Business[];
   clients: Client[];
   invitations: Invitation[];
   projects: ConnectedProject[];
+  businessesLoading: boolean;
+  clientsLoading: boolean;
+  invitationsLoading: boolean;
+  projectsLoading: boolean;
   onTabChange: (tab: AdminTab) => void;
 }) {
   return (
@@ -1016,7 +1028,7 @@ function AdminOverview({
       <AdminCard
         eyebrow="Management"
         title="Επιχειρήσεις"
-        description={`${businesses.length} συνολικά`}
+        description={businessesLoading ? "Φόρτωση…" : `${businesses.length} συνολικά`}
         onClick={() =>
           onTabChange("businesses")
         }
@@ -1025,7 +1037,7 @@ function AdminOverview({
       <AdminCard
         eyebrow="Accounts"
         title="Clients"
-        description={`${clients.length} συνολικά`}
+        description={clientsLoading ? "Φόρτωση…" : `${clients.length} συνολικά`}
         onClick={() =>
           onTabChange("clients")
         }
@@ -1034,7 +1046,7 @@ function AdminOverview({
       <AdminCard
         eyebrow="Custom projects"
         title="Projects"
-        description={`${projects.length} συνολικά`}
+        description={projectsLoading ? "Φόρτωση…" : `${projects.length} συνολικά`}
         onClick={() =>
           onTabChange("projects")
         }
@@ -1043,7 +1055,7 @@ function AdminOverview({
       <AdminCard
         eyebrow="Invitations"
         title="Προσκλήσεις"
-        description={`${invitations.length} συνολικά`}
+        description={invitationsLoading ? "Φόρτωση…" : `${invitations.length} συνολικά`}
         onClick={() =>
           onTabChange("invitations")
         }
