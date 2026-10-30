@@ -847,10 +847,28 @@ export default async function handler(
         limit: "10000",
       });
 
+    const appointmentsAnalyticsQuery =
+      new URLSearchParams({
+        business_id:
+          `eq.${businessId}`,
+
+        select: [
+          "starts_at",
+          "status",
+          "created_at",
+          "updated_at",
+        ].join(","),
+
+        order: "created_at.desc",
+
+        limit: "10000",
+      });
+
     const [
       businessResponse,
       locationResponse,
       eventsResponse,
+      appointmentsAnalyticsResponse,
     ] = await Promise.all([
       supabaseRequest({
         supabaseUrl,
@@ -875,12 +893,21 @@ export default async function handler(
         path:
           `/rest/v1/analytics_events?${eventsQuery.toString()}`,
       }),
+
+      supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+
+        path:
+          `/rest/v1/appointments?${appointmentsAnalyticsQuery.toString()}`,
+      }),
     ]);
 
     if (
       !businessResponse.ok ||
       !locationResponse.ok ||
-      !eventsResponse.ok
+      !eventsResponse.ok ||
+      !appointmentsAnalyticsResponse.ok
     ) {
       const businessError =
         await businessResponse.text();
@@ -891,12 +918,17 @@ export default async function handler(
       const eventsError =
         await eventsResponse.text();
 
+      const appointmentsError =
+        await appointmentsAnalyticsResponse.text();
+
       console.error(
         "Analytics data query failed",
         {
           business: businessError,
           location: locationError,
           events: eventsError,
+          appointments:
+            appointmentsError,
         },
       );
 
@@ -910,10 +942,12 @@ export default async function handler(
       businesses,
       locations,
       rawEvents,
+      analyticsAppointments,
     ] = await Promise.all([
       businessResponse.json(),
       locationResponse.json(),
       eventsResponse.json(),
+      appointmentsAnalyticsResponse.json(),
     ]);
 
     const business =
@@ -964,6 +998,67 @@ export default async function handler(
           startOfMonth,
       );
 
+    const activeAppointments =
+      analyticsAppointments.filter(
+        (appointment) =>
+          appointment.status !==
+          "cancelled",
+      );
+
+    const appointmentStartsToday =
+      activeAppointments.filter(
+        (appointment) => {
+          const startsAt =
+            new Date(
+              appointment.starts_at,
+            );
+
+          return (
+            startsAt >= startOfToday &&
+            startsAt <
+              new Date(
+                startOfToday.getTime() +
+                  24 * 60 * 60 * 1000,
+              )
+          );
+        },
+      );
+
+    const appointmentStartsWeek =
+      activeAppointments.filter(
+        (appointment) =>
+          new Date(
+            appointment.starts_at,
+          ) >= startOfWeek,
+      );
+
+    const appointmentStartsMonth =
+      activeAppointments.filter(
+        (appointment) =>
+          new Date(
+            appointment.starts_at,
+          ) >= startOfMonth,
+      );
+
+    const bookingsCreatedToday =
+      analyticsAppointments.filter(
+        (appointment) =>
+          new Date(
+            appointment.created_at,
+          ) >= startOfToday,
+      );
+
+    const cancelledThisMonth =
+      analyticsAppointments.filter(
+        (appointment) =>
+          appointment.status ===
+            "cancelled" &&
+          new Date(
+            appointment.updated_at ||
+              appointment.created_at,
+          ) >= startOfMonth,
+      );
+
     const pageViewsToday =
       countEvent(
         todayEvents,
@@ -1000,6 +1095,18 @@ export default async function handler(
             (
               (
                 menuOpensToday /
+                pageViewsToday
+              ) * 100
+            ).toFixed(1),
+          )
+        : 0;
+
+    const bookingConversionRate =
+      pageViewsToday > 0
+        ? Number(
+            (
+              (
+                bookingsCreatedToday.length /
                 pageViewsToday
               ) * 100
             ).toFixed(1),
@@ -1069,6 +1176,49 @@ export default async function handler(
           );
         });
 
+      const nextDayAppointments =
+        new Date(nextDay);
+
+      const dayAppointments =
+        activeAppointments.filter(
+          (appointment) => {
+            const startsAt =
+              new Date(
+                appointment.starts_at,
+              );
+
+            return (
+              startsAt >= day &&
+              startsAt <
+                nextDayAppointments
+            );
+          },
+        );
+
+      const dayCancelledAppointments =
+        analyticsAppointments.filter(
+          (appointment) => {
+            if (
+              appointment.status !==
+              "cancelled"
+            ) {
+              return false;
+            }
+
+            const updatedAt =
+              new Date(
+                appointment.updated_at ||
+                  appointment.created_at,
+              );
+
+            return (
+              updatedAt >= day &&
+              updatedAt <
+                nextDayAppointments
+            );
+          },
+        );
+
       dailyActivity.push({
         date:
           day
@@ -1092,6 +1242,12 @@ export default async function handler(
             dayEvents,
             "review_click",
           ),
+
+        appointments:
+          dayAppointments.length,
+
+        cancelled_appointments:
+          dayCancelledAppointments.length,
       });
     }
 
@@ -1156,6 +1312,24 @@ export default async function handler(
 
         review_conversion_rate:
           reviewConversionRate,
+
+        appointments_today:
+          appointmentStartsToday.length,
+
+        appointments_week:
+          appointmentStartsWeek.length,
+
+        appointments_month:
+          appointmentStartsMonth.length,
+
+        appointments_cancelled_month:
+          cancelledThisMonth.length,
+
+        bookings_created_today:
+          bookingsCreatedToday.length,
+
+        booking_conversion_rate:
+          bookingConversionRate,
       },
 
       sources: {
