@@ -510,10 +510,20 @@ async function handleAppointmentBootstrap(
 
     const { business, project } = resolved;
 
+    const busyWindowStart =
+      new Date();
+
+    const busyWindowEnd =
+      new Date(
+        busyWindowStart.getTime() +
+          35 * 24 * 60 * 60 * 1000,
+      );
+
     const [
       servicesResult,
       staffResult,
       availabilityResult,
+      busyResult,
     ] = await Promise.all([
       supabaseAdmin
         .from("appointment_services")
@@ -545,12 +555,31 @@ async function handleAppointmentBootstrap(
         .order("weekday", {
           ascending: true,
         }),
+      supabaseAdmin
+        .from("appointments")
+        .select(
+          "staff_id,starts_at,ends_at",
+        )
+        .eq("business_id", business.id)
+        .neq("status", "cancelled")
+        .gt(
+          "ends_at",
+          busyWindowStart.toISOString(),
+        )
+        .lt(
+          "starts_at",
+          busyWindowEnd.toISOString(),
+        )
+        .order("starts_at", {
+          ascending: true,
+        }),
     ]);
 
     if (
       servicesResult.error ||
       staffResult.error ||
-      availabilityResult.error
+      availabilityResult.error ||
+      busyResult.error
     ) {
       console.error(
         "Appointment bootstrap failed",
@@ -560,6 +589,8 @@ async function handleAppointmentBootstrap(
           staff: staffResult.error,
           availability:
             availabilityResult.error,
+          busy:
+            busyResult.error,
         },
       );
 
@@ -568,12 +599,15 @@ async function handleAppointmentBootstrap(
           ? "appointment_services"
           : staffResult.error
             ? "appointment_staff"
-            : "appointment_availability";
+            : availabilityResult.error
+              ? "appointment_availability"
+              : "appointments";
 
       const failedCode =
         servicesResult.error?.code ||
         staffResult.error?.code ||
         availabilityResult.error?.code ||
+        busyResult.error?.code ||
         null;
 
       return response.status(500).json({
@@ -600,6 +634,8 @@ async function handleAppointmentBootstrap(
         staffResult.data ?? [],
       availability:
         availabilityResult.data ?? [],
+      busy:
+        busyResult.data ?? [],
     });
   } catch (error) {
     console.error(
