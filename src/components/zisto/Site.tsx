@@ -1883,6 +1883,8 @@ type DailyActivity = {
   page_views: number;
   menu_opens: number;
   review_clicks: number;
+  appointments?: number;
+  cancelled_appointments?: number;
 };
 
 type NfcCard = {
@@ -1932,6 +1934,12 @@ type AnalyticsResponse = {
     review_clicks_today: number;
     menu_conversion_rate: number;
     review_conversion_rate: number;
+    appointments_today?: number;
+    appointments_week?: number;
+    appointments_month?: number;
+    appointments_cancelled_month?: number;
+    bookings_created_today?: number;
+    booking_conversion_rate?: number;
   };
   sources: {
     nfc: number;
@@ -2463,6 +2471,18 @@ function AnalyticsTab({
 }: {
   analytics: AnalyticsResponse;
 }) {
+  const modules =
+    analytics.business.dashboard_modules || [];
+
+  const hasAppointments =
+    modules.includes("appointments");
+
+  const hasMenu =
+    modules.includes("menu");
+
+  const hasReviews =
+    modules.includes("reviews");
+
   const totalSources =
     analytics.sources.nfc +
     analytics.sources.qr +
@@ -2470,67 +2490,85 @@ function AnalyticsTab({
     analytics.sources.unknown;
 
   const sourceItems = [
-    {
-      label: "NFC",
-      value: analytics.sources.nfc,
-    },
-    {
-      label: "QR code",
-      value: analytics.sources.qr,
-    },
-    {
-      label: "Direct",
-      value: analytics.sources.direct,
-    },
-    {
-      label: "Άγνωστο",
-      value: analytics.sources.unknown,
-    },
+    { label: "NFC", value: analytics.sources.nfc },
+    { label: "QR code", value: analytics.sources.qr },
+    { label: "Direct", value: analytics.sources.direct },
+    { label: "Άγνωστο", value: analytics.sources.unknown },
   ];
 
-  const maxDailyViews = Math.max(
-    ...analytics.daily_activity.map(
-      (item) => item.page_views,
+  const maxDailyValue = Math.max(
+    ...analytics.daily_activity.map((item) =>
+      hasAppointments
+        ? item.appointments ?? 0
+        : item.page_views,
     ),
     1,
   );
 
+  const primaryMetrics = hasAppointments
+    ? [
+        {
+          label: "Ραντεβού σήμερα",
+          value:
+            analytics.totals.appointments_today ?? 0,
+          note: "Ενεργά ραντεβού για σήμερα",
+        },
+        {
+          label: "Ραντεβού εβδομάδας",
+          value:
+            analytics.totals.appointments_week ?? 0,
+          note: "Ενεργά ραντεβού αυτή την εβδομάδα",
+        },
+        {
+          label: "Ραντεβού μήνα",
+          value:
+            analytics.totals.appointments_month ?? 0,
+          note: "Ενεργά ραντεβού αυτόν τον μήνα",
+        },
+        {
+          label: "Booking conversion",
+          value: `${percentFormatter.format(
+            analytics.totals.booking_conversion_rate ?? 0,
+          )}%`,
+          note: `${analytics.totals.bookings_created_today ?? 0} νέα bookings σήμερα`,
+        },
+      ]
+    : [
+        {
+          label: "Επισκέψεις σήμερα",
+          value: analytics.totals.page_views_today,
+          note: `${analytics.totals.unique_visitors_today} μοναδικοί`,
+        },
+        {
+          label: "Επισκέψεις εβδομάδας",
+          value: analytics.totals.page_views_week,
+          note: `${analytics.totals.unique_visitors_week} μοναδικοί`,
+        },
+        {
+          label: "Επισκέψεις μήνα",
+          value: analytics.totals.page_views_month,
+          note: `${analytics.totals.unique_visitors_month} μοναδικοί`,
+        },
+        {
+          label: "Συνολικό conversion",
+          value: `${percentFormatter.format(
+            Math.max(
+              hasMenu
+                ? analytics.totals.menu_conversion_rate
+                : 0,
+              hasReviews
+                ? analytics.totals.review_conversion_rate
+                : 0,
+            ),
+          )}%`,
+          note: "Καλύτερη σημερινή ενέργεια",
+        },
+      ];
+
   return (
     <div className="space-y-6">
-      {/* Κεντρικές μετρήσεις */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Επισκέψεις σήμερα",
-            value:
-              analytics.totals.page_views_today,
-            note: `${analytics.totals.unique_visitors_today} μοναδικοί`,
-          },
-          {
-            label: "Επισκέψεις εβδομάδας",
-            value:
-              analytics.totals.page_views_week,
-            note: `${analytics.totals.unique_visitors_week} μοναδικοί`,
-          },
-          {
-            label: "Επισκέψεις μήνα",
-            value:
-              analytics.totals.page_views_month,
-            note: `${analytics.totals.unique_visitors_month} μοναδικοί`,
-          },
-          {
-            label: "Συνολικό conversion",
-            value: `${percentFormatter.format(
-              Math.max(
-                analytics.totals
-                  .menu_conversion_rate,
-                analytics.totals
-                  .review_conversion_rate,
-              ),
-            )}%`,
-            note: "Καλύτερη σημερινή ενέργεια",
-          },
-        ].map((item, index) => (
+        {primaryMetrics.map((item, index) => (
           <article
             key={item.label}
             className={`min-h-[190px] rounded-[20px] border p-6 ${
@@ -2551,9 +2589,7 @@ function AnalyticsTab({
 
             <p className="mt-8 text-[44px] font-black leading-none tracking-[-0.05em]">
               {typeof item.value === "number"
-                ? numberFormatter.format(
-                    item.value,
-                  )
+                ? numberFormatter.format(item.value)
                 : item.value}
             </p>
 
@@ -2570,17 +2606,20 @@ function AnalyticsTab({
         ))}
       </section>
 
-      {/* Γράφημα + πηγές */}
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Activity
+                {hasAppointments
+                  ? "Appointments activity"
+                  : "Activity"}
               </p>
 
               <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-                Επισκέψεις τελευταίων 7 ημερών
+                {hasAppointments
+                  ? "Ραντεβού τελευταίων 7 ημερών"
+                  : "Επισκέψεις τελευταίων 7 ημερών"}
               </h2>
             </div>
 
@@ -2590,54 +2629,51 @@ function AnalyticsTab({
           </div>
 
           <div className="mt-10 flex h-[280px] items-end gap-3 md:gap-5">
-            {analytics.daily_activity.map(
-              (item) => {
-                const height =
-                  item.page_views === 0
-                    ? 4
-                    : Math.max(
-                        12,
-                        (item.page_views /
-                          maxDailyViews) *
-                          100,
-                      );
+            {analytics.daily_activity.map((item) => {
+              const value = hasAppointments
+                ? item.appointments ?? 0
+                : item.page_views;
 
-                return (
-                  <div
-                    key={item.date}
-                    className="flex min-w-0 flex-1 flex-col items-center justify-end"
-                  >
-                    <span className="mb-3 text-[10px] font-bold text-[#222]/40">
-                      {item.page_views}
-                    </span>
+              const height =
+                value === 0
+                  ? 4
+                  : Math.max(
+                      12,
+                      (value / maxDailyValue) * 100,
+                    );
 
-                    <div className="flex h-[210px] w-full items-end rounded-[8px] bg-[#F1F1EF]">
-                      <div
-                        className="w-full rounded-[8px] bg-[#222] transition-all duration-500"
-                        style={{
-                          height: `${height}%`,
-                        }}
-                      />
-                    </div>
+              return (
+                <div
+                  key={item.date}
+                  className="flex min-w-0 flex-1 flex-col items-center justify-end"
+                >
+                  <span className="mb-3 text-[10px] font-bold text-[#222]/40">
+                    {value}
+                  </span>
 
-                    <span className="mt-4 text-[9px] font-bold uppercase text-[#222]/35">
-                      {new Intl.DateTimeFormat(
-                        "el-GR",
-                        {
-                          weekday: "short",
-                          timeZone:
-                            "Europe/Athens",
-                        },
-                      ).format(
-                        new Date(
-                          `${item.date}T12:00:00`,
-                        ),
-                      )}
-                    </span>
+                  <div className="flex h-[210px] w-full items-end rounded-[8px] bg-[#F1F1EF]">
+                    <div
+                      className="w-full rounded-[8px] bg-[#222] transition-all duration-500"
+                      style={{ height: `${height}%` }}
+                    />
                   </div>
-                );
-              },
-            )}
+
+                  <span className="mt-4 text-[9px] font-bold uppercase text-[#222]/35">
+                    {new Intl.DateTimeFormat(
+                      "el-GR",
+                      {
+                        weekday: "short",
+                        timeZone: "Europe/Athens",
+                      },
+                    ).format(
+                      new Date(
+                        `${item.date}T12:00:00`,
+                      ),
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </article>
 
@@ -2654,9 +2690,7 @@ function AnalyticsTab({
             {sourceItems.map((source) => {
               const percentage =
                 totalSources > 0
-                  ? (source.value /
-                      totalSources) *
-                    100
+                  ? (source.value / totalSources) * 100
                   : 0;
 
               return (
@@ -2665,25 +2699,16 @@ function AnalyticsTab({
                     <span className="text-[12px] font-bold">
                       {source.label}
                     </span>
-
                     <span className="text-[11px] font-bold text-[#222]/40">
-                      {numberFormatter.format(
-                        source.value,
-                      )}{" "}
-                      ·{" "}
-                      {percentFormatter.format(
-                        percentage,
-                      )}
-                      %
+                      {numberFormatter.format(source.value)} ·{" "}
+                      {percentFormatter.format(percentage)}%
                     </span>
                   </div>
 
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#EEEEEC]">
                     <div
                       className="h-full rounded-full bg-[#DC2727] transition-all duration-500"
-                      style={{
-                        width: `${percentage}%`,
-                      }}
+                      style={{ width: `${percentage}%` }}
                     />
                   </div>
                 </div>
@@ -2693,82 +2718,93 @@ function AnalyticsTab({
         </article>
       </section>
 
-      {/* Conversions */}
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Menu conversion
-          </p>
-
-          <div className="mt-6 flex items-end justify-between gap-4">
-            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-              {percentFormatter.format(
-                analytics.totals
-                  .menu_conversion_rate,
-              )}
-              %
+      {hasAppointments && (
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Booking conversion
             </p>
 
-            <p className="text-right text-[11px] leading-relaxed text-[#222]/40">
-              {
-                analytics.totals
-                  .menu_opens_today
-              }{" "}
-              ανοίγματα σήμερα
-            </p>
-          </div>
-
-          <div className="mt-8 h-3 overflow-hidden rounded-full bg-[#EEEEEC]">
-            <div
-              className="h-full rounded-full bg-[#222]"
-              style={{
-                width: `${Math.min(
+            <div className="mt-6 flex items-end justify-between gap-4">
+              <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
+                {percentFormatter.format(
                   analytics.totals
-                    .menu_conversion_rate,
-                  100,
-                )}%`,
-              }}
-            />
-          </div>
-        </article>
+                    .booking_conversion_rate ?? 0,
+                )}
+                %
+              </p>
 
-        <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
-            Review conversion
-          </p>
+              <p className="text-right text-[11px] leading-relaxed text-[#222]/40">
+                {analytics.totals.bookings_created_today ?? 0} bookings
+                <br />
+                {analytics.totals.page_views_today} visits σήμερα
+              </p>
+            </div>
 
-          <div className="mt-6 flex items-end justify-between gap-4">
-            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-              {percentFormatter.format(
+            <div className="mt-8 h-3 overflow-hidden rounded-full bg-[#EEEEEC]">
+              <div
+                className="h-full rounded-full bg-[#222]"
+                style={{
+                  width: `${Math.min(
+                    analytics.totals
+                      .booking_conversion_rate ?? 0,
+                    100,
+                  )}%`,
+                }}
+              />
+            </div>
+          </article>
+
+          <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
+              Ακυρώσεις μήνα
+            </p>
+
+            <p className="mt-6 text-[54px] font-black leading-none tracking-[-0.06em]">
+              {numberFormatter.format(
                 analytics.totals
-                  .review_conversion_rate,
+                  .appointments_cancelled_month ?? 0,
               )}
-              %
             </p>
 
-            <p className="text-right text-[11px] leading-relaxed text-white/55">
-              {
-                analytics.totals
-                  .review_clicks_today
-              }{" "}
-              clicks σήμερα
+            <p className="mt-5 text-[11px] leading-relaxed text-white/55">
+              Ακυρωμένα ραντεβού μέσα στον τρέχοντα μήνα
             </p>
-          </div>
+          </article>
+        </section>
+      )}
 
-          <div className="mt-8 h-3 overflow-hidden rounded-full bg-white/20">
-            <div
-              className="h-full rounded-full bg-white"
-              style={{
-                width: `${Math.min(
-                  analytics.totals
-                    .review_conversion_rate,
-                  100,
-                )}%`,
-              }}
-            />
-          </div>
-        </article>
-      </section>
+      {!hasAppointments && (hasMenu || hasReviews) && (
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {hasMenu && (
+            <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Menu conversion
+              </p>
+              <p className="mt-6 text-[54px] font-black leading-none tracking-[-0.06em]">
+                {percentFormatter.format(
+                  analytics.totals.menu_conversion_rate,
+                )}
+                %
+              </p>
+            </article>
+          )}
+
+          {hasReviews && (
+            <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
+                Review conversion
+              </p>
+              <p className="mt-6 text-[54px] font-black leading-none tracking-[-0.06em]">
+                {percentFormatter.format(
+                  analytics.totals.review_conversion_rate,
+                )}
+                %
+              </p>
+            </article>
+          )}
+        </section>
+      )}
 
       <RecentActivity
         events={analytics.recent_activity}
