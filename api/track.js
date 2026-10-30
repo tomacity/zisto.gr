@@ -1957,6 +1957,14 @@ async function parseIncomingBody(request) {
     typeof body === "object" &&
     !Array.isArray(body)
   ) {
+    if (
+      typeof body.payload === "string"
+    ) {
+      return JSON.parse(
+        body.payload,
+      );
+    }
+
     return body;
   }
 
