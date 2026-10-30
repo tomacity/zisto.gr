@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const ALLOWED_EVENT_TYPES = new Set([
@@ -21,6 +22,35 @@ function cleanText(value, maxLength = 500) {
   }
 
   return cleaned.slice(0, maxLength);
+}
+
+function getClientIp(request) {
+  const forwarded =
+    cleanText(
+      request.headers["x-forwarded-for"],
+      500,
+    );
+
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() || null;
+  }
+
+  return (
+    cleanText(
+      request.headers["x-real-ip"],
+      120,
+    ) ||
+    cleanText(
+      request.socket?.remoteAddress,
+      120,
+    )
+  );
+}
+
+function hashRateLimitValue(value) {
+  return createHash("sha256")
+    .update(value)
+    .digest("hex");
 }
 
 function cleanMetadata(value) {
@@ -659,6 +689,7 @@ async function handleAppointmentBootstrap(
 async function handleAppointmentBooking(
   supabaseAdmin,
   body,
+  request,
   response,
 ) {
   const projectKey =
@@ -735,6 +766,49 @@ async function handleAppointmentBooking(
     }
 
     const { business, project } = resolved;
+
+    const clientIp =
+      getClientIp(request);
+
+    if (clientIp) {
+      const rateKey =
+        `booking:${business.id}:${hashRateLimitValue(clientIp)}`;
+
+      const {
+        data: rateLimitAllowed,
+        error: rateLimitError,
+      } = await supabaseAdmin.rpc(
+        "check_appointment_rate_limit",
+        {
+          p_key: rateKey,
+          p_limit: 5,
+          p_window_seconds: 600,
+        },
+      );
+
+      if (rateLimitError) {
+        console.error(
+          "Appointment rate limit check failed:",
+          rateLimitError,
+        );
+      } else if (
+        rateLimitAllowed === false
+      ) {
+        response.setHeader(
+          "Retry-After",
+          "600",
+        );
+
+        return response.status(429).json({
+          error:
+            "Too many booking attempts. Please wait a few minutes and try again.",
+        });
+      }
+    } else {
+      console.warn(
+        "Appointment rate limit skipped: client IP unavailable",
+      );
+    }
 
     const {
       data: service,
@@ -1791,6 +1865,7 @@ export default async function handler(request, response) {
     return handleAppointmentBooking(
       supabaseAdmin,
       incomingBody,
+      request,
       response,
     );
   }
