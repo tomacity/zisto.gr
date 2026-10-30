@@ -1280,24 +1280,68 @@ async function handleAppointmentManage(
       business?.timezone ||
       "Europe/Athens";
 
-    const {
-      data: availability,
-      error: availabilityError,
-    } = await supabaseAdmin
-      .from("appointment_availability")
-      .select(
-        "id,staff_id,weekday,starts_at,ends_at,is_active",
-      )
-      .eq(
-        "business_id",
-        appointment.business_id,
-      )
-      .eq("is_active", true);
+    const busyWindowStart =
+      new Date();
 
-    if (availabilityError) {
+    const busyWindowEnd =
+      new Date(
+        busyWindowStart.getTime() +
+          35 * 24 * 60 * 60 * 1000,
+      );
+
+    const [
+      availabilityResult,
+      busyResult,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("appointment_availability")
+        .select(
+          "id,staff_id,weekday,starts_at,ends_at,is_active",
+        )
+        .eq(
+          "business_id",
+          appointment.business_id,
+        )
+        .eq("is_active", true),
+      supabaseAdmin
+        .from("appointments")
+        .select(
+          "staff_id,starts_at,ends_at",
+        )
+        .eq(
+          "business_id",
+          appointment.business_id,
+        )
+        .neq(
+          "id",
+          appointment.id,
+        )
+        .neq("status", "cancelled")
+        .gt(
+          "ends_at",
+          busyWindowStart.toISOString(),
+        )
+        .lt(
+          "starts_at",
+          busyWindowEnd.toISOString(),
+        )
+        .order("starts_at", {
+          ascending: true,
+        }),
+    ]);
+
+    if (
+      availabilityResult.error ||
+      busyResult.error
+    ) {
       console.error(
-        "Manage appointment availability failed:",
-        availabilityError,
+        "Manage appointment setup failed:",
+        {
+          availability:
+            availabilityResult.error,
+          busy:
+            busyResult.error,
+        },
       );
 
       return response.status(500).json({
@@ -1305,6 +1349,12 @@ async function handleAppointmentManage(
           "Could not load appointment availability",
       });
     }
+
+    const availability =
+      availabilityResult.data ?? [];
+
+    const busy =
+      busyResult.data ?? [];
 
     return response.status(200).json({
       appointment: {
@@ -1327,8 +1377,8 @@ async function handleAppointmentManage(
           business?.name || "",
         timezone: timeZone,
       },
-      availability:
-        availability ?? [],
+      availability,
+      busy,
     });
   } catch (error) {
     console.error(
