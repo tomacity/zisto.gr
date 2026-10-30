@@ -1309,8 +1309,6 @@ async function handleAppointmentManage(
     return response.status(200).json({
       appointment: {
         id: appointment.id,
-        public_token:
-          appointment.public_token,
         starts_at:
           appointment.starts_at,
         ends_at:
@@ -1384,6 +1382,16 @@ async function handleAppointmentPublicCancel(
       return response.status(200).json({
         success: true,
         already_cancelled: true,
+      });
+    }
+
+    if (
+      new Date(appointment.starts_at) <=
+      new Date()
+    ) {
+      return response.status(409).json({
+        error:
+          "Past appointments cannot be cancelled",
       });
     }
 
@@ -1494,6 +1502,16 @@ async function handleAppointmentPublicReschedule(
       return response.status(409).json({
         error:
           "Cancelled appointments cannot be changed",
+      });
+    }
+
+    if (
+      new Date(appointment.starts_at) <=
+      new Date()
+    ) {
+      return response.status(409).json({
+        error:
+          "Past appointments cannot be changed",
       });
     }
 
