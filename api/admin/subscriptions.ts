@@ -640,6 +640,233 @@ export default async function handler(
 
     const body = request.body ?? {};
 
+    if (
+      request.method === "POST" &&
+      body.action === "create_checkout"
+    ) {
+      const stripeSecretKey =
+        process.env.STRIPE_SECRET_KEY;
+
+      if (!stripeSecretKey) {
+        return response.status(500).json({
+          error:
+            "Stripe is not configured yet",
+        });
+      }
+
+      const subscriptionId =
+        cleanText(body.id, 100);
+
+      if (!subscriptionId) {
+        return response.status(400).json({
+          error:
+            "Subscription ID is required",
+        });
+      }
+
+      const {
+        data: subscription,
+        error: subscriptionError,
+      } = await supabaseAdmin
+        .from("subscriptions")
+        .select(`
+          id,
+          business_id,
+          billing_email,
+          amount_cents,
+          currency,
+          vat_rate,
+          billing_interval_months,
+          stripe_customer_id,
+          stripe_subscription_id,
+          businesses (
+            id,
+            name,
+            slug
+          )
+        `)
+        .eq("id", subscriptionId)
+        .single();
+
+      if (
+        subscriptionError ||
+        !subscription
+      ) {
+        return response.status(404).json({
+          error:
+            "Subscription not found",
+        });
+      }
+
+      if (
+        subscription.stripe_subscription_id
+      ) {
+        return response.status(409).json({
+          error:
+            "Stripe subscription is already connected",
+        });
+      }
+
+      if (!subscription.billing_email) {
+        return response.status(400).json({
+          error:
+            "Billing email is required before creating checkout",
+        });
+      }
+
+      const businessRelation =
+        Array.isArray(
+          subscription.businesses,
+        )
+          ? subscription.businesses[0]
+          : subscription.businesses;
+
+      const businessName =
+        businessRelation?.name ??
+        "Zisto subscription";
+
+      const totalAmountCents =
+        Math.round(
+          subscription.amount_cents *
+            (1 +
+              Number(
+                subscription.vat_rate,
+              ) /
+                100),
+        );
+
+      const appUrl = (
+        process.env.APP_URL ??
+        "https://zisto.app"
+      ).replace(/\/$/, "");
+
+      const form =
+        new URLSearchParams();
+
+      form.set("mode", "subscription");
+      form.set(
+        "client_reference_id",
+        subscription.business_id,
+      );
+      form.set(
+        "customer_email",
+        subscription.billing_email,
+      );
+      form.set(
+        "success_url",
+        `${appUrl}/#/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      );
+      form.set(
+        "cancel_url",
+        `${appUrl}/#/dashboard?billing=cancelled`,
+      );
+      form.set(
+        "payment_method_types[0]",
+        "card",
+      );
+      form.set(
+        "payment_method_types[1]",
+        "sepa_debit",
+      );
+      form.set(
+        "line_items[0][quantity]",
+        "1",
+      );
+      form.set(
+        "line_items[0][price_data][currency]",
+        (
+          subscription.currency ??
+          "EUR"
+        ).toLowerCase(),
+      );
+      form.set(
+        "line_items[0][price_data][unit_amount]",
+        String(totalAmountCents),
+      );
+      form.set(
+        "line_items[0][price_data][product_data][name]",
+        `Zisto — ${businessName}`,
+      );
+      form.set(
+        "line_items[0][price_data][product_data][description]",
+        `Custom Zisto subscription · ${subscription.billing_interval_months} month billing interval`,
+      );
+      form.set(
+        "line_items[0][price_data][recurring][interval]",
+        "month",
+      );
+      form.set(
+        "line_items[0][price_data][recurring][interval_count]",
+        String(
+          subscription.billing_interval_months,
+        ),
+      );
+      form.set(
+        "metadata[business_id]",
+        subscription.business_id,
+      );
+      form.set(
+        "metadata[zisto_subscription_id]",
+        subscription.id,
+      );
+      form.set(
+        "subscription_data[metadata][business_id]",
+        subscription.business_id,
+      );
+      form.set(
+        "subscription_data[metadata][zisto_subscription_id]",
+        subscription.id,
+      );
+
+      if (
+        subscription.stripe_customer_id
+      ) {
+        form.delete("customer_email");
+        form.set(
+          "customer",
+          subscription.stripe_customer_id,
+        );
+      }
+
+      const stripeResponse =
+        await fetch(
+          "https://api.stripe.com/v1/checkout/sessions",
+          {
+            method: "POST",
+            headers: {
+              Authorization:
+                `Bearer ${stripeSecretKey}`,
+              "Content-Type":
+                "application/x-www-form-urlencoded",
+            },
+            body: form.toString(),
+          },
+        );
+
+      const stripeResult =
+        await stripeResponse.json();
+
+      if (!stripeResponse.ok) {
+        console.error(
+          "Stripe checkout creation failed:",
+          stripeResult,
+        );
+
+        return response.status(502).json({
+          error:
+            stripeResult?.error?.message ??
+            "Could not create Stripe checkout",
+        });
+      }
+
+      return response.status(200).json({
+        checkout_url:
+          stripeResult.url,
+        checkout_session_id:
+          stripeResult.id,
+      });
+    }
+
     const businessId =
       cleanText(body.business_id, 100);
 
