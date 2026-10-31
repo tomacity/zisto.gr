@@ -90,6 +90,88 @@ function addMonths(
   return date.toISOString();
 }
 
+function addDays(
+  isoDate: string,
+  days: number,
+) {
+  const date = new Date(isoDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  date.setUTCDate(
+    date.getUTCDate() + days,
+  );
+
+  return date.toISOString();
+}
+
+function nextFutureBillingDate(
+  baseIsoDate: string,
+  intervalMonths: number,
+  now: Date,
+) {
+  let candidate =
+    addMonths(baseIsoDate, intervalMonths);
+
+  while (
+    candidate &&
+    new Date(candidate).getTime() <=
+      now.getTime()
+  ) {
+    candidate =
+      addMonths(
+        candidate,
+        intervalMonths,
+      );
+  }
+
+  return candidate;
+}
+
+async function sendBillingEmail({
+  apiKey,
+  to,
+  subject,
+  html,
+}: {
+  apiKey: string;
+  to: string;
+  subject: string;
+  html: string;
+}) {
+  const emailResponse = await fetch(
+    "https://api.resend.com/emails",
+    {
+      method: "POST",
+      headers: {
+        Authorization:
+          `Bearer ${apiKey}`,
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        from:
+          "Zisto <hello@mail.zisto.app>",
+        to: [to],
+        reply_to: "zisto.gr@gmail.com",
+        subject,
+        html,
+      }),
+    },
+  );
+
+  if (!emailResponse.ok) {
+    const error =
+      await emailResponse.text();
+
+    throw new Error(
+      `Resend error: ${error}`,
+    );
+  }
+}
+
 export default async function handler(
   request: VercelRequest,
   response: VercelResponse,
@@ -135,16 +217,30 @@ export default async function handler(
   const authorization =
     request.headers.authorization ?? "";
 
-  if (!authorization.startsWith("Bearer ")) {
+  const cronSecret =
+    process.env.CRON_SECRET;
+
+  const isCronRequest =
+    request.method === "GET" &&
+    Boolean(cronSecret) &&
+    authorization ===
+      `Bearer ${cronSecret}`;
+
+  if (
+    !isCronRequest &&
+    !authorization.startsWith("Bearer ")
+  ) {
     return response.status(401).json({
       error: "Authentication required",
     });
   }
 
   const accessToken =
-    authorization
-      .slice("Bearer ".length)
-      .trim();
+    isCronRequest
+      ? null
+      : authorization
+          .slice("Bearer ".length)
+          .trim();
 
   const supabaseAdmin = createClient(
     supabaseUrl,
@@ -159,12 +255,295 @@ export default async function handler(
   );
 
   try {
+    if (isCronRequest) {
+      const resendApiKey =
+        process.env.RESEND_API_KEY;
+
+      if (!resendApiKey) {
+        return response.status(500).json({
+          error:
+            "Missing RESEND_API_KEY",
+        });
+      }
+
+      const now = new Date();
+
+      const {
+        data: dueSubscriptions,
+        error: dueError,
+      } = await supabaseAdmin
+        .from("subscriptions")
+        .select(`
+          id,
+          business_id,
+          billing_email,
+          billing_interval_months,
+          billing_status,
+          access_status,
+          next_billing_at,
+          overdue_email_sent_at,
+          suspended_at,
+          suspension_email_sent_at,
+          businesses (
+            id,
+            name
+          )
+        `)
+        .in("billing_status", [
+          "active",
+          "past_due",
+        ])
+        .not(
+          "next_billing_at",
+          "is",
+          null,
+        )
+        .lte(
+          "next_billing_at",
+          now.toISOString(),
+        );
+
+      if (dueError) {
+        console.error(
+          "Subscription cron load failed:",
+          dueError,
+        );
+
+        return response.status(500).json({
+          error:
+            "Could not load due subscriptions",
+        });
+      }
+
+      let markedPastDue = 0;
+      let remindersSent = 0;
+      let suspended = 0;
+      let suspensionEmailsSent = 0;
+
+      for (
+        const subscription of
+          dueSubscriptions ?? []
+      ) {
+        const dueAt =
+          subscription.next_billing_at
+            ? new Date(
+                subscription.next_billing_at,
+              )
+            : null;
+
+        if (
+          !dueAt ||
+          Number.isNaN(
+            dueAt.getTime(),
+          )
+        ) {
+          continue;
+        }
+
+        const overdueDays =
+          Math.floor(
+            (now.getTime() -
+              dueAt.getTime()) /
+              86_400_000,
+          );
+
+        const businessRelation =
+          Array.isArray(
+            subscription.businesses,
+          )
+            ? subscription.businesses[0]
+            : subscription.businesses;
+
+        const businessName =
+          businessRelation?.name ??
+          "την επιχείρησή σου";
+
+        const graceUntil =
+          addDays(
+            dueAt.toISOString(),
+            10,
+          );
+
+        if (
+          subscription.billing_status ===
+          "active"
+        ) {
+          const { error: updateError } =
+            await supabaseAdmin
+              .from("subscriptions")
+              .update({
+                billing_status:
+                  "past_due",
+                access_status:
+                  overdueDays >= 10
+                    ? "suspended"
+                    : "grace_period",
+                payment_due_at:
+                  dueAt.toISOString(),
+                grace_until:
+                  graceUntil,
+                suspended_at:
+                  overdueDays >= 10
+                    ? now.toISOString()
+                    : null,
+                updated_at:
+                  now.toISOString(),
+              })
+              .eq(
+                "id",
+                subscription.id,
+              );
+
+          if (updateError) {
+            console.error(
+              "Past-due update failed:",
+              updateError,
+            );
+            continue;
+          }
+
+          markedPastDue += 1;
+        }
+
+        if (
+          subscription.billing_email &&
+          !subscription.overdue_email_sent_at
+        ) {
+          try {
+            await sendBillingEmail({
+              apiKey: resendApiKey,
+              to:
+                subscription.billing_email,
+              subject:
+                `Εκκρεμής πληρωμή Zisto — ${businessName}`,
+              html: `
+                <div style="font-family:Arial,sans-serif;background:#f4f4f2;padding:40px 16px;">
+                  <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:24px;padding:40px;">
+                    <p style="margin:0 0 12px;color:#dc2727;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">Zisto Billing</p>
+                    <h1 style="margin:0 0 18px;font-size:28px;line-height:1.1;color:#222;">Υπάρχει εκκρεμής πληρωμή.</h1>
+                    <p style="margin:0;color:#555;line-height:1.7;">Η συνδρομή για <strong>${businessName}</strong> έχει περάσει την ημερομηνία χρέωσης. Παρακαλούμε επικοινώνησε μαζί μας για την τακτοποίηση της πληρωμής.</p>
+                    <p style="margin:22px 0 0;color:#777;font-size:13px;line-height:1.6;">Μετά από 10 ημέρες καθυστέρησης η πρόσβαση στην υπηρεσία μπορεί να τεθεί προσωρινά σε παύση.</p>
+                  </div>
+                </div>
+              `,
+            });
+
+            await supabaseAdmin
+              .from("subscriptions")
+              .update({
+                overdue_email_sent_at:
+                  now.toISOString(),
+                updated_at:
+                  now.toISOString(),
+              })
+              .eq(
+                "id",
+                subscription.id,
+              );
+
+            remindersSent += 1;
+          } catch (emailError) {
+            console.error(
+              "Overdue email failed:",
+              emailError,
+            );
+          }
+        }
+
+        if (overdueDays >= 10) {
+          const { error: suspendError } =
+            await supabaseAdmin
+              .from("subscriptions")
+              .update({
+                billing_status:
+                  "past_due",
+                access_status:
+                  "suspended",
+                suspended_at:
+                  subscription.suspended_at ??
+                  now.toISOString(),
+                grace_until:
+                  graceUntil,
+                updated_at:
+                  now.toISOString(),
+              })
+              .eq(
+                "id",
+                subscription.id,
+              );
+
+          if (!suspendError) {
+            suspended += 1;
+          }
+
+          if (
+            subscription.billing_email &&
+            !subscription
+              .suspension_email_sent_at
+          ) {
+            try {
+              await sendBillingEmail({
+                apiKey: resendApiKey,
+                to:
+                  subscription.billing_email,
+                subject:
+                  `Η συνδρομή Zisto τέθηκε σε παύση — ${businessName}`,
+                html: `
+                  <div style="font-family:Arial,sans-serif;background:#f4f4f2;padding:40px 16px;">
+                    <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:24px;padding:40px;">
+                      <p style="margin:0 0 12px;color:#dc2727;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;">Zisto Billing</p>
+                      <h1 style="margin:0 0 18px;font-size:28px;line-height:1.1;color:#222;">Η συνδρομή τέθηκε προσωρινά σε παύση.</h1>
+                      <p style="margin:0;color:#555;line-height:1.7;">Η πληρωμή για <strong>${businessName}</strong> παραμένει εκκρεμής για 10 ημέρες. Η πρόσβαση στο Zisto έχει τεθεί προσωρινά σε παύση.</p>
+                      <p style="margin:22px 0 0;color:#777;font-size:13px;line-height:1.6;">Μόλις τακτοποιηθεί η πληρωμή, η υπηρεσία μπορεί να ενεργοποιηθεί ξανά άμεσα.</p>
+                    </div>
+                  </div>
+                `,
+              });
+
+              await supabaseAdmin
+                .from("subscriptions")
+                .update({
+                  suspension_email_sent_at:
+                    now.toISOString(),
+                  updated_at:
+                    now.toISOString(),
+                })
+                .eq(
+                  "id",
+                  subscription.id,
+                );
+
+              suspensionEmailsSent += 1;
+            } catch (emailError) {
+              console.error(
+                "Suspension email failed:",
+                emailError,
+              );
+            }
+          }
+        }
+      }
+
+      return response.status(200).json({
+        success: true,
+        checked:
+          dueSubscriptions?.length ?? 0,
+        marked_past_due:
+          markedPastDue,
+        reminders_sent:
+          remindersSent,
+        suspended,
+        suspension_emails_sent:
+          suspensionEmailsSent,
+      });
+    }
+
     const {
       data: { user },
       error: userError,
     } =
       await supabaseAdmin.auth.getUser(
-        accessToken,
+        accessToken!,
       );
 
     if (userError || !user) {
@@ -226,6 +605,9 @@ export default async function handler(
           notes,
           stripe_customer_id,
           stripe_subscription_id,
+          overdue_email_sent_at,
+          suspended_at,
+          suspension_email_sent_at,
           created_at,
           updated_at,
           businesses (
@@ -257,6 +639,112 @@ export default async function handler(
     }
 
     const body = request.body ?? {};
+
+    if (
+      request.method === "PATCH" &&
+      body.action === "mark_paid"
+    ) {
+      const id =
+        cleanText(body.id, 100);
+
+      if (!id) {
+        return response.status(400).json({
+          error:
+            "Subscription ID is required",
+        });
+      }
+
+      const {
+        data: existing,
+        error: existingError,
+      } = await supabaseAdmin
+        .from("subscriptions")
+        .select(
+          "id, starts_at, next_billing_at, billing_interval_months",
+        )
+        .eq("id", id)
+        .single();
+
+      if (
+        existingError ||
+        !existing
+      ) {
+        return response.status(404).json({
+          error:
+            "Subscription not found",
+        });
+      }
+
+      const now = new Date();
+
+      const baseDate =
+        existing.next_billing_at ??
+        existing.starts_at;
+
+      const nextBillingAt =
+        nextFutureBillingDate(
+          baseDate,
+          existing.billing_interval_months,
+          now,
+        );
+
+      if (!nextBillingAt) {
+        return response.status(400).json({
+          error:
+            "Could not calculate next billing date",
+        });
+      }
+
+      const {
+        data,
+        error,
+      } = await supabaseAdmin
+        .from("subscriptions")
+        .update({
+          billing_status: "active",
+          access_status: "active",
+          last_paid_at:
+            now.toISOString(),
+          next_billing_at:
+            nextBillingAt,
+          payment_due_at: null,
+          grace_until: null,
+          overdue_email_sent_at:
+            null,
+          suspended_at: null,
+          suspension_email_sent_at:
+            null,
+          updated_at:
+            now.toISOString(),
+        })
+        .eq("id", id)
+        .select(`
+          *,
+          businesses (
+            id,
+            name,
+            slug,
+            status
+          )
+        `)
+        .single();
+
+      if (error) {
+        console.error(
+          "Mark-paid update failed:",
+          error,
+        );
+
+        return response.status(500).json({
+          error:
+            "Could not mark subscription as paid",
+        });
+      }
+
+      return response.status(200).json({
+        subscription: data,
+      });
+    }
 
     const businessId =
       cleanText(body.business_id, 100);
