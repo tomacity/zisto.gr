@@ -154,6 +154,10 @@ export function SubscriptionsPanel({
     useState("");
   const [saving, setSaving] =
     useState(false);
+  const [
+    openingCheckoutId,
+    setOpeningCheckoutId,
+  ] = useState<string | null>(null);
   const [formError, setFormError] =
     useState("");
 
@@ -334,6 +338,82 @@ export function SubscriptionsPanel({
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openStripeCheckout(
+    subscription: AdminSubscription,
+  ) {
+    try {
+      setOpeningCheckoutId(
+        subscription.id,
+      );
+      setFormError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/subscriptions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action:
+              "create_checkout",
+            id: subscription.id,
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η δημιουργία του Stripe Checkout.",
+        );
+      }
+
+      if (!result.checkout_url) {
+        throw new Error(
+          "Η Stripe δεν επέστρεψε Checkout URL.",
+        );
+      }
+
+      window.location.href =
+        result.checkout_url;
+    } catch (checkoutError) {
+      setFormError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Δεν ήταν δυνατό να ανοίξει το Stripe Checkout.",
+      );
+      setOpeningCheckoutId(null);
     }
   }
 
@@ -608,13 +688,14 @@ export function SubscriptionsPanel({
       </section>
 
       <section className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
-        <div className="hidden grid-cols-[1.35fr_1fr_0.9fr_0.9fr_0.8fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
+        <div className="hidden grid-cols-[1.25fr_1fr_0.8fr_0.8fr_0.8fr_0.9fr_1fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
           <span>Επιχείρηση</span>
           <span>Χρέωση</span>
           <span>Billing</span>
           <span>Access</span>
           <span>Επόμενη</span>
           <span>Email</span>
+          <span>Stripe</span>
         </div>
 
         {subscriptions.length === 0 ? (
@@ -646,7 +727,7 @@ export function SubscriptionsPanel({
                 return (
                   <article
                     key={subscription.id}
-                    className="grid gap-5 px-6 py-6 xl:grid-cols-[1.35fr_1fr_0.9fr_0.9fr_0.8fr_0.9fr] xl:items-center"
+                    className="grid gap-5 px-6 py-6 xl:grid-cols-[1.25fr_1fr_0.8fr_0.8fr_0.8fr_0.9fr_1fr] xl:items-center"
                   >
                     <div>
                       <p className="font-black">
@@ -732,6 +813,37 @@ export function SubscriptionsPanel({
                       {subscription.billing_email ??
                         "—"}
                     </p>
+
+                    <div>
+                      {subscription.stripe_subscription_id ? (
+                        <span className="inline-flex rounded-full bg-green-100 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-green-700">
+                          Connected
+                        </span>
+                      ) : subscription.billing_status === "draft" ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openStripeCheckout(
+                              subscription,
+                            )
+                          }
+                          disabled={
+                            openingCheckoutId ===
+                            subscription.id
+                          }
+                          className="rounded-xl bg-[#635BFF] px-4 py-3 text-[11px] font-black text-white transition hover:bg-[#222] disabled:opacity-50"
+                        >
+                          {openingCheckoutId ===
+                          subscription.id
+                            ? "Άνοιγμα..."
+                            : "Stripe Checkout"}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-[#999]">
+                          —
+                        </span>
+                      )}
+                    </div>
 
                   </article>
                 );
