@@ -154,8 +154,6 @@ export function SubscriptionsPanel({
     useState("");
   const [saving, setSaving] =
     useState(false);
-  const [markingPaidId, setMarkingPaidId] =
-    useState<string | null>(null);
   const [formError, setFormError] =
     useState("");
 
@@ -336,75 +334,6 @@ export function SubscriptionsPanel({
       );
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function markAsPaid(
-    subscription: AdminSubscription,
-  ) {
-    try {
-      setMarkingPaidId(subscription.id);
-      setFormError("");
-
-      const {
-        data: { session },
-        error: sessionError,
-      } =
-        await supabase.auth.getSession();
-
-      if (sessionError) {
-        throw sessionError;
-      }
-
-      if (!session) {
-        window.location.hash = "/login";
-        return;
-      }
-
-      const response = await fetch(
-        "/api/admin/subscriptions",
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type":
-              "application/json",
-            Authorization:
-              `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            id: subscription.id,
-            action: "mark_paid",
-          }),
-        },
-      );
-
-      const result =
-        await response.json();
-
-      if (response.status === 401) {
-        await supabase.auth.signOut();
-        window.location.hash = "/login";
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-            "Could not mark subscription as paid",
-        );
-      }
-
-      onSubscriptionSaved(
-        result.subscription,
-      );
-    } catch (markPaidError) {
-      setFormError(
-        markPaidError instanceof Error
-          ? markPaidError.message
-          : "Δεν ήταν δυνατή η καταχώρηση της πληρωμής.",
-      );
-    } finally {
-      setMarkingPaidId(null);
     }
   }
 
@@ -679,14 +608,13 @@ export function SubscriptionsPanel({
       </section>
 
       <section className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
-        <div className="hidden grid-cols-[1.35fr_1fr_0.9fr_0.9fr_0.8fr_0.9fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
+        <div className="hidden grid-cols-[1.35fr_1fr_0.9fr_0.9fr_0.8fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
           <span>Επιχείρηση</span>
           <span>Χρέωση</span>
           <span>Billing</span>
           <span>Access</span>
           <span>Επόμενη</span>
           <span>Email</span>
-          <span>Ενέργεια</span>
         </div>
 
         {subscriptions.length === 0 ? (
@@ -718,7 +646,7 @@ export function SubscriptionsPanel({
                 return (
                   <article
                     key={subscription.id}
-                    className="grid gap-5 px-6 py-6 xl:grid-cols-[1.35fr_1fr_0.9fr_0.9fr_0.8fr_0.9fr_0.9fr] xl:items-center"
+                    className="grid gap-5 px-6 py-6 xl:grid-cols-[1.35fr_1fr_0.9fr_0.9fr_0.8fr_0.9fr] xl:items-center"
                   >
                     <div>
                       <p className="font-black">
@@ -805,24 +733,6 @@ export function SubscriptionsPanel({
                         "—"}
                     </p>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        markAsPaid(
-                          subscription,
-                        )
-                      }
-                      disabled={
-                        markingPaidId ===
-                        subscription.id
-                      }
-                      className="w-fit rounded-xl border border-black/10 bg-[#F7F5F1] px-4 py-2.5 text-[11px] font-black transition hover:border-[#222] hover:bg-[#222] hover:text-white disabled:opacity-50"
-                    >
-                      {markingPaidId ===
-                      subscription.id
-                        ? "Καταχώρηση..."
-                        : "Πληρώθηκε"}
-                    </button>
                   </article>
                 );
               },
