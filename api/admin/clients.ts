@@ -58,6 +58,11 @@ export default async function handler(
     });
   }
 
+  const requestedView =
+    typeof request.query.view === "string"
+      ? request.query.view
+      : null;
+
   const supabaseUrl = process.env.SUPABASE_URL;
 
   const supabaseAdminKey =
@@ -130,6 +135,21 @@ export default async function handler(
     if (!adminRecord) {
       return response.status(403).json({
         error: "Zisto admin access required",
+        isAdmin: false,
+      });
+    }
+
+    if (
+      request.method === "GET" &&
+      requestedView === "me"
+    ) {
+      return response.status(200).json({
+        isAdmin: true,
+        user: {
+          id: requestingUser.id,
+          email:
+            requestingUser.email ?? null,
+        },
       });
     }
 
