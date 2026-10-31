@@ -1360,7 +1360,7 @@ function LoginPage() {
 
     async function redirectLoggedInUser(accessToken: string) {
     try {
-      const response = await fetch("/api/admin/me", {
+      const response = await fetch("/api/admin/clients?view=me", {
         method: "GET",
         headers: {
           Authorization: `Bearer ${accessToken}`,
