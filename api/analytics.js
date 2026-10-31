@@ -812,7 +812,7 @@ export default async function handler(
         id: `eq.${businessId}`,
 
         select:
-          "id,name,slug,timezone,dashboard_modules",
+          "id,name,slug,timezone,dashboard_modules,status",
 
         limit: "1",
       });
@@ -922,6 +922,50 @@ export default async function handler(
     if (!business) {
       return res.status(404).json({
         error: "Business not found",
+      });
+    }
+
+    const subscriptionQuery =
+      new URLSearchParams({
+        business_id:
+          `eq.${businessId}`,
+        select:
+          "billing_status,access_status,next_billing_at,grace_until",
+        limit: "1",
+      });
+
+    const subscriptionResponse =
+      await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path:
+          `/rest/v1/subscriptions?${subscriptionQuery.toString()}`,
+      });
+
+    let subscriptionState = null;
+
+    if (subscriptionResponse.ok) {
+      const subscriptionRows =
+        await subscriptionResponse.json();
+
+      subscriptionState =
+        subscriptionRows[0] ?? null;
+    }
+
+    if (
+      subscriptionState?.access_status ===
+      "suspended"
+    ) {
+      return res.status(402).json({
+        error: "subscription_suspended",
+        message:
+          "Η συνδρομή σας έχει τεθεί προσωρινά σε παύση λόγω εκκρεμούς πληρωμής.",
+        billing_status:
+          subscriptionState.billing_status,
+        access_status:
+          subscriptionState.access_status,
+        grace_until:
+          subscriptionState.grace_until,
       });
     }
 
