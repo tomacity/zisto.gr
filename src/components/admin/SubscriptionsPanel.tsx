@@ -147,10 +147,6 @@ export function SubscriptionsPanel({
     useState(() =>
       new Date().toISOString().slice(0, 10),
     );
-  const [
-    nextBillingAt,
-    setNextBillingAt,
-  ] = useState("");
   const [notes, setNotes] =
     useState("");
   const [saving, setSaving] =
@@ -228,7 +224,6 @@ export function SubscriptionsPanel({
     setStartsAt(
       new Date().toISOString().slice(0, 10),
     );
-    setNextBillingAt("");
     setNotes("");
     setFormError("");
   }
@@ -302,12 +297,6 @@ export function SubscriptionsPanel({
               new Date(
                 `${startsAt}T00:00:00`,
               ).toISOString(),
-            next_billing_at:
-              nextBillingAt
-                ? new Date(
-                    `${nextBillingAt}T00:00:00`,
-                  ).toISOString()
-                : null,
             notes: notes.trim() || null,
           }),
         },
@@ -571,22 +560,6 @@ export function SubscriptionsPanel({
                   )
                 }
                 required
-                className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none focus:border-[#222]"
-              />
-            </label>
-
-            <label>
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                Επόμενη χρέωση
-              </span>
-              <input
-                type="date"
-                value={nextBillingAt}
-                onChange={(event) =>
-                  setNextBillingAt(
-                    event.target.value,
-                  )
-                }
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none focus:border-[#222]"
               />
             </label>
