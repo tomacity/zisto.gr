@@ -353,7 +353,7 @@ const [invitationsError, setInvitationsError] =
           return;
         }
 
-        const response = await fetch("/api/admin/me", {
+        const response = await fetch("/api/admin/clients?view=me", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${session.access_token}`,
