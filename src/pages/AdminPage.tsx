@@ -2,6 +2,7 @@ import { GlobalLoader } from "../components/ui/GlobalLoader";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { InviteClientPanel } from "../components/admin/InviteClientPanel";
+import { SubscriptionsPanel, type AdminSubscription } from "../components/admin/SubscriptionsPanel";
 
 type AdminTab =
   | "home"
@@ -9,6 +10,7 @@ type AdminTab =
   | "projects"
   | "clients"
   | "invitations"
+  | "subscriptions"
   | "invite";
 
 const ADMIN_TABS: {
@@ -45,6 +47,12 @@ const ADMIN_TABS: {
     label: "Προσκλήσεις",
     description:
       "Έλεγχος ενεργών, ολοκληρωμένων και εκκρεμών προσκλήσεων.",
+  },
+  {
+    id: "subscriptions",
+    label: "Συνδρομές",
+    description:
+      "Custom χρεώσεις, billing status, επόμενες πληρωμές και πρόσβαση ανά επιχείρηση.",
   },
   {
     id: "invite",
@@ -217,6 +225,13 @@ const [invitationsError, setInvitationsError] =
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [businessesLoading, setBusinessesLoading] = useState(false);
   const [businessesError, setBusinessesError] = useState("");
+
+  const [subscriptions, setSubscriptions] =
+    useState<AdminSubscription[]>([]);
+  const [subscriptionsLoading, setSubscriptionsLoading] =
+    useState(false);
+  const [subscriptionsError, setSubscriptionsError] =
+    useState("");
 
   useEffect(() => {
     if (!isAdmin || (activeAdminTab !== "home" && activeAdminTab !== "projects")) {
@@ -664,6 +679,97 @@ useEffect(() => {
     active = false;
   };
 }, [isAdmin, activeAdminTab]);
+
+useEffect(() => {
+  if (
+    !isAdmin ||
+    (
+      activeAdminTab !== "home" &&
+      activeAdminTab !== "subscriptions"
+    )
+  ) {
+    return;
+  }
+
+  let active = true;
+
+  async function loadSubscriptions() {
+    try {
+      setSubscriptionsLoading(true);
+      setSubscriptionsError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/subscriptions",
+        {
+          method: "GET",
+          headers: {
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          cache: "no-store",
+        },
+      );
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Could not load subscriptions",
+        );
+      }
+
+      if (active) {
+        setSubscriptions(
+          result.subscriptions ?? [],
+        );
+      }
+    } catch (loadError) {
+      console.error(
+        "Subscriptions loading failed:",
+        loadError,
+      );
+
+      if (active) {
+        setSubscriptionsError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Δεν ήταν δυνατή η φόρτωση των συνδρομών.",
+        );
+      }
+    } finally {
+      if (active) {
+        setSubscriptionsLoading(false);
+      }
+    }
+  }
+
+  loadSubscriptions();
+
+  return () => {
+    active = false;
+  };
+}, [isAdmin, activeAdminTab]);
   
   if (loading) {
     return (
@@ -787,10 +893,12 @@ useEffect(() => {
                   clients={clients}
                   invitations={invitations}
                   projects={projects}
+                  subscriptions={subscriptions}
                   businessesLoading={businessesLoading}
                   clientsLoading={clientsLoading}
                   invitationsLoading={invitationsLoading}
                   projectsLoading={projectsLoading}
+                  subscriptionsLoading={subscriptionsLoading}
                   onTabChange={setActiveAdminTab}
                 />
               )}
@@ -878,6 +986,37 @@ useEffect(() => {
                           : invitation,
                       ),
                     );
+                  }}
+                />
+              )}
+
+              {activeAdminTab === "subscriptions" && (
+                <SubscriptionsPanel
+                  subscriptions={subscriptions}
+                  businesses={businesses}
+                  loading={subscriptionsLoading}
+                  error={subscriptionsError}
+                  onSubscriptionSaved={(savedSubscription) => {
+                    setSubscriptions((currentSubscriptions) => {
+                      const exists = currentSubscriptions.some(
+                        (subscription) =>
+                          subscription.id === savedSubscription.id,
+                      );
+
+                      if (exists) {
+                        return currentSubscriptions.map(
+                          (subscription) =>
+                            subscription.id === savedSubscription.id
+                              ? savedSubscription
+                              : subscription,
+                        );
+                      }
+
+                      return [
+                        savedSubscription,
+                        ...currentSubscriptions,
+                      ];
+                    });
                   }}
                 />
               )}
@@ -1007,24 +1146,28 @@ function AdminOverview({
   clients,
   invitations,
   projects,
+  subscriptions,
   businessesLoading,
   clientsLoading,
   invitationsLoading,
   projectsLoading,
+  subscriptionsLoading,
   onTabChange,
 }: {
   businesses: Business[];
   clients: Client[];
   invitations: Invitation[];
   projects: ConnectedProject[];
+  subscriptions: AdminSubscription[];
   businessesLoading: boolean;
   clientsLoading: boolean;
   invitationsLoading: boolean;
   projectsLoading: boolean;
+  subscriptionsLoading: boolean;
   onTabChange: (tab: AdminTab) => void;
 }) {
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
       <AdminCard
         eyebrow="Management"
         title="Επιχειρήσεις"
@@ -1059,6 +1202,16 @@ function AdminOverview({
         onClick={() =>
           onTabChange("invitations")
         }
+      />
+
+      <AdminCard
+        eyebrow="Billing"
+        title="Συνδρομές"
+        description={subscriptionsLoading ? "Φόρτωση…" : `${subscriptions.length} συνολικά`}
+        onClick={() =>
+          onTabChange("subscriptions")
+        }
+        dark
       />
     </div>
   );
