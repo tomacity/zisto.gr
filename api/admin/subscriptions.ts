@@ -761,14 +761,6 @@ export default async function handler(
         `${appUrl}/#/dashboard?billing=cancelled`,
       );
       form.set(
-        "payment_method_types[0]",
-        "card",
-      );
-      form.set(
-        "payment_method_types[1]",
-        "sepa_debit",
-      );
-      form.set(
         "line_items[0][quantity]",
         "1",
       );
