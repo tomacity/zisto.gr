@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/admin/subscriptions",
+      "schedule": "0 7 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
