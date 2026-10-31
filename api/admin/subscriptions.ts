@@ -54,6 +54,42 @@ function parseDate(value: unknown) {
   return date.toISOString();
 }
 
+function addMonths(
+  isoDate: string,
+  months: number,
+) {
+  const date = new Date(isoDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  const originalDay = date.getUTCDate();
+
+  date.setUTCDate(1);
+  date.setUTCMonth(
+    date.getUTCMonth() + months,
+  );
+
+  const lastDayOfTargetMonth =
+    new Date(
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth() + 1,
+        0,
+      ),
+    ).getUTCDate();
+
+  date.setUTCDate(
+    Math.min(
+      originalDay,
+      lastDayOfTargetMonth,
+    ),
+  );
+
+  return date.toISOString();
+}
+
 export default async function handler(
   request: VercelRequest,
   response: VercelResponse,
@@ -253,9 +289,6 @@ export default async function handler(
       parseDate(body.starts_at) ??
       new Date().toISOString();
 
-    const nextBillingAt =
-      parseDate(body.next_billing_at);
-
     const paymentDueAt =
       parseDate(body.payment_due_at);
 
@@ -328,12 +361,24 @@ export default async function handler(
 
     if (
       startsAt === undefined ||
-      nextBillingAt === undefined ||
       paymentDueAt === undefined ||
       graceUntil === undefined
     ) {
       return response.status(400).json({
         error: "Invalid billing date",
+      });
+    }
+
+    const nextBillingAt =
+      addMonths(
+        startsAt,
+        billingIntervalMonths,
+      );
+
+    if (!nextBillingAt) {
+      return response.status(400).json({
+        error:
+          "Could not calculate next billing date",
       });
     }
 
