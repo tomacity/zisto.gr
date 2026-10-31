@@ -294,7 +294,7 @@ export function SubscriptionsPanel({
               Number(
                 billingIntervalMonths,
               ),
-            billing_status: "active",
+            billing_status: "draft",
             access_status: "active",
             starts_at:
               new Date(
