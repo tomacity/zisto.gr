@@ -400,6 +400,84 @@ export default async function handler(
 
     if (
       eventType ===
+      "checkout.session.async_payment_failed"
+    ) {
+      const zistoSubscriptionId =
+        object?.metadata
+          ?.zisto_subscription_id;
+
+      const businessId =
+        object?.metadata
+          ?.business_id ??
+        object?.client_reference_id;
+
+      let query =
+        supabaseAdmin
+          .from(
+            "subscriptions",
+          )
+          .update({
+            billing_status:
+              "past_due",
+            access_status:
+              "grace_period",
+            payment_due_at:
+              new Date()
+                .toISOString(),
+            grace_until:
+              addDays(
+                new Date()
+                  .toISOString(),
+                10,
+              ),
+            overdue_email_sent_at:
+              null,
+            suspended_at:
+              null,
+            suspension_email_sent_at:
+              null,
+            updated_at:
+              new Date()
+                .toISOString(),
+          });
+
+      if (
+        typeof zistoSubscriptionId ===
+          "string" &&
+        zistoSubscriptionId
+      ) {
+        query = query.eq(
+          "id",
+          zistoSubscriptionId,
+        );
+      } else if (
+        typeof businessId ===
+          "string" &&
+        businessId
+      ) {
+        query = query.eq(
+          "business_id",
+          businessId,
+        );
+      } else {
+        return response
+          .status(200)
+          .json({
+            received: true,
+            ignored: true,
+          });
+      }
+
+      const { error } =
+        await query;
+
+      if (error) {
+        throw error;
+      }
+    }
+
+    if (
+      eventType ===
       "invoice.paid"
     ) {
       const invoice =
