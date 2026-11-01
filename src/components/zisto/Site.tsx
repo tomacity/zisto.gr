@@ -6400,6 +6400,16 @@ function DashboardPage({
         );
       }
 
+      if (
+        typeof result.checkout_url ===
+          "string" &&
+        result.checkout_url
+      ) {
+        window.location.href =
+          result.checkout_url;
+        return;
+      }
+
       window.location.reload();
     } catch (error) {
       console.error(
