@@ -382,7 +382,7 @@ export default async function handler(
           business_id:
             `eq.${businessId}`,
           select:
-            "id,billing_status,access_status,stripe_subscription_id,cancel_at_period_end",
+            "id,business_id,billing_email,amount_cents,currency,vat_rate,billing_interval_months,billing_status,access_status,stripe_customer_id,stripe_subscription_id,cancel_at_period_end,businesses(name)",
           limit: "1",
         });
 
@@ -418,10 +418,22 @@ export default async function handler(
         !subscription
           .stripe_subscription_id
       ) {
-        const nextState =
+        if (
           action ===
           "cancel_subscription"
-            ? {
+        ) {
+          const localUpdateResponse =
+            await supabaseRequest({
+              supabaseUrl,
+              supabaseSecretKey,
+              path:
+                `/rest/v1/subscriptions?id=eq.${subscription.id}`,
+              method: "PATCH",
+              headers: {
+                Prefer:
+                  "return=representation",
+              },
+              body: {
                 billing_status:
                   "cancelled",
                 access_status:
@@ -431,52 +443,223 @@ export default async function handler(
                 cancellation_requested_at:
                   new Date()
                     .toISOString(),
-              }
-            : {
-                billing_status:
-                  "draft",
-                access_status:
-                  "active",
-                cancel_at_period_end:
-                  false,
-                cancellation_requested_at:
-                  null,
-              };
+                updated_at:
+                  new Date()
+                    .toISOString(),
+              },
+            });
 
-        const localUpdateResponse =
-          await supabaseRequest({
-            supabaseUrl,
-            supabaseSecretKey,
-            path:
-              `/rest/v1/subscriptions?id=eq.${subscription.id}`,
-            method: "PATCH",
-            headers: {
-              Prefer:
-                "return=representation",
-            },
-            body: {
-              ...nextState,
-              updated_at:
-                new Date()
-                  .toISOString(),
-            },
-          });
+          if (
+            !localUpdateResponse.ok
+          ) {
+            return res.status(500).json({
+              error:
+                "Could not update subscription",
+            });
+          }
 
-        if (
-          !localUpdateResponse.ok
-        ) {
-          return res.status(500).json({
-            error:
-              "Could not update subscription",
+          const localRows =
+            await localUpdateResponse.json();
+
+          return res.status(200).json({
+            subscription:
+              localRows[0] ?? null,
           });
         }
 
-        const localRows =
-          await localUpdateResponse.json();
+        if (!subscription.billing_email) {
+          return res.status(400).json({
+            error:
+              "Billing email is required before creating checkout",
+          });
+        }
+
+        const stripeSecretKey =
+          process.env.STRIPE_SECRET_KEY;
+
+        if (!stripeSecretKey) {
+          return res.status(500).json({
+            error:
+              "Stripe is not configured",
+          });
+        }
+
+        const totalAmountCents =
+          Math.round(
+            Number(
+              subscription.amount_cents,
+            ) *
+              (1 +
+                Number(
+                  subscription.vat_rate,
+                ) /
+                  100),
+          );
+
+        const businessRelation =
+          Array.isArray(
+            subscription.businesses,
+          )
+            ? subscription.businesses[0]
+            : subscription.businesses;
+
+        const businessName =
+          businessRelation?.name ??
+          "Zisto subscription";
+
+        const requestOrigin =
+          typeof req.headers.origin ===
+            "string" &&
+          /^https?:\/\//.test(
+            req.headers.origin,
+          )
+            ? req.headers.origin
+            : null;
+
+        const appUrl = (
+          requestOrigin ??
+          process.env.APP_URL ??
+          "https://zisto.app"
+        ).replace(/\/$/, "");
+
+        const form =
+          new URLSearchParams();
+
+        form.set(
+          "mode",
+          "subscription",
+        );
+        form.set(
+          "consent_collection[terms_of_service]",
+          "required",
+        );
+        form.set(
+          "custom_text[terms_of_service_acceptance][message]",
+          "Με την εγγραφή αποδέχεσαι την Πολιτική Πληρωμών & Συνδρομών του Zisto: https://zisto.app/#/payments",
+        );
+        form.set(
+          "custom_text[submit][message]",
+          "Η συνδρομή ανανεώνεται αυτόματα σύμφωνα με τη συμφωνημένη περίοδο χρέωσης. Σε αποτυχημένη πληρωμή ισχύει περίοδος χάριτος 10 ημερών.",
+        );
+        form.set(
+          "client_reference_id",
+          subscription.business_id,
+        );
+        form.set(
+          "customer_email",
+          subscription.billing_email,
+        );
+        form.set(
+          "success_url",
+          `${appUrl}/#/dashboard?business=${encodeURIComponent(
+            subscription.business_id,
+          )}&billing=success&session_id={CHECKOUT_SESSION_ID}`,
+        );
+        form.set(
+          "cancel_url",
+          `${appUrl}/#/dashboard?business=${encodeURIComponent(
+            subscription.business_id,
+          )}&billing=cancelled`,
+        );
+        form.set(
+          "line_items[0][quantity]",
+          "1",
+        );
+        form.set(
+          "line_items[0][price_data][currency]",
+          (
+            subscription.currency ??
+            "EUR"
+          ).toLowerCase(),
+        );
+        form.set(
+          "line_items[0][price_data][unit_amount]",
+          String(totalAmountCents),
+        );
+        form.set(
+          "line_items[0][price_data][product_data][name]",
+          `Zisto — ${businessName}`,
+        );
+        form.set(
+          "line_items[0][price_data][product_data][description]",
+          `Custom Zisto subscription · ${subscription.billing_interval_months} month billing interval`,
+        );
+        form.set(
+          "line_items[0][price_data][recurring][interval]",
+          "month",
+        );
+        form.set(
+          "line_items[0][price_data][recurring][interval_count]",
+          String(
+            subscription.billing_interval_months,
+          ),
+        );
+        form.set(
+          "metadata[business_id]",
+          subscription.business_id,
+        );
+        form.set(
+          "metadata[zisto_subscription_id]",
+          subscription.id,
+        );
+        form.set(
+          "subscription_data[metadata][business_id]",
+          subscription.business_id,
+        );
+        form.set(
+          "subscription_data[metadata][zisto_subscription_id]",
+          subscription.id,
+        );
+
+        if (
+          subscription.stripe_customer_id
+        ) {
+          form.delete(
+            "customer_email",
+          );
+          form.set(
+            "customer",
+            subscription.stripe_customer_id,
+          );
+        }
+
+        const stripeResponse =
+          await fetch(
+            "https://api.stripe.com/v1/checkout/sessions",
+            {
+              method: "POST",
+              headers: {
+                Authorization:
+                  `Bearer ${stripeSecretKey}`,
+                "Content-Type":
+                  "application/x-www-form-urlencoded",
+              },
+              body:
+                form.toString(),
+            },
+          );
+
+        const stripeResult =
+          await stripeResponse.json();
+
+        if (!stripeResponse.ok) {
+          console.error(
+            "Client Stripe checkout creation failed:",
+            stripeResult,
+          );
+
+          return res.status(502).json({
+            error:
+              stripeResult?.error?.message ??
+              "Could not create Stripe checkout",
+          });
+        }
 
         return res.status(200).json({
-          subscription:
-            localRows[0] ?? null,
+          checkout_url:
+            stripeResult.url,
+          checkout_session_id:
+            stripeResult.id,
         });
       }
 
