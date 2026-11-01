@@ -1305,6 +1305,13 @@ function Footer() {
           >
             Πολιτική Cookies
           </a>
+
+          <a
+            href="/#/payments"
+            className="transition-colors duration-300 hover:text-white"
+          >
+            Πολιτική Πληρωμών
+          </a>
         
           <button
             type="button"
@@ -6667,6 +6674,193 @@ function CookiePolicyPage() {
 }
 
 /* ================================================================== */
+/*  PAYMENT POLICY                                                    */
+/* ================================================================== */
+
+function PaymentPolicyPage() {
+  return (
+    <main className="min-h-screen bg-white font-sans text-[#222]">
+      <header className="border-b border-black/10">
+        <div className="mx-auto flex h-20 w-full max-w-[1100px] items-center justify-between px-5 md:px-10">
+          <a href="/#/" aria-label="Zisto — αρχική">
+            <img
+              src={WORDMARK}
+              alt="Zisto"
+              className="h-7 w-auto"
+              draggable={false}
+            />
+          </a>
+
+          <a
+            href="/#/"
+            className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#222]/60 transition hover:text-[#222]"
+          >
+            ← Πίσω
+          </a>
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-[900px] px-5 py-20 md:px-10 md:py-28">
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
+          Billing
+        </p>
+
+        <h1 className="mt-5 text-[13vw] font-black leading-[0.9] tracking-[-0.045em] md:text-[64px]">
+          Πολιτική Πληρωμών
+          <br />
+          & Συνδρομών.
+        </h1>
+
+        <p className="mt-8 max-w-2xl text-[16px] leading-relaxed text-[#222]/60">
+          Η παρούσα πολιτική περιγράφει τον τρόπο χρέωσης,
+          ανανέωσης, ακύρωσης και διαχείρισης καθυστερημένων
+          πληρωμών για τις υπηρεσίες Zisto.
+        </p>
+
+        <div className="mt-16 space-y-14 border-t border-black/10 pt-14">
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              01 — Χρέωση
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Custom τιμή ανά επιχείρηση
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Η τιμή και η περίοδος χρέωσης συμφωνούνται
+              ξεχωριστά με κάθε επιχείρηση. Πριν από την πρώτη
+              πληρωμή εμφανίζονται το ποσό, η συχνότητα χρέωσης
+              και τυχόν εφαρμοζόμενος ΦΠΑ.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              02 — Αυτόματη ανανέωση
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Η συνδρομή ανανεώνεται αυτόματα
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Με την ολοκλήρωση της πρώτης πληρωμής, ο πελάτης
+              εξουσιοδοτεί την επαναλαμβανόμενη χρέωση σύμφωνα
+              με τη συμφωνημένη περίοδο. Η συνδρομή συνεχίζεται
+              μέχρι να ακυρωθεί.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              03 — Τρόποι πληρωμής
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Ασφαλής επεξεργασία μέσω Stripe
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Οι ηλεκτρονικές πληρωμές επεξεργάζονται μέσω
+              Stripe. Οι διαθέσιμες μέθοδοι μπορεί να
+              περιλαμβάνουν κάρτα, Apple Pay, Google Pay,
+              SEPA Direct Debit ή άλλες συμβατές μεθόδους,
+              ανάλογα με τη χώρα, τη συσκευή και τη
+              διαθεσιμότητα του παρόχου.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              04 — Αποτυχημένη πληρωμή
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              10 ημέρες περίοδος χάριτος
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Αν μια επαναλαμβανόμενη πληρωμή αποτύχει, η
+              συνδρομή μεταφέρεται σε κατάσταση καθυστέρησης
+              και αποστέλλεται σχετική ενημέρωση. Η πρόσβαση
+              παραμένει διαθέσιμη για έως 10 ημερολογιακές
+              ημέρες από την ημερομηνία οφειλής.
+            </p>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Αν η οφειλή δεν τακτοποιηθεί εντός της περιόδου
+              χάριτος, η υπηρεσία μπορεί να τεθεί προσωρινά σε
+              παύση. Μετά από επιτυχημένη πληρωμή, η πρόσβαση
+              επανενεργοποιείται αυτόματα.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              05 — Ακύρωση
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Ακύρωση πριν από την επόμενη ανανέωση
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Η ακύρωση μπορεί να ζητηθεί οποιαδήποτε στιγμή
+              πριν από την επόμενη ημερομηνία χρέωσης. Εκτός
+              αν συμφωνηθεί διαφορετικά, η ακύρωση ισχύει για
+              την επόμενη ανανέωση και η ήδη πληρωμένη περίοδος
+              παραμένει ενεργή μέχρι τη λήξη της.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              06 — Επιστροφές χρημάτων
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Refunds και λανθασμένες χρεώσεις
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Πληρωμές για περίοδο υπηρεσίας που έχει ήδη
+              ξεκινήσει δεν επιστρέφονται αναλογικά, εκτός αν
+              υπάρχει λανθασμένη ή διπλή χρέωση, αδυναμία
+              παροχής της συμφωνημένης υπηρεσίας ή άλλη
+              περίπτωση όπου απαιτείται επιστροφή από την
+              εφαρμοστέα νομοθεσία.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              07 — Ειδική συμφωνία
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Η γραπτή συμφωνία υπερισχύει
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Επειδή οι υπηρεσίες Zisto διαμορφώνονται custom,
+              μπορεί να συμφωνηθούν ειδικοί εμπορικοί όροι με
+              συγκεκριμένο πελάτη. Σε περίπτωση διαφοράς,
+              υπερισχύει η ειδική γραπτή συμφωνία, με την
+              επιφύλαξη τυχόν υποχρεωτικών διατάξεων του νόμου.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              08 — Επικοινωνία
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Θέμα με πληρωμή ή συνδρομή;
+            </h2>
+            <a
+              href="mailto:zisto.gr@gmail.com"
+              className="mt-5 inline-block text-[15px] font-bold underline decoration-[#DC2727] decoration-2 underline-offset-4"
+            >
+              zisto.gr@gmail.com
+            </a>
+          </section>
+        </div>
+
+        <p className="mt-20 border-t border-black/10 pt-6 text-[11px] uppercase tracking-[0.18em] text-[#222]/35">
+          Τελευταία ενημέρωση — Νοέμβριος 2026
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/* ================================================================== */
 /*  ROOT                                                              */
 /* ================================================================== */
 function LandingPage() {
@@ -6755,6 +6949,10 @@ useEffect(() => {
 
   if (route === "/privacy") {
     return <PrivacyPolicyPage />;
+  }
+
+  if (route === "/payments") {
+    return <PaymentPolicyPage />;
   }
 
   if (route === "/login") {
