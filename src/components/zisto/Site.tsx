@@ -3727,27 +3727,72 @@ function SettingsTab({
     try {
       setUploadingAvatar(true);
 
-      const extension =
-        file.type === "image/png"
-          ? "png"
-          : file.type === "image/webp"
-            ? "webp"
-            : "jpg";
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const signedResponse =
+        await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            analytics.business_id,
+          )}&view=business-avatar-upload`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              content_type: file.type,
+            }),
+          },
+        );
+
+      const signedResult =
+        await signedResponse.json();
+
+      if (!signedResponse.ok) {
+        throw new Error(
+          signedResult.error ||
+            "Δεν ήταν δυνατή η προετοιμασία του upload.",
+        );
+      }
 
       const objectPath =
-        `${analytics.business_id}/avatar.${extension}`;
+        signedResult.path;
+
+      const uploadToken =
+        signedResult.token;
+
+      if (
+        typeof objectPath !==
+          "string" ||
+        typeof uploadToken !==
+          "string"
+      ) {
+        throw new Error(
+          "Το upload token δεν είναι έγκυρο.",
+        );
+      }
 
       const {
         error: uploadError,
       } = await supabase.storage
         .from("business-avatars")
-        .upload(
+        .uploadToSignedUrl(
           objectPath,
+          uploadToken,
           file,
           {
-            upsert: true,
-            contentType: file.type,
-            cacheControl: "3600",
+            contentType:
+              file.type,
           },
         );
 
@@ -3760,15 +3805,6 @@ function SettingsTab({
       } = supabase.storage
         .from("business-avatars")
         .getPublicUrl(objectPath);
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        window.location.hash = "/login";
-        return;
-      }
 
       const profileImageUrl =
         `${publicData.publicUrl}?v=${Date.now()}`;
