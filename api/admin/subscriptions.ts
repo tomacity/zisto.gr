@@ -187,14 +187,112 @@ async function sendBillingEmail({
   }
 }
 
+async function stripeRequestJson(
+  path: string,
+  secretKey: string,
+) {
+  const controller =
+    new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    6000,
+  );
+
+  try {
+    const response = await fetch(
+      `https://api.stripe.com${path}`,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${secretKey}`,
+        },
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Stripe request failed: ${response.status}`,
+      );
+    }
+
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function stripeSimulationNow({
+  stripeSubscriptionId,
+  stripeSecretKey,
+}: {
+  stripeSubscriptionId: string;
+  stripeSecretKey: string;
+}) {
+  try {
+    const stripeSubscription =
+      await stripeRequestJson(
+        `/v1/subscriptions/${encodeURIComponent(
+          stripeSubscriptionId,
+        )}`,
+        stripeSecretKey,
+      );
+
+    const clockRef =
+      stripeSubscription?.test_clock;
+
+    const clockId =
+      typeof clockRef === "string"
+        ? clockRef
+        : typeof clockRef?.id ===
+            "string"
+          ? clockRef.id
+          : null;
+
+    if (!clockId) {
+      return null;
+    }
+
+    const clock =
+      await stripeRequestJson(
+        `/v1/test_helpers/test_clocks/${encodeURIComponent(
+          clockId,
+        )}`,
+        stripeSecretKey,
+      );
+
+    if (
+      typeof clock?.frozen_time !==
+      "number"
+    ) {
+      return null;
+    }
+
+    return new Date(
+      clock.frozen_time * 1000,
+    );
+  } catch (error) {
+    console.warn(
+      "Stripe test clock lookup failed:",
+      error,
+    );
+
+    return null;
+  }
+}
+
 async function runBillingAutomation({
   supabaseAdmin,
   resendApiKey,
   now = new Date(),
+  stripeSecretKey,
+  useStripeTestClock = false,
 }: {
   supabaseAdmin: SupabaseClient;
   resendApiKey: string;
   now?: Date;
+  stripeSecretKey?: string;
+  useStripeTestClock?: boolean;
 }) {
   const {
     data: dueSubscriptions,
@@ -212,6 +310,7 @@ async function runBillingAutomation({
       overdue_email_sent_at,
       suspended_at,
       suspension_email_sent_at,
+      stripe_subscription_id,
       businesses (
         id,
         name
@@ -241,6 +340,28 @@ async function runBillingAutomation({
     const subscription of
       dueSubscriptions ?? []
   ) {
+    let effectiveNow = now;
+
+    if (
+      useStripeTestClock &&
+      stripeSecretKey &&
+      subscription
+        .stripe_subscription_id
+    ) {
+      const simulatedNow =
+        await stripeSimulationNow({
+          stripeSubscriptionId:
+            subscription
+              .stripe_subscription_id,
+          stripeSecretKey,
+        });
+
+      if (simulatedNow) {
+        effectiveNow =
+          simulatedNow;
+      }
+    }
+
     const dueAt =
       subscription.payment_due_at
         ? new Date(
@@ -292,7 +413,7 @@ async function runBillingAutomation({
           grace_until:
             graceUntilIso,
           updated_at:
-            now.toISOString(),
+            effectiveNow.toISOString(),
         })
         .eq(
           "id",
@@ -335,9 +456,9 @@ async function runBillingAutomation({
           .from("subscriptions")
           .update({
             overdue_email_sent_at:
-              now.toISOString(),
+              effectiveNow.toISOString(),
             updated_at:
-              now.toISOString(),
+              effectiveNow.toISOString(),
           })
           .eq(
             "id",
@@ -354,7 +475,7 @@ async function runBillingAutomation({
     }
 
     if (
-      now.getTime() >=
+      effectiveNow.getTime() >=
       new Date(
         graceUntilIso,
       ).getTime()
@@ -370,11 +491,11 @@ async function runBillingAutomation({
             "suspended",
           suspended_at:
             subscription.suspended_at ??
-            now.toISOString(),
+            effectiveNow.toISOString(),
           grace_until:
             graceUntilIso,
           updated_at:
-            now.toISOString(),
+            effectiveNow.toISOString(),
         })
         .eq(
           "id",
@@ -413,9 +534,9 @@ async function runBillingAutomation({
             .from("subscriptions")
             .update({
               suspension_email_sent_at:
-                now.toISOString(),
+                effectiveNow.toISOString(),
               updated_at:
-                now.toISOString(),
+                effectiveNow.toISOString(),
             })
             .eq(
               "id",
@@ -686,6 +807,13 @@ export default async function handler(
           await runBillingAutomation({
             supabaseAdmin,
             resendApiKey,
+            stripeSecretKey:
+              process.env
+                .STRIPE_SECRET_KEY,
+            useStripeTestClock:
+              process.env
+                .VERCEL_ENV !==
+              "production",
           });
 
         return response
