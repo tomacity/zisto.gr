@@ -873,11 +873,11 @@ export function SubscriptionsPanel({
             <table className="hidden w-full table-fixed border-collapse xl:table">
               <colgroup>
                 <col style={{ width: "16%" }} />
-                <col style={{ width: "16%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "14%" }} />
                 <col style={{ width: "12%" }} />
                 <col style={{ width: "12%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "20%" }} />
+                <col style={{ width: "19%" }} />
                 <col style={{ width: "12%" }} />
               </colgroup>
 
@@ -965,7 +965,7 @@ export function SubscriptionsPanel({
                         </td>
 
                         <td className="h-[96px] border-l border-black/[0.05] px-5">
-                          <span className={`inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.1em] ${
+                          <span className={`inline-flex max-w-full items-center justify-center whitespace-normal break-words rounded-full px-2.5 py-1.5 text-center text-[9px] font-black uppercase leading-4 tracking-[0.08em] ${
                             subscription.billing_status ===
                             "past_due"
                               ? "bg-red-100 text-red-700"
@@ -981,7 +981,7 @@ export function SubscriptionsPanel({
                         </td>
 
                         <td className="h-[96px] border-l border-black/[0.05] px-5">
-                          <span className={`inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.1em] ${
+                          <span className={`inline-flex max-w-full items-center justify-center whitespace-normal break-words rounded-full px-2.5 py-1.5 text-center text-[9px] font-black uppercase leading-4 tracking-[0.08em] ${
                             subscription.access_status ===
                             "suspended"
                               ? "bg-red-100 text-red-700"
