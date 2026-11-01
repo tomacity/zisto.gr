@@ -6069,6 +6069,16 @@ function DashboardPage({
   const [userEmail, setUserEmail] = useState("");
   const [awaitingApproval, setAwaitingApproval] = useState(false);
   const [subscriptionSuspended, setSubscriptionSuspended] = useState(false);
+  const [
+    subscriptionBlockReason,
+    setSubscriptionBlockReason,
+  ] = useState<
+    "cancelled" | "payment" | null
+  >(null);
+  const [
+    reactivatingSubscription,
+    setReactivatingSubscription,
+  ] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
@@ -6164,6 +6174,7 @@ function DashboardPage({
             setAnalytics(data);
             setAwaitingApproval(false);
             setSubscriptionSuspended(false);
+            setSubscriptionBlockReason(null);
 
             const tutorialKey = `zisto_tutorial_${session.user.id}`;
 
@@ -6182,16 +6193,24 @@ function DashboardPage({
             ) {
               setAwaitingApproval(true);
               setSubscriptionSuspended(false);
+              setSubscriptionBlockReason(null);
               setAnalyticsError(null);
             } else if (
               error instanceof AnalyticsRequestError &&
               error.status === 402
             ) {
               setSubscriptionSuspended(true);
+              setSubscriptionBlockReason(
+                error.message ===
+                  "subscription_cancelled"
+                  ? "cancelled"
+                  : "payment",
+              );
               setAwaitingApproval(false);
               setAnalyticsError(null);
             } else {
               setSubscriptionSuspended(false);
+              setSubscriptionBlockReason(null);
               setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
             }
           }
@@ -6335,7 +6354,73 @@ function DashboardPage({
     );
   }
 
+  async function reactivateCancelledSubscription() {
+    try {
+      setReactivatingSubscription(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const query = businessId
+        ? `?business_id=${encodeURIComponent(
+            businessId,
+          )}&view=subscription`
+        : "?view=subscription";
+
+      const response = await fetch(
+        `/api/analytics${query}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action:
+              "resume_renewal",
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η επανενεργοποίηση.",
+        );
+      }
+
+      window.location.reload();
+    } catch (error) {
+      console.error(
+        "Subscription reactivation failed:",
+        error,
+      );
+      setAnalyticsError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η επανενεργοποίηση.",
+      );
+    } finally {
+      setReactivatingSubscription(false);
+    }
+  }
+
   if (subscriptionSuspended) {
+    const isCancelled =
+      subscriptionBlockReason ===
+      "cancelled";
+
     return (
       <main className="grid min-h-screen place-items-center bg-[#F6F6F4] px-6 font-sans text-[#222]">
         <section className="w-full max-w-2xl rounded-[32px] border border-black/10 bg-white p-8 text-center shadow-sm sm:p-12">
@@ -6346,20 +6431,44 @@ function DashboardPage({
             draggable={false}
           />
           <p className="mt-10 text-[11px] font-black uppercase tracking-[0.24em] text-[#DC2727]">
-            Συνδρομή σε παύση
+            {isCancelled
+              ? "Συνδρομή ακυρωμένη"
+              : "Συνδρομή σε παύση"}
           </p>
           <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
-            Η πρόσβασή σου έχει τεθεί προσωρινά σε παύση.
+            {isCancelled
+              ? "Η συνδρομή σου ακυρώθηκε."
+              : "Η πρόσβασή σου έχει τεθεί προσωρινά σε παύση."}
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#666] sm:text-base">
-            Υπάρχει εκκρεμής πληρωμή για την υπηρεσία Zisto. Μόλις τακτοποιηθεί, η πρόσβαση στο dashboard θα ενεργοποιηθεί ξανά.
+            {isCancelled
+              ? "Η αυτόματη συνδρομή Zisto έχει ακυρωθεί. Μπορείς να την επανενεργοποιήσεις και να συνεχίσεις από εκεί που σταμάτησες."
+              : "Υπάρχει εκκρεμής πληρωμή για την υπηρεσία Zisto. Μόλις τακτοποιηθεί, η πρόσβαση στο dashboard θα ενεργοποιηθεί ξανά."}
           </p>
-          <a
-            href="mailto:zisto.gr@gmail.com"
-            className="mt-8 inline-flex rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727]"
-          >
-            Επικοινωνία με Zisto
-          </a>
+
+          {isCancelled ? (
+            <button
+              type="button"
+              disabled={
+                reactivatingSubscription
+              }
+              onClick={() =>
+                void reactivateCancelledSubscription()
+              }
+              className="mt-8 inline-flex rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+            >
+              {reactivatingSubscription
+                ? "Επανενεργοποίηση..."
+                : "Επανενεργοποίηση συνδρομής"}
+            </button>
+          ) : (
+            <a
+              href="mailto:zisto.gr@gmail.com"
+              className="mt-8 inline-flex rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727]"
+            >
+              Επικοινωνία με Zisto
+            </a>
+          )}
           <button
             type="button"
             onClick={async () => {
