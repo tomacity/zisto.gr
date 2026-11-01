@@ -859,14 +859,14 @@ export function SubscriptionsPanel({
       </section>
 
       <section className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
-        <div className="hidden grid-cols-[1.25fr_1fr_0.8fr_0.8fr_0.8fr_0.9fr_1fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
-          <span>Επιχείρηση</span>
-          <span>Χρέωση</span>
-          <span>Billing</span>
-          <span>Access</span>
-          <span>Επόμενη</span>
-          <span>Email</span>
-          <span>Stripe</span>
+        <div className="hidden grid-cols-[1.35fr_1.15fr_0.9fr_0.9fr_1fr_1.05fr_0.95fr] border-b border-black/[0.06] bg-[#F7F5F1] text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
+          <span className="flex min-h-14 items-center px-6">Επιχείρηση</span>
+          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Χρέωση</span>
+          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Billing</span>
+          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Access</span>
+          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Επόμενη</span>
+          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Email</span>
+          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Stripe</span>
         </div>
 
         {subscriptions.length === 0 ? (
@@ -898,9 +898,9 @@ export function SubscriptionsPanel({
                 return (
                   <article
                     key={subscription.id}
-                    className="grid gap-5 px-6 py-6 xl:grid-cols-[1.25fr_1fr_0.8fr_0.8fr_0.8fr_0.9fr_1fr] xl:items-center"
+                    className="grid gap-5 px-6 py-6 xl:grid-cols-[1.35fr_1.15fr_0.9fr_0.9fr_1fr_1.05fr_0.95fr] xl:gap-0 xl:px-0 xl:py-0 xl:items-stretch"
                   >
-                    <div>
+                    <div className="xl:flex xl:min-h-[92px] xl:flex-col xl:justify-center xl:px-6">
                       <p className="font-black">
                         {business?.name ??
                           "Άγνωστη επιχείρηση"}
@@ -912,7 +912,7 @@ export function SubscriptionsPanel({
                       </p>
                     </div>
 
-                    <div>
+                    <div className="xl:flex xl:min-h-[92px] xl:flex-col xl:justify-center xl:border-l xl:border-black/[0.05] xl:px-5">
                       <p className="font-black">
                         {formatMoney(
                           subscription.amount_cents,
@@ -936,6 +936,7 @@ export function SubscriptionsPanel({
                       </p>
                     </div>
 
+                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
                     <span className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${
                       subscription.billing_status ===
                       "past_due"
@@ -949,7 +950,9 @@ export function SubscriptionsPanel({
                         subscription.billing_status,
                       )}
                     </span>
+                    </div>
 
+                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
                     <span className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${
                       subscription.access_status ===
                       "suspended"
@@ -963,8 +966,9 @@ export function SubscriptionsPanel({
                         subscription.access_status,
                       )}
                     </span>
+                    </div>
 
-                    <div>
+                    <div className="xl:flex xl:min-h-[92px] xl:flex-col xl:justify-center xl:border-l xl:border-black/[0.05] xl:px-5">
                       <p className="text-sm font-bold">
                         {formatDate(
                           subscription.next_billing_at,
@@ -980,12 +984,14 @@ export function SubscriptionsPanel({
                       )}
                     </div>
 
-                    <p className="truncate text-sm text-[#666]">
-                      {subscription.billing_email ??
-                        "—"}
-                    </p>
+                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
+                      <p className="min-w-0 truncate text-sm text-[#666]">
+                        {subscription.billing_email ??
+                          "—"}
+                      </p>
+                    </div>
 
-                    <div>
+                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
                       {subscription.stripe_subscription_id ? (
                         <span className="inline-flex rounded-full bg-green-100 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-green-700">
                           Connected
