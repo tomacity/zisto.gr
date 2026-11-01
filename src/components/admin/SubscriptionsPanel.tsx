@@ -859,16 +859,6 @@ export function SubscriptionsPanel({
       </section>
 
       <section className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
-        <div className="hidden grid-cols-[1.35fr_1.15fr_0.9fr_0.9fr_1fr_1.05fr_0.95fr] border-b border-black/[0.06] bg-[#F7F5F1] text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
-          <span className="flex min-h-14 items-center px-6">Επιχείρηση</span>
-          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Χρέωση</span>
-          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Billing</span>
-          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Access</span>
-          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Επόμενη</span>
-          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Email</span>
-          <span className="flex min-h-14 items-center border-l border-black/[0.05] px-5">Stripe</span>
-        </div>
-
         {subscriptions.length === 0 ? (
           <div className="p-10 text-center">
             <h3 className="text-xl font-black">
@@ -879,154 +869,313 @@ export function SubscriptionsPanel({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-black/8">
-            {subscriptions.map(
-              (subscription) => {
-                const business =
-                  businessOf(
-                    subscription,
-                  );
+          <>
+            <table className="hidden w-full table-fixed border-collapse xl:table">
+              <colgroup>
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "20%" }} />
+                <col style={{ width: "12%" }} />
+              </colgroup>
 
-                const totalCents =
-                  subscription.amount_cents *
-                  (1 +
-                    Number(
-                      subscription.vat_rate,
-                    ) /
-                      100);
+              <thead className="bg-[#F7F5F1] text-left text-[10px] font-bold uppercase tracking-[0.18em] text-[#777]">
+                <tr className="border-b border-black/[0.06]">
+                  <th className="h-14 px-6 font-bold">
+                    Επιχείρηση
+                  </th>
+                  <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
+                    Χρέωση
+                  </th>
+                  <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
+                    Billing
+                  </th>
+                  <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
+                    Access
+                  </th>
+                  <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
+                    Επόμενη
+                  </th>
+                  <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
+                    Email
+                  </th>
+                  <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
+                    Stripe
+                  </th>
+                </tr>
+              </thead>
 
-                return (
-                  <article
-                    key={subscription.id}
-                    className="grid gap-5 px-6 py-6 xl:grid-cols-[1.35fr_1.15fr_0.9fr_0.9fr_1fr_1.05fr_0.95fr] xl:gap-0 xl:px-0 xl:py-0 xl:items-stretch"
-                  >
-                    <div className="xl:flex xl:min-h-[92px] xl:flex-col xl:justify-center xl:px-6">
-                      <p className="font-black">
-                        {business?.name ??
-                          "Άγνωστη επιχείρηση"}
-                      </p>
-                      <p className="mt-1 font-mono text-[10px] text-[#999]">
-                        {business?.slug
-                          ? `/${business.slug}`
-                          : subscription.business_id}
-                      </p>
-                    </div>
+              <tbody className="divide-y divide-black/[0.06]">
+                {subscriptions.map(
+                  (subscription) => {
+                    const business =
+                      businessOf(
+                        subscription,
+                      );
 
-                    <div className="xl:flex xl:min-h-[92px] xl:flex-col xl:justify-center xl:border-l xl:border-black/[0.05] xl:px-5">
-                      <p className="font-black">
-                        {formatMoney(
-                          subscription.amount_cents,
-                          subscription.currency,
-                        )}
-                      </p>
-                      <p className="mt-1 text-xs text-[#777]">
-                        {intervalLabel(
-                          subscription.billing_interval_months,
-                        )}{" "}
-                        · {subscription.vat_rate}% ΦΠΑ
-                      </p>
-                      <p className="mt-1 text-[10px] text-[#999]">
-                        Σύνολο{" "}
-                        {formatMoney(
-                          Math.round(
-                            totalCents,
-                          ),
-                          subscription.currency,
-                        )}
-                      </p>
-                    </div>
+                    const totalCents =
+                      subscription.amount_cents *
+                      (1 +
+                        Number(
+                          subscription.vat_rate,
+                        ) /
+                          100);
 
-                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
-                    <span className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${
-                      subscription.billing_status ===
-                      "past_due"
-                        ? "bg-red-100 text-red-700"
-                        : subscription.billing_status ===
-                          "active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-[#F1F1EF] text-[#666]"
-                    }`}>
-                      {billingStatusLabel(
-                        subscription.billing_status,
-                      )}
-                    </span>
-                    </div>
+                    return (
+                      <tr
+                        key={subscription.id}
+                        className="align-middle"
+                      >
+                        <td className="h-[96px] px-6">
+                          <p className="font-black">
+                            {business?.name ??
+                              "Άγνωστη επιχείρηση"}
+                          </p>
+                          <p className="mt-1 font-mono text-[10px] text-[#999]">
+                            {business?.slug
+                              ? `/${business.slug}`
+                              : subscription.business_id}
+                          </p>
+                        </td>
 
-                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
-                    <span className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${
-                      subscription.access_status ===
-                      "suspended"
-                        ? "bg-red-100 text-red-700"
-                        : subscription.access_status ===
-                          "grace_period"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-[#F1F1EF] text-[#555]"
-                    }`}>
-                      {accessStatusLabel(
-                        subscription.access_status,
-                      )}
-                    </span>
-                    </div>
+                        <td className="h-[96px] border-l border-black/[0.05] px-5">
+                          <p className="font-black">
+                            {formatMoney(
+                              subscription.amount_cents,
+                              subscription.currency,
+                            )}
+                          </p>
+                          <p className="mt-1 text-xs leading-4 text-[#777]">
+                            {intervalLabel(
+                              subscription.billing_interval_months,
+                            )}{" "}
+                            · {subscription.vat_rate}% ΦΠΑ
+                          </p>
+                          <p className="mt-1 text-[10px] text-[#999]">
+                            Σύνολο{" "}
+                            {formatMoney(
+                              Math.round(
+                                totalCents,
+                              ),
+                              subscription.currency,
+                            )}
+                          </p>
+                        </td>
 
-                    <div className="xl:flex xl:min-h-[92px] xl:flex-col xl:justify-center xl:border-l xl:border-black/[0.05] xl:px-5">
-                      <p className="text-sm font-bold">
-                        {formatDate(
-                          subscription.next_billing_at,
-                        )}
-                      </p>
-                      {subscription.payment_due_at && (
-                        <p className="mt-1 text-[10px] text-[#999]">
-                          Due{" "}
-                          {formatDate(
-                            subscription.payment_due_at,
+                        <td className="h-[96px] border-l border-black/[0.05] px-5">
+                          <span className={`inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.1em] ${
+                            subscription.billing_status ===
+                            "past_due"
+                              ? "bg-red-100 text-red-700"
+                              : subscription.billing_status ===
+                                "active"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-[#F1F1EF] text-[#666]"
+                          }`}>
+                            {billingStatusLabel(
+                              subscription.billing_status,
+                            )}
+                          </span>
+                        </td>
+
+                        <td className="h-[96px] border-l border-black/[0.05] px-5">
+                          <span className={`inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.1em] ${
+                            subscription.access_status ===
+                            "suspended"
+                              ? "bg-red-100 text-red-700"
+                              : subscription.access_status ===
+                                "grace_period"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-[#F1F1EF] text-[#555]"
+                          }`}>
+                            {accessStatusLabel(
+                              subscription.access_status,
+                            )}
+                          </span>
+                        </td>
+
+                        <td className="h-[96px] border-l border-black/[0.05] px-5">
+                          <p className="text-sm font-bold leading-5">
+                            {formatDate(
+                              subscription.next_billing_at,
+                            )}
+                          </p>
+                          {subscription.payment_due_at && (
+                            <p className="mt-1 text-[10px] leading-4 text-[#999]">
+                              Due{" "}
+                              {formatDate(
+                                subscription.payment_due_at,
+                              )}
+                            </p>
                           )}
+                        </td>
+
+                        <td className="h-[96px] border-l border-black/[0.05] px-5">
+                          <p className="truncate text-sm text-[#666]">
+                            {subscription.billing_email ??
+                              "—"}
+                          </p>
+                        </td>
+
+                        <td className="h-[96px] border-l border-black/[0.05] px-5">
+                          {subscription.stripe_subscription_id ? (
+                            <span className="inline-flex rounded-full bg-green-100 px-3 py-2 text-[9px] font-black uppercase tracking-[0.1em] text-green-700">
+                              Connected
+                            </span>
+                          ) : subscription.billing_status === "draft" ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openStripeCheckout(
+                                  subscription,
+                                )
+                              }
+                              disabled={
+                                openingCheckoutId ===
+                                subscription.id
+                              }
+                              className="rounded-xl bg-[#635BFF] px-3 py-2.5 text-[10px] font-black text-white transition hover:bg-[#222] disabled:opacity-50"
+                            >
+                              {openingCheckoutId ===
+                              subscription.id
+                                ? "Άνοιγμα..."
+                                : "Stripe Checkout"}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-[#999]">
+                              —
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  },
+                )}
+              </tbody>
+            </table>
+
+            <div className="divide-y divide-black/[0.06] xl:hidden">
+              {subscriptions.map(
+                (subscription) => {
+                  const business =
+                    businessOf(
+                      subscription,
+                    );
+
+                  const totalCents =
+                    subscription.amount_cents *
+                    (1 +
+                      Number(
+                        subscription.vat_rate,
+                      ) /
+                        100);
+
+                  return (
+                    <article
+                      key={subscription.id}
+                      className="space-y-5 p-6"
+                    >
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
+                          Επιχείρηση
                         </p>
-                      )}
-                    </div>
+                        <p className="mt-2 font-black">
+                          {business?.name ??
+                            "Άγνωστη επιχείρηση"}
+                        </p>
+                        <p className="mt-1 font-mono text-[10px] text-[#999]">
+                          {business?.slug
+                            ? `/${business.slug}`
+                            : subscription.business_id}
+                        </p>
+                      </div>
 
-                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
-                      <p className="min-w-0 truncate text-sm text-[#666]">
-                        {subscription.billing_email ??
-                          "—"}
-                      </p>
-                    </div>
+                      <div className="grid grid-cols-2 gap-5">
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
+                            Χρέωση
+                          </p>
+                          <p className="mt-2 font-black">
+                            {formatMoney(
+                              subscription.amount_cents,
+                              subscription.currency,
+                            )}
+                          </p>
+                          <p className="mt-1 text-xs text-[#777]">
+                            {intervalLabel(
+                              subscription.billing_interval_months,
+                            )}{" "}
+                            · {subscription.vat_rate}% ΦΠΑ
+                          </p>
+                          <p className="mt-1 text-[10px] text-[#999]">
+                            Σύνολο{" "}
+                            {formatMoney(
+                              Math.round(
+                                totalCents,
+                              ),
+                              subscription.currency,
+                            )}
+                          </p>
+                        </div>
 
-                    <div className="xl:flex xl:min-h-[92px] xl:items-center xl:border-l xl:border-black/[0.05] xl:px-5">
-                      {subscription.stripe_subscription_id ? (
-                        <span className="inline-flex rounded-full bg-green-100 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-green-700">
-                          Connected
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
+                            Επόμενη
+                          </p>
+                          <p className="mt-2 text-sm font-bold">
+                            {formatDate(
+                              subscription.next_billing_at,
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`inline-flex rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] ${
+                          subscription.billing_status ===
+                          "past_due"
+                            ? "bg-red-100 text-red-700"
+                            : subscription.billing_status ===
+                              "active"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-[#F1F1EF] text-[#666]"
+                        }`}>
+                          {billingStatusLabel(
+                            subscription.billing_status,
+                          )}
                         </span>
-                      ) : subscription.billing_status === "draft" ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openStripeCheckout(
-                              subscription,
-                            )
-                          }
-                          disabled={
-                            openingCheckoutId ===
-                            subscription.id
-                          }
-                          className="rounded-xl bg-[#635BFF] px-4 py-3 text-[11px] font-black text-white transition hover:bg-[#222] disabled:opacity-50"
-                        >
-                          {openingCheckoutId ===
-                          subscription.id
-                            ? "Άνοιγμα..."
-                            : "Stripe Checkout"}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-[#999]">
-                          —
+                        <span className={`inline-flex rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] ${
+                          subscription.access_status ===
+                          "suspended"
+                            ? "bg-red-100 text-red-700"
+                            : subscription.access_status ===
+                              "grace_period"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-[#F1F1EF] text-[#555]"
+                        }`}>
+                          {accessStatusLabel(
+                            subscription.access_status,
+                          )}
                         </span>
-                      )}
-                    </div>
+                      </div>
 
-                  </article>
-                );
-              },
-            )}
-          </div>
+                      <div className="border-t border-black/[0.06] pt-4">
+                        <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
+                          Billing email
+                        </p>
+                        <p className="mt-2 break-all text-sm text-[#666]">
+                          {subscription.billing_email ??
+                            "—"}
+                        </p>
+                      </div>
+                    </article>
+                  );
+                },
+              )}
+            </div>
+          </>
         )}
       </section>
     </div>
