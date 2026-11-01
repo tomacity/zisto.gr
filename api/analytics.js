@@ -1254,10 +1254,17 @@ export default async function handler(
       subscriptionState?.access_status ===
       "suspended"
     ) {
+      const isCancelled =
+        subscriptionState.billing_status ===
+        "cancelled";
+
       return res.status(402).json({
-        error: "subscription_suspended",
-        message:
-          "Η συνδρομή σας έχει τεθεί προσωρινά σε παύση λόγω εκκρεμούς πληρωμής.",
+        error: isCancelled
+          ? "subscription_cancelled"
+          : "subscription_suspended",
+        message: isCancelled
+          ? "Η συνδρομή σας έχει ακυρωθεί."
+          : "Η συνδρομή σας έχει τεθεί προσωρινά σε παύση λόγω εκκρεμούς πληρωμής.",
         billing_status:
           subscriptionState.billing_status,
         access_status:
