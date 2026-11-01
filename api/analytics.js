@@ -771,6 +771,130 @@ export default async function handler(
     }
 
     if (
+      requestedView === "business-avatar-upload" &&
+      req.method === "POST"
+    ) {
+      if (
+        !isAdmin &&
+        !["owner", "manager"].includes(
+          membership?.role ?? "",
+        )
+      ) {
+        return res.status(403).json({
+          error:
+            "You cannot upload an image for this business",
+        });
+      }
+
+      const body = req.body ?? {};
+
+      const contentType =
+        typeof body.content_type === "string"
+          ? body.content_type
+          : "";
+
+      const extensionByType = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+      };
+
+      const extension =
+        extensionByType[contentType];
+
+      if (!extension) {
+        return res.status(400).json({
+          error:
+            "Only JPG, PNG and WebP images are supported",
+        });
+      }
+
+      const randomPart =
+        Math.random()
+          .toString(36)
+          .slice(2, 10);
+
+      const objectPath =
+        `${businessId}/avatar-${Date.now()}-${randomPart}.${extension}`;
+
+      const encodedObjectPath =
+        objectPath
+          .split("/")
+          .map(encodeURIComponent)
+          .join("/");
+
+      const signedUploadResponse =
+        await fetch(
+          `${supabaseUrl}/storage/v1/object/upload/sign/business-avatars/${encodedObjectPath}`,
+          {
+            method: "POST",
+            headers: {
+              apikey:
+                supabaseSecretKey,
+              Authorization:
+                `Bearer ${supabaseSecretKey}`,
+              "Content-Type":
+                "application/json",
+            },
+            body: "{}",
+          },
+        );
+
+      const signedUploadResult =
+        await signedUploadResponse.json();
+
+      if (!signedUploadResponse.ok) {
+        console.error(
+          "Signed avatar upload URL creation failed:",
+          signedUploadResult,
+        );
+
+        return res.status(502).json({
+          error:
+            signedUploadResult?.message ??
+            signedUploadResult?.error ??
+            "Could not create avatar upload URL",
+        });
+      }
+
+      const relativeSignedUrl =
+        signedUploadResult.url;
+
+      if (
+        typeof relativeSignedUrl !==
+        "string"
+      ) {
+        return res.status(502).json({
+          error:
+            "Supabase did not return an upload token",
+        });
+      }
+
+      const signedUrl =
+        new URL(
+          relativeSignedUrl,
+          `${supabaseUrl}/storage/v1`,
+        );
+
+      const token =
+        signedUrl.searchParams.get(
+          "token",
+        );
+
+      if (!token) {
+        return res.status(502).json({
+          error:
+            "Supabase did not return an upload token",
+        });
+      }
+
+      return res.status(200).json({
+        path: objectPath,
+        token,
+      });
+    }
+
+    if (
       requestedView === "business-profile" &&
       req.method === "PATCH"
     ) {
