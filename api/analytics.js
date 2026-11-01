@@ -179,7 +179,8 @@ export default async function handler(
 
   if (
     req.method !== "GET" &&
-    req.method !== "PATCH"
+    req.method !== "PATCH" &&
+    req.method !== "POST"
   ) {
     return res.status(405).json({
       error: "Method not allowed",
