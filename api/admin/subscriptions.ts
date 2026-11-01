@@ -277,10 +277,10 @@ export default async function handler(
           id,
           business_id,
           billing_email,
-          billing_interval_months,
           billing_status,
           access_status,
-          next_billing_at,
+          payment_due_at,
+          grace_until,
           overdue_email_sent_at,
           suspended_at,
           suspension_email_sent_at,
@@ -289,18 +289,14 @@ export default async function handler(
             name
           )
         `)
-        .in("billing_status", [
-          "active",
+        .eq(
+          "billing_status",
           "past_due",
-        ])
+        )
         .not(
-          "next_billing_at",
+          "payment_due_at",
           "is",
           null,
-        )
-        .lte(
-          "next_billing_at",
-          now.toISOString(),
         );
 
       if (dueError) {
@@ -325,9 +321,9 @@ export default async function handler(
           dueSubscriptions ?? []
       ) {
         const dueAt =
-          subscription.next_billing_at
+          subscription.payment_due_at
             ? new Date(
-                subscription.next_billing_at,
+                subscription.payment_due_at,
               )
             : null;
 
@@ -359,33 +355,31 @@ export default async function handler(
           "την επιχείρησή σου";
 
         const graceUntil =
-          addDays(
-            dueAt.toISOString(),
-            10,
-          );
+          subscription.grace_until
+            ? new Date(
+                subscription.grace_until,
+              )
+            : addDays(
+                dueAt.toISOString(),
+                10,
+              );
+
+        const graceUntilIso =
+          graceUntil instanceof Date
+            ? graceUntil.toISOString()
+            : graceUntil;
 
         if (
-          subscription.billing_status ===
-          "active"
+          !subscription.grace_until
         ) {
-          const { error: updateError } =
+          const { error: graceError } =
             await supabaseAdmin
               .from("subscriptions")
               .update({
-                billing_status:
-                  "past_due",
                 access_status:
-                  overdueDays >= 10
-                    ? "suspended"
-                    : "grace_period",
-                payment_due_at:
-                  dueAt.toISOString(),
+                  "grace_period",
                 grace_until:
-                  graceUntil,
-                suspended_at:
-                  overdueDays >= 10
-                    ? now.toISOString()
-                    : null,
+                  graceUntilIso,
                 updated_at:
                   now.toISOString(),
               })
@@ -394,15 +388,13 @@ export default async function handler(
                 subscription.id,
               );
 
-          if (updateError) {
+          if (graceError) {
             console.error(
-              "Past-due update failed:",
-              updateError,
+              "Grace-period sync failed:",
+              graceError,
             );
             continue;
           }
-
-          markedPastDue += 1;
         }
 
         if (
@@ -450,7 +442,12 @@ export default async function handler(
           }
         }
 
-        if (overdueDays >= 10) {
+        if (
+          now.getTime() >=
+          new Date(
+            graceUntilIso,
+          ).getTime()
+        ) {
           const { error: suspendError } =
             await supabaseAdmin
               .from("subscriptions")
@@ -528,6 +525,7 @@ export default async function handler(
         success: true,
         checked:
           dueSubscriptions?.length ?? 0,
+        webhook_past_due_only: true,
         marked_past_due:
           markedPastDue,
         reminders_sent:
