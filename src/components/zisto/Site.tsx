@@ -3550,6 +3550,41 @@ function SettingsTab({
   ] = useState("");
 
   const [
+    avatarCrop,
+    setAvatarCrop,
+  ] = useState<{
+    file: File;
+    url: string;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [avatarZoom, setAvatarZoom] =
+    useState(1);
+  const [
+    avatarOffset,
+    setAvatarOffset,
+  ] = useState({ x: 0, y: 0 });
+  const avatarDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+
+  const AVATAR_CROP_SIZE = 300;
+
+  useEffect(() => {
+    return () => {
+      if (avatarCrop?.url) {
+        URL.revokeObjectURL(
+          avatarCrop.url,
+        );
+      }
+    };
+  }, [avatarCrop?.url]);
+
+  const [
     managingSubscription,
     setManagingSubscription,
   ] = useState(false);
@@ -3692,11 +3727,83 @@ function SettingsTab({
     }
   }
 
-  async function handleAvatarUpload(
+  function closeAvatarCrop() {
+    setAvatarCrop(null);
+    setAvatarZoom(1);
+    setAvatarOffset({ x: 0, y: 0 });
+    avatarDragRef.current = null;
+  }
+
+  function getAvatarCropMetrics(
+    zoom = avatarZoom,
+  ) {
+    if (!avatarCrop) {
+      return null;
+    }
+
+    const baseScale = Math.max(
+      AVATAR_CROP_SIZE /
+        avatarCrop.width,
+      AVATAR_CROP_SIZE /
+        avatarCrop.height,
+    );
+
+    const scale = baseScale * zoom;
+    const displayWidth =
+      avatarCrop.width * scale;
+    const displayHeight =
+      avatarCrop.height * scale;
+
+    return {
+      scale,
+      displayWidth,
+      displayHeight,
+      maxX: Math.max(
+        0,
+        (displayWidth -
+          AVATAR_CROP_SIZE) /
+          2,
+      ),
+      maxY: Math.max(
+        0,
+        (displayHeight -
+          AVATAR_CROP_SIZE) /
+          2,
+      ),
+    };
+  }
+
+  function clampAvatarOffset(
+    x: number,
+    y: number,
+    zoom = avatarZoom,
+  ) {
+    const metrics =
+      getAvatarCropMetrics(zoom);
+
+    if (!metrics) {
+      return { x: 0, y: 0 };
+    }
+
+    return {
+      x: Math.max(
+        -metrics.maxX,
+        Math.min(metrics.maxX, x),
+      ),
+      y: Math.max(
+        -metrics.maxY,
+        Math.min(metrics.maxY, y),
+      ),
+    };
+  }
+
+  function handleAvatarSelect(
     event: React.ChangeEvent<HTMLInputElement>,
   ) {
     const file =
       event.target.files?.[0];
+
+    event.target.value = "";
 
     if (!file) {
       return;
@@ -3724,8 +3831,248 @@ function SettingsTab({
       return;
     }
 
+    const objectUrl =
+      URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      setAvatarZoom(1);
+      setAvatarOffset({
+        x: 0,
+        y: 0,
+      });
+      setAvatarCrop({
+        file,
+        url: objectUrl,
+        width:
+          image.naturalWidth,
+        height:
+          image.naturalHeight,
+      });
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(
+        objectUrl,
+      );
+      setAvatarError(
+        "Δεν ήταν δυνατή η ανάγνωση της εικόνας.",
+      );
+    };
+
+    image.src = objectUrl;
+  }
+
+  function handleAvatarPointerDown(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    if (!avatarCrop) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(
+      event.pointerId,
+    );
+
+    avatarDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      offsetX:
+        avatarOffset.x,
+      offsetY:
+        avatarOffset.y,
+    };
+  }
+
+  function handleAvatarPointerMove(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    const drag =
+      avatarDragRef.current;
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return;
+    }
+
+    const next =
+      clampAvatarOffset(
+        drag.offsetX +
+          event.clientX -
+          drag.startX,
+        drag.offsetY +
+          event.clientY -
+          drag.startY,
+      );
+
+    setAvatarOffset(next);
+  }
+
+  function handleAvatarPointerEnd(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    if (
+      avatarDragRef.current
+        ?.pointerId ===
+      event.pointerId
+    ) {
+      avatarDragRef.current =
+        null;
+    }
+  }
+
+  function handleAvatarZoom(
+    nextZoom: number,
+  ) {
+    const next = Math.max(
+      1,
+      Math.min(3, nextZoom),
+    );
+
+    setAvatarZoom(next);
+    setAvatarOffset((current) =>
+      clampAvatarOffset(
+        current.x,
+        current.y,
+        next,
+      ),
+    );
+  }
+
+  async function createCroppedAvatarBlob() {
+    if (!avatarCrop) {
+      throw new Error(
+        "Δεν έχει επιλεγεί εικόνα.",
+      );
+    }
+
+    const image = new Image();
+    image.src = avatarCrop.url;
+
+    if ("decode" in image) {
+      await image.decode();
+    } else {
+      await new Promise<void>(
+        (resolve, reject) => {
+          image.onload = () =>
+            resolve();
+          image.onerror = () =>
+            reject(
+              new Error(
+                "Δεν ήταν δυνατή η ανάγνωση της εικόνας.",
+              ),
+            );
+        },
+      );
+    }
+
+    const metrics =
+      getAvatarCropMetrics();
+
+    if (!metrics) {
+      throw new Error(
+        "Δεν ήταν δυνατή η δημιουργία crop.",
+      );
+    }
+
+    const imageLeft =
+      AVATAR_CROP_SIZE / 2 -
+      metrics.displayWidth / 2 +
+      avatarOffset.x;
+
+    const imageTop =
+      AVATAR_CROP_SIZE / 2 -
+      metrics.displayHeight / 2 +
+      avatarOffset.y;
+
+    const sourceX =
+      Math.max(
+        0,
+        -imageLeft /
+          metrics.scale,
+      );
+
+    const sourceY =
+      Math.max(
+        0,
+        -imageTop /
+          metrics.scale,
+      );
+
+    const sourceSize =
+      AVATAR_CROP_SIZE /
+      metrics.scale;
+
+    const canvas =
+      document.createElement(
+        "canvas",
+      );
+
+    canvas.width = 800;
+    canvas.height = 800;
+
+    const context =
+      canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error(
+        "Δεν ήταν δυνατή η επεξεργασία της εικόνας.",
+      );
+    }
+
+    context.imageSmoothingEnabled =
+      true;
+    context.imageSmoothingQuality =
+      "high";
+
+    context.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      sourceSize,
+      sourceSize,
+      0,
+      0,
+      800,
+      800,
+    );
+
+    const blob =
+      await new Promise<Blob | null>(
+        (resolve) => {
+          canvas.toBlob(
+            resolve,
+            "image/jpeg",
+            0.9,
+          );
+        },
+      );
+
+    if (!blob) {
+      throw new Error(
+        "Δεν ήταν δυνατή η δημιουργία της φωτογραφίας.",
+      );
+    }
+
+    return blob;
+  }
+
+  async function uploadCroppedAvatar() {
+    if (!avatarCrop) {
+      return;
+    }
+
+    setAvatarError("");
+
     try {
       setUploadingAvatar(true);
+
+      const croppedBlob =
+        await createCroppedAvatarBlob();
 
       const {
         data: { session },
@@ -3750,7 +4097,8 @@ function SettingsTab({
                 `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-              content_type: file.type,
+              content_type:
+                "image/jpeg",
             }),
           },
         );
@@ -3789,10 +4137,10 @@ function SettingsTab({
         .uploadToSignedUrl(
           objectPath,
           uploadToken,
-          file,
+          croppedBlob,
           {
             contentType:
-              file.type,
+              "image/jpeg",
           },
         );
 
@@ -3846,6 +4194,8 @@ function SettingsTab({
             profileImageUrl,
         },
       });
+
+      closeAvatarCrop();
     } catch (error) {
       setAvatarError(
         error instanceof Error
@@ -3854,7 +4204,6 @@ function SettingsTab({
       );
     } finally {
       setUploadingAvatar(false);
-      event.target.value = "";
     }
   }
 
@@ -3975,6 +4324,190 @@ function SettingsTab({
 
   return (
     <div className="space-y-6">
+      {avatarCrop && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Περικοπή φωτογραφίας επιχείρησης"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeAvatarCrop();
+            }
+          }}
+        >
+          <div className="w-full max-w-[430px] overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-black/8 px-6 py-5">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#DC2727]">
+                  Φωτογραφία επιχείρησης
+                </p>
+                <h3 className="mt-1 text-[22px] font-black tracking-[-0.035em]">
+                  Προσαρμογή φωτογραφίας
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  closeAvatarCrop
+                }
+                disabled={
+                  uploadingAvatar
+                }
+                className="grid h-10 w-10 place-items-center rounded-full border border-black/10 text-lg text-[#222]/55 transition hover:bg-[#F3F3F1] hover:text-[#222]"
+                aria-label="Κλείσιμο"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center px-6 py-7">
+              <div
+                className="relative touch-none select-none overflow-hidden rounded-full bg-[#ECECEA] shadow-inner"
+                style={{
+                  width:
+                    AVATAR_CROP_SIZE,
+                  height:
+                    AVATAR_CROP_SIZE,
+                  cursor:
+                    avatarDragRef.current
+                      ? "grabbing"
+                      : "grab",
+                }}
+                onPointerDown={
+                  handleAvatarPointerDown
+                }
+                onPointerMove={
+                  handleAvatarPointerMove
+                }
+                onPointerUp={
+                  handleAvatarPointerEnd
+                }
+                onPointerCancel={
+                  handleAvatarPointerEnd
+                }
+              >
+                {(() => {
+                  const metrics =
+                    getAvatarCropMetrics();
+
+                  if (!metrics) {
+                    return null;
+                  }
+
+                  return (
+                    <img
+                      src={
+                        avatarCrop.url
+                      }
+                      alt="Crop preview"
+                      draggable={false}
+                      className="pointer-events-none absolute left-1/2 top-1/2 max-w-none select-none"
+                      style={{
+                        width:
+                          metrics.displayWidth,
+                        height:
+                          metrics.displayHeight,
+                        transform: `translate(calc(-50% + ${avatarOffset.x}px), calc(-50% + ${avatarOffset.y}px))`,
+                      }}
+                    />
+                  );
+                })()}
+
+                <div className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-inset ring-white/90" />
+                <div className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" />
+              </div>
+
+              <p className="mt-4 text-center text-[11px] text-[#222]/45">
+                Σύρε τη φωτογραφία για να αλλάξεις θέση.
+              </p>
+
+              <div className="mt-7 w-full">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Zoom
+                  </span>
+                  <span className="text-[10px] font-bold text-[#222]/45">
+                    {Math.round(
+                      avatarZoom *
+                        100,
+                    )}
+                    %
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-[#222]/35">
+                    −
+                  </span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.01"
+                    value={
+                      avatarZoom
+                    }
+                    onChange={(event) =>
+                      handleAvatarZoom(
+                        Number(
+                          event.target
+                            .value,
+                        ),
+                      )
+                    }
+                    className="h-1.5 w-full cursor-pointer accent-[#222]"
+                  />
+                  <span className="text-sm font-bold text-[#222]/35">
+                    +
+                  </span>
+                </div>
+              </div>
+
+              {avatarError && (
+                <p className="mt-5 w-full rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                  {avatarError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3 border-t border-black/8 bg-[#F7F5F1] px-6 py-5">
+              <button
+                type="button"
+                onClick={
+                  closeAvatarCrop
+                }
+                disabled={
+                  uploadingAvatar
+                }
+                className="flex-1 rounded-[16px] border border-black/10 bg-white px-5 py-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#222] transition hover:border-[#222] disabled:opacity-50"
+              >
+                Ακύρωση
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void uploadCroppedAvatar()
+                }
+                disabled={
+                  uploadingAvatar
+                }
+                className="flex-1 rounded-[16px] bg-[#222] px-5 py-4 text-[11px] font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+              >
+                {uploadingAvatar
+                  ? "Ανέβασμα..."
+                  : "Upload"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="overflow-hidden rounded-[26px] border border-black/10 bg-white">
         <div className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between md:p-8">
           <div className="flex items-center gap-5">
@@ -4026,7 +4559,7 @@ function SettingsTab({
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={
-                handleAvatarUpload
+                handleAvatarSelect
               }
               disabled={uploadingAvatar}
               className="hidden"
