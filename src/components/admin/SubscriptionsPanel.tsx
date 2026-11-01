@@ -160,6 +160,19 @@ export function SubscriptionsPanel({
   ] = useState<string | null>(null);
   const [formError, setFormError] =
     useState("");
+  const [
+    runningBillingCheck,
+    setRunningBillingCheck,
+  ] = useState(false);
+  const [
+    billingCheckResult,
+    setBillingCheckResult,
+  ] = useState<{
+    checked: number;
+    reminders_sent: number;
+    suspended: number;
+    suspension_emails_sent: number;
+  } | null>(null);
 
   const subscribedBusinessIds =
     useMemo(
@@ -221,6 +234,107 @@ export function SubscriptionsPanel({
             ),
         0,
       );
+
+  async function runBillingCheck() {
+    try {
+      setRunningBillingCheck(true);
+      setFormError("");
+      setBillingCheckResult(null);
+
+      const {
+        data: { session },
+        error: sessionError,
+      } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/subscriptions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action:
+              "run_billing_check",
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατός ο έλεγχος billing.",
+        );
+      }
+
+      setBillingCheckResult({
+        checked:
+          Number(result.checked) || 0,
+        reminders_sent:
+          Number(
+            result.reminders_sent,
+          ) || 0,
+        suspended:
+          Number(result.suspended) || 0,
+        suspension_emails_sent:
+          Number(
+            result.suspension_emails_sent,
+          ) || 0,
+      });
+
+      const refreshResponse =
+        await fetch(
+          "/api/admin/subscriptions",
+          {
+            method: "GET",
+            headers: {
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+      const refreshResult =
+        await refreshResponse.json();
+
+      if (refreshResponse.ok) {
+        for (
+          const subscription of
+          refreshResult.subscriptions ??
+          []
+        ) {
+          onSubscriptionSaved(
+            subscription,
+          );
+        }
+      }
+    } catch (runError) {
+      setFormError(
+        runError instanceof Error
+          ? runError.message
+          : "Δεν ήταν δυνατός ο έλεγχος billing.",
+      );
+    } finally {
+      setRunningBillingCheck(false);
+    }
+  }
 
   function resetForm() {
     setBusinessId("");
@@ -492,21 +606,78 @@ export function SubscriptionsPanel({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowForm(
-                (current) => !current,
-              );
-              setFormError("");
-            }}
-            className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727]"
-          >
-            {showForm
-              ? "Κλείσιμο"
-              : "+ Νέα συνδρομή"}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => {
+                void runBillingCheck();
+              }}
+              disabled={
+                runningBillingCheck
+              }
+              className="rounded-2xl border border-black/10 bg-white px-5 py-4 text-sm font-bold text-[#222] transition hover:border-[#222] disabled:opacity-50"
+            >
+              {runningBillingCheck
+                ? "Έλεγχος billing..."
+                : "Run billing check"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(
+                  (current) => !current,
+                );
+                setFormError("");
+              }}
+              className="rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727]"
+            >
+              {showForm
+                ? "Κλείσιμο"
+                : "+ Νέα συνδρομή"}
+            </button>
+          </div>
         </div>
+
+        {billingCheckResult && (
+          <div className="mt-6 grid gap-3 rounded-[20px] border border-black/8 bg-[#F7F5F1] p-5 text-sm sm:grid-cols-4">
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#888]">
+                Checked
+              </p>
+              <p className="mt-2 text-xl font-black">
+                {billingCheckResult.checked}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#888]">
+                Reminders
+              </p>
+              <p className="mt-2 text-xl font-black">
+                {billingCheckResult.reminders_sent}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#888]">
+                Suspended
+              </p>
+              <p className="mt-2 text-xl font-black">
+                {billingCheckResult.suspended}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#888]">
+                Suspension emails
+              </p>
+              <p className="mt-2 text-xl font-black">
+                {
+                  billingCheckResult
+                    .suspension_emails_sent
+                }
+              </p>
+            </div>
+          </div>
+        )}
 
         {showForm && (
           <form
