@@ -39,3 +39,69 @@ comment on column public.subscriptions.cancel_at_period_end is
 
 comment on column public.subscriptions.cancellation_requested_at is
   'When the customer requested cancellation of automatic renewal.';
+
+
+drop policy if exists "business members can upload avatars"
+  on storage.objects;
+create policy "business members can upload avatars"
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'business-avatars'
+  and exists (
+    select 1
+    from public.business_members bm
+    where bm.user_id = auth.uid()
+      and bm.business_id::text =
+        (storage.foldername(name))[1]
+      and bm.role in ('owner','manager')
+  )
+);
+
+drop policy if exists "business members can update avatars"
+  on storage.objects;
+create policy "business members can update avatars"
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'business-avatars'
+  and exists (
+    select 1
+    from public.business_members bm
+    where bm.user_id = auth.uid()
+      and bm.business_id::text =
+        (storage.foldername(name))[1]
+      and bm.role in ('owner','manager')
+  )
+)
+with check (
+  bucket_id = 'business-avatars'
+  and exists (
+    select 1
+    from public.business_members bm
+    where bm.user_id = auth.uid()
+      and bm.business_id::text =
+        (storage.foldername(name))[1]
+      and bm.role in ('owner','manager')
+  )
+);
+
+drop policy if exists "business members can delete avatars"
+  on storage.objects;
+create policy "business members can delete avatars"
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'business-avatars'
+  and exists (
+    select 1
+    from public.business_members bm
+    where bm.user_id = auth.uid()
+      and bm.business_id::text =
+        (storage.foldername(name))[1]
+      and bm.role in ('owner','manager')
+  )
+);
