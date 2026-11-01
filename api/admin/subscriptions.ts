@@ -141,26 +141,41 @@ async function sendBillingEmail({
   subject: string;
   html: string;
 }) {
-  const emailResponse = await fetch(
-    "https://api.resend.com/emails",
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          `Bearer ${apiKey}`,
-        "Content-Type":
-          "application/json",
-      },
-      body: JSON.stringify({
-        from:
-          "Zisto <hello@mail.zisto.app>",
-        to: [to],
-        reply_to: "zisto.gr@gmail.com",
-        subject,
-        html,
-      }),
-    },
+  const controller =
+    new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    8000,
   );
+
+  let emailResponse: Response;
+
+  try {
+    emailResponse = await fetch(
+      "https://api.resend.com/emails",
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Bearer ${apiKey}`,
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          from:
+            "Zisto <hello@mail.zisto.app>",
+          to: [to],
+          reply_to:
+            "zisto.gr@gmail.com",
+          subject,
+          html,
+        }),
+        signal: controller.signal,
+      },
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!emailResponse.ok) {
     const error =
