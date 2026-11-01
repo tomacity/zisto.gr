@@ -346,6 +346,242 @@ export default async function handler(
         membership.business_id;
     }
 
+    if (
+      requestedView === "subscription" &&
+      req.method === "PATCH"
+    ) {
+      if (
+        !isAdmin &&
+        membership?.role !== "owner"
+      ) {
+        return res.status(403).json({
+          error:
+            "Only the business owner can manage the subscription",
+        });
+      }
+
+      const body = req.body ?? {};
+
+      const action =
+        typeof body.action === "string"
+          ? body.action
+          : "";
+
+      if (
+        action !== "cancel_renewal" &&
+        action !== "resume_renewal"
+      ) {
+        return res.status(400).json({
+          error:
+            "Invalid subscription action",
+        });
+      }
+
+      const subscriptionParams =
+        new URLSearchParams({
+          business_id:
+            `eq.${businessId}`,
+          select:
+            "id,stripe_subscription_id,cancel_at_period_end",
+          limit: "1",
+        });
+
+      const subscriptionResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/subscriptions?${subscriptionParams.toString()}`,
+        });
+
+      if (!subscriptionResponse.ok) {
+        return res.status(500).json({
+          error:
+            "Could not load subscription",
+        });
+      }
+
+      const subscriptionRows =
+        await subscriptionResponse.json();
+
+      const subscription =
+        subscriptionRows[0];
+
+      if (
+        !subscription ||
+        !subscription
+          .stripe_subscription_id
+      ) {
+        return res.status(404).json({
+          error:
+            "Stripe subscription is not connected",
+        });
+      }
+
+      const stripeSecretKey =
+        process.env.STRIPE_SECRET_KEY;
+
+      if (!stripeSecretKey) {
+        return res.status(500).json({
+          error:
+            "Stripe is not configured",
+        });
+      }
+
+      const stripeBody =
+        new URLSearchParams();
+
+      stripeBody.set(
+        "cancel_at_period_end",
+        action === "cancel_renewal"
+          ? "true"
+          : "false",
+      );
+
+      const stripeResponse =
+        await fetch(
+          `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(
+            subscription
+              .stripe_subscription_id,
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization:
+                `Bearer ${stripeSecretKey}`,
+              "Content-Type":
+                "application/x-www-form-urlencoded",
+            },
+            body:
+              stripeBody.toString(),
+          },
+        );
+
+      const stripeResult =
+        await stripeResponse.json();
+
+      if (!stripeResponse.ok) {
+        console.error(
+          "Stripe subscription update failed:",
+          stripeResult,
+        );
+
+        return res.status(502).json({
+          error:
+            stripeResult?.error?.message ??
+            "Could not update subscription",
+        });
+      }
+
+      const cancelAtPeriodEnd =
+        Boolean(
+          stripeResult
+            .cancel_at_period_end,
+        );
+
+      const updateResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/subscriptions?id=eq.${subscription.id}`,
+          method: "PATCH",
+          headers: {
+            Prefer:
+              "return=representation",
+          },
+          body: {
+            cancel_at_period_end:
+              cancelAtPeriodEnd,
+            cancellation_requested_at:
+              cancelAtPeriodEnd
+                ? new Date()
+                    .toISOString()
+                : null,
+            updated_at:
+              new Date()
+                .toISOString(),
+          },
+        });
+
+      if (!updateResponse.ok) {
+        console.error(
+          "Subscription state sync failed:",
+          await updateResponse.text(),
+        );
+
+        return res.status(500).json({
+          error:
+            "Stripe was updated but Zisto could not sync the subscription",
+        });
+      }
+
+      const updatedRows =
+        await updateResponse.json();
+
+      return res.status(200).json({
+        subscription:
+          updatedRows[0] ?? null,
+      });
+    }
+
+    if (
+      requestedView === "business-profile" &&
+      req.method === "PATCH"
+    ) {
+      if (
+        !isAdmin &&
+        membership?.role !== "owner"
+      ) {
+        return res.status(403).json({
+          error:
+            "Only the business owner can update the business profile",
+        });
+      }
+
+      const body = req.body ?? {};
+
+      const profileImageUrl =
+        typeof body.profile_image_url ===
+        "string"
+          ? body.profile_image_url
+              .trim()
+              .slice(0, 2000)
+          : null;
+
+      const updateResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/businesses?id=eq.${businessId}`,
+          method: "PATCH",
+          headers: {
+            Prefer:
+              "return=representation",
+          },
+          body: {
+            profile_image_url:
+              profileImageUrl || null,
+          },
+        });
+
+      if (!updateResponse.ok) {
+        return res.status(500).json({
+          error:
+            "Could not update business profile",
+        });
+      }
+
+      const updatedRows =
+        await updateResponse.json();
+
+      return res.status(200).json({
+        business:
+          updatedRows[0] ?? null,
+      });
+    }
+
     if (requestedView === "appointments") {
       const start =
         typeof req.query.start === "string"
@@ -812,7 +1048,7 @@ export default async function handler(
         id: `eq.${businessId}`,
 
         select:
-          "id,name,slug,timezone,dashboard_modules,status",
+          "id,name,slug,timezone,dashboard_modules,status,profile_image_url",
 
         limit: "1",
       });
@@ -930,7 +1166,7 @@ export default async function handler(
         business_id:
           `eq.${businessId}`,
         select:
-          "billing_status,access_status,next_billing_at,grace_until",
+          "id,billing_email,amount_cents,currency,vat_rate,billing_interval_months,billing_status,access_status,starts_at,next_billing_at,payment_due_at,grace_until,last_paid_at,notes,stripe_customer_id,stripe_subscription_id,cancel_at_period_end,cancellation_requested_at",
         limit: "1",
       });
 
@@ -1156,7 +1392,13 @@ export default async function handler(
           Array.isArray(business.dashboard_modules)
             ? business.dashboard_modules
             : ["analytics", "reviews", "menu", "nfc"],
+
+        profile_image_url:
+          business.profile_image_url ?? null,
       },
+
+      subscription:
+        subscriptionState ?? null,
 
       totals: {
         page_views_today:
