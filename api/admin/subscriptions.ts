@@ -460,7 +460,7 @@ export default async function handler(
                   subscription.suspended_at ??
                   now.toISOString(),
                 grace_until:
-                  graceUntil,
+                  graceUntilIso,
                 updated_at:
                   now.toISOString(),
               })
