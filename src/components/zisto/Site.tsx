@@ -3502,12 +3502,16 @@ function SettingsTab({
   userEmail,
   onLogout,
   onAnalyticsChange,
+  onSubscriptionBlocked,
 }: {
   analytics: AnalyticsResponse;
   userEmail: string;
   onLogout: () => Promise<void>;
   onAnalyticsChange: (
     analytics: AnalyticsResponse,
+  ) => void;
+  onSubscriptionBlocked: (
+    reason: "cancelled" | "payment",
   ) => void;
 }) {
   const [
@@ -3878,13 +3882,27 @@ function SettingsTab({
         );
       }
 
+      const updatedSubscription = {
+        ...subscription,
+        ...result.subscription,
+      };
+
       onAnalyticsChange({
         ...analytics,
-        subscription: {
-          ...subscription,
-          ...result.subscription,
-        },
+        subscription:
+          updatedSubscription,
       });
+
+      if (
+        updatedSubscription.billing_status ===
+          "cancelled" &&
+        updatedSubscription.access_status ===
+          "suspended"
+      ) {
+        onSubscriptionBlocked(
+          "cancelled",
+        );
+      }
     } catch (error) {
       setSubscriptionError(
         error instanceof Error
@@ -6726,6 +6744,16 @@ function DashboardPage({
                     onAnalyticsChange={
                       setAnalytics
                     }
+                    onSubscriptionBlocked={(
+                      reason,
+                    ) => {
+                      setSubscriptionBlockReason(
+                        reason,
+                      );
+                      setSubscriptionSuspended(
+                        true,
+                      );
+                    }}
                     onLogout={async () => {
                       await supabase.auth.signOut();
                       window.location.hash = "/login";
