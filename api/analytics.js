@@ -368,7 +368,7 @@ export default async function handler(
           : "";
 
       if (
-        action !== "cancel_renewal" &&
+        action !== "cancel_subscription" &&
         action !== "resume_renewal"
       ) {
         return res.status(400).json({
@@ -382,7 +382,7 @@ export default async function handler(
           business_id:
             `eq.${businessId}`,
           select:
-            "id,stripe_subscription_id,cancel_at_period_end",
+            "id,billing_status,access_status,stripe_subscription_id,cancel_at_period_end",
           limit: "1",
         });
 
@@ -407,14 +407,76 @@ export default async function handler(
       const subscription =
         subscriptionRows[0];
 
+      if (!subscription) {
+        return res.status(404).json({
+          error:
+            "Subscription not found",
+        });
+      }
+
       if (
-        !subscription ||
         !subscription
           .stripe_subscription_id
       ) {
-        return res.status(404).json({
-          error:
-            "Stripe subscription is not connected",
+        const nextState =
+          action ===
+          "cancel_subscription"
+            ? {
+                billing_status:
+                  "cancelled",
+                access_status:
+                  "suspended",
+                cancel_at_period_end:
+                  false,
+                cancellation_requested_at:
+                  new Date()
+                    .toISOString(),
+              }
+            : {
+                billing_status:
+                  "draft",
+                access_status:
+                  "active",
+                cancel_at_period_end:
+                  false,
+                cancellation_requested_at:
+                  null,
+              };
+
+        const localUpdateResponse =
+          await supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/subscriptions?id=eq.${subscription.id}`,
+            method: "PATCH",
+            headers: {
+              Prefer:
+                "return=representation",
+            },
+            body: {
+              ...nextState,
+              updated_at:
+                new Date()
+                  .toISOString(),
+            },
+          });
+
+        if (
+          !localUpdateResponse.ok
+        ) {
+          return res.status(500).json({
+            error:
+              "Could not update subscription",
+          });
+        }
+
+        const localRows =
+          await localUpdateResponse.json();
+
+        return res.status(200).json({
+          subscription:
+            localRows[0] ?? null,
         });
       }
 
@@ -433,7 +495,7 @@ export default async function handler(
 
       stripeBody.set(
         "cancel_at_period_end",
-        action === "cancel_renewal"
+        action === "cancel_subscription"
           ? "true"
           : "false",
       );
