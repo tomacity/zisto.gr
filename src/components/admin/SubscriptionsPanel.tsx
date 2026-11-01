@@ -256,22 +256,39 @@ export function SubscriptionsPanel({
         return;
       }
 
-      const response = await fetch(
-        "/api/admin/subscriptions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-            Authorization:
-              `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action:
-              "run_billing_check",
-          }),
-        },
+      const controller =
+        new AbortController();
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        12000,
       );
+
+      let response: Response;
+
+      try {
+        response = await fetch(
+          "/api/admin/subscriptions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              action:
+                "run_billing_check",
+            }),
+            signal:
+              controller.signal,
+          },
+        );
+      } finally {
+        window.clearTimeout(
+          timeout,
+        );
+      }
 
       const result =
         await response.json();
@@ -327,9 +344,13 @@ export function SubscriptionsPanel({
       }
     } catch (runError) {
       setFormError(
-        runError instanceof Error
-          ? runError.message
-          : "Δεν ήταν δυνατός ο έλεγχος billing.",
+        runError instanceof DOMException &&
+          runError.name ===
+            "AbortError"
+          ? "Ο έλεγχος billing άργησε να απαντήσει. Δοκίμασε ξανά."
+          : runError instanceof Error
+            ? runError.message
+            : "Δεν ήταν δυνατός ο έλεγχος billing.",
       );
     } finally {
       setRunningBillingCheck(false);
