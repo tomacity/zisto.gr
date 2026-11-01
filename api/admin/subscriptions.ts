@@ -745,6 +745,18 @@ export default async function handler(
 
       form.set("mode", "subscription");
       form.set(
+        "consent_collection[terms_of_service]",
+        "required",
+      );
+      form.set(
+        "custom_text[terms_of_service_acceptance][message]",
+        "Με την εγγραφή αποδέχεσαι την Πολιτική Πληρωμών & Συνδρομών του Zisto: https://zisto.app/#/payments",
+      );
+      form.set(
+        "custom_text[submit][message]",
+        "Η συνδρομή ανανεώνεται αυτόματα σύμφωνα με τη συμφωνημένη περίοδο χρέωσης. Σε αποτυχημένη πληρωμή ισχύει περίοδος χάριτος 10 ημερών.",
+      );
+      form.set(
         "client_reference_id",
         subscription.business_id,
       );
