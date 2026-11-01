@@ -3820,7 +3820,7 @@ function SettingsTab({
 
   async function manageSubscription(
     action:
-      | "cancel_renewal"
+      | "cancel_subscription"
       | "resume_renewal",
   ) {
     if (!subscription) {
@@ -3830,7 +3830,7 @@ function SettingsTab({
     setSubscriptionError("");
 
     if (
-      action === "cancel_renewal" &&
+      action === "cancel_subscription" &&
       !window.confirm(
         "Η συνδρομή θα παραμείνει ενεργή μέχρι το τέλος της ήδη πληρωμένης περιόδου και μετά δεν θα ανανεωθεί. Συνέχεια;",
       )
@@ -4383,11 +4383,15 @@ function SettingsTab({
               )}
 
               {membershipRole ===
-                "owner" &&
-                subscription
-                  .stripe_subscription_id && (
+                "owner" && (
                   <div className="mt-8 flex flex-col gap-3 border-t border-black/8 pt-6 sm:flex-row">
-                    {subscription
+                    {subscription.billing_status ===
+                    "cancelled" &&
+                    !subscription.stripe_subscription_id ? (
+                      <span className="rounded-full bg-red-50 px-5 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600">
+                        Η συνδρομή ακυρώθηκε
+                      </span>
+                    ) : subscription
                       .cancel_at_period_end ? (
                       <button
                         type="button"
@@ -4413,14 +4417,14 @@ function SettingsTab({
                         }
                         onClick={() =>
                           void manageSubscription(
-                            "cancel_renewal",
+                            "cancel_subscription",
                           )
                         }
                         className="rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600 transition hover:bg-red-600 hover:text-white disabled:opacity-50"
                       >
                         {managingSubscription
                           ? "Ενημέρωση..."
-                          : "Ακύρωση ανανέωσης"}
+                          : "Ακύρωση συνδρομής"}
                       </button>
                     )}
 
