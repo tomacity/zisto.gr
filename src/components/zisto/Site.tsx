@@ -5805,11 +5805,11 @@ function DashboardTabPlaceholder({
       description:
         "Το booking module του Zisto θα συγκεντρώνει διαθεσιμότητα, ραντεβού, πελάτες και υπενθυμίσεις σε ένα live ημερολόγιο.",
     },
-    settings: {
-      eyebrow: "Ρυθμίσεις",
+    business_center: {
+      eyebrow: "Business Center",
       title: "Ρυθμίσεις επιχείρησης",
       description:
-        "Εδώ θα διαχειρίζεσαι στοιχεία επιχείρησης, smart links, integrations και λογαριασμό.",
+        "Διαχείριση προφίλ, λογαριασμού και συνδρομής Zisto.",
     },
   };
 
@@ -6399,24 +6399,51 @@ function DashboardPage({
           </button>
         </div>
 
-        <div className="mt-12 rounded-[16px] border border-white/10 bg-white/[0.04] p-4">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("business_center");
+            setSidebarOpen(false);
+          }}
+          className={`mt-12 w-full rounded-[16px] border p-4 text-left transition ${
+            activeTab === "business_center"
+              ? "border-[#DC2727] bg-[#DC2727]/10"
+              : "border-white/10 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
+          }`}
+        >
           <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">
-            Επιχείρηση
+            Επιχείρηση · Ρυθμίσεις
           </p>
 
           <div className="mt-4 flex items-center gap-3">
-            <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#DC2727] text-[15px] font-black">
-              {clientInitial}
+            <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-full bg-[#DC2727] text-[15px] font-black">
+              {analytics?.business.profile_image_url ? (
+                <img
+                  src={analytics.business.profile_image_url}
+                  alt={businessName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="grid h-full w-full place-items-center">
+                  {clientInitial}
+                </div>
+              )}
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold">
                 {businessName}
               </p>
-              <p className="mt-1 text-[10px] text-white/40">{businessLocation}</p>
+              <p className="mt-1 truncate text-[10px] text-white/40">
+                {businessLocation}
+              </p>
             </div>
+
+            <span className="text-white/35">
+              →
+            </span>
           </div>
-        </div>
+        </button>
 
         <nav className="mt-10 flex flex-col gap-2">
           {visibleNavItems.map((item) => {
@@ -6568,11 +6595,14 @@ function DashboardPage({
                   <AppointmentsTab
                     businessId={businessId}
                   />
-                ) : activeTab === "settings" &&
+                ) : activeTab === "business_center" &&
                   analytics ? (
                   <SettingsTab
                     analytics={analytics}
                     userEmail={userEmail}
+                    onAnalyticsChange={
+                      setAnalytics
+                    }
                     onLogout={async () => {
                       await supabase.auth.signOut();
                       window.location.hash = "/login";
