@@ -3501,28 +3501,58 @@ function SettingsTab({
   analytics,
   userEmail,
   onLogout,
+  onAnalyticsChange,
 }: {
   analytics: AnalyticsResponse;
   userEmail: string;
   onLogout: () => Promise<void>;
+  onAnalyticsChange: (
+    analytics: AnalyticsResponse,
+  ) => void;
 }) {
+  const [
+    centerTab,
+    setCenterTab,
+  ] = useState<
+    "profile" | "account" | "subscription"
+  >("profile");
+
   const [newPassword, setNewPassword] =
     useState("");
-
-  const [confirmPassword, setConfirmPassword] =
-    useState("");
-
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState("");
   const [showPassword, setShowPassword] =
     useState(false);
-
-  const [savingPassword, setSavingPassword] =
-    useState(false);
-
+  const [
+    savingPassword,
+    setSavingPassword,
+  ] = useState(false);
   const [passwordError, setPasswordError] =
     useState("");
+  const [
+    passwordSuccess,
+    setPasswordSuccess,
+  ] = useState("");
 
-  const [passwordSuccess, setPasswordSuccess] =
-    useState("");
+  const [
+    uploadingAvatar,
+    setUploadingAvatar,
+  ] = useState(false);
+  const [
+    avatarError,
+    setAvatarError,
+  ] = useState("");
+
+  const [
+    managingSubscription,
+    setManagingSubscription,
+  ] = useState(false);
+  const [
+    subscriptionError,
+    setSubscriptionError,
+  ] = useState("");
 
   const roleLabels: Record<string, string> = {
     owner: "Ιδιοκτήτης",
@@ -3532,6 +3562,81 @@ function SettingsTab({
 
   const membershipRole =
     analytics.membership_role ?? "staff";
+
+  const subscription =
+    analytics.subscription;
+
+  function formatMoney(
+    cents: number,
+    currency = "EUR",
+  ) {
+    return new Intl.NumberFormat("el-GR", {
+      style: "currency",
+      currency,
+    }).format(cents / 100);
+  }
+
+  function formatDate(
+    value: string | null,
+  ) {
+    if (!value) {
+      return "—";
+    }
+
+    return new Intl.DateTimeFormat("el-GR", {
+      dateStyle: "long",
+    }).format(new Date(value));
+  }
+
+  function intervalLabel(months: number) {
+    if (months === 1) return "Κάθε μήνα";
+    if (months === 3)
+      return "Κάθε 3 μήνες";
+    if (months === 6)
+      return "Κάθε 6 μήνες";
+    if (months === 12)
+      return "Κάθε χρόνο";
+    return `Κάθε ${months} μήνες`;
+  }
+
+  function subscriptionAgeText(
+    startsAt: string,
+  ) {
+    const startDate =
+      new Date(startsAt);
+    const now = new Date();
+
+    const months =
+      Math.max(
+        0,
+        (now.getFullYear() -
+          startDate.getFullYear()) *
+          12 +
+          now.getMonth() -
+          startDate.getMonth(),
+      );
+
+    if (months === 0) {
+      return "Λιγότερο από 1 μήνα";
+    }
+
+    if (months === 1) {
+      return "1 μήνα";
+    }
+
+    if (months < 12) {
+      return `${months} μήνες`;
+    }
+
+    const years =
+      Math.floor(months / 12);
+    const remainingMonths =
+      months % 12;
+
+    return remainingMonths
+      ? `${years} έτ. και ${remainingMonths} μ.`
+      : `${years} έτη`;
+  }
 
   async function handlePasswordUpdate(
     event: React.FormEvent<HTMLFormElement>,
@@ -3545,7 +3650,6 @@ function SettingsTab({
       setPasswordError(
         "Ο νέος κωδικός πρέπει να περιέχει τουλάχιστον 8 χαρακτήρες.",
       );
-
       return;
     }
 
@@ -3553,7 +3657,6 @@ function SettingsTab({
       setPasswordError(
         "Οι δύο κωδικοί δεν ταιριάζουν.",
       );
-
       return;
     }
 
@@ -3571,16 +3674,10 @@ function SettingsTab({
 
       setNewPassword("");
       setConfirmPassword("");
-
       setPasswordSuccess(
         "Ο κωδικός ενημερώθηκε επιτυχώς.",
       );
     } catch (error) {
-      console.error(
-        "Password update failed:",
-        error,
-      );
-
       setPasswordError(
         error instanceof Error
           ? error.message
@@ -3591,238 +3688,754 @@ function SettingsTab({
     }
   }
 
+  async function handleAvatarUpload(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setAvatarError("");
+
+    if (
+      ![
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+      ].includes(file.type)
+    ) {
+      setAvatarError(
+        "Χρησιμοποίησε JPG, PNG ή WebP.",
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError(
+        "Η εικόνα πρέπει να είναι έως 5MB.",
+      );
+      return;
+    }
+
+    try {
+      setUploadingAvatar(true);
+
+      const extension =
+        file.type === "image/png"
+          ? "png"
+          : file.type === "image/webp"
+            ? "webp"
+            : "jpg";
+
+      const objectPath =
+        `${analytics.business_id}/avatar.${extension}`;
+
+      const {
+        error: uploadError,
+      } = await supabase.storage
+        .from("business-avatars")
+        .upload(
+          objectPath,
+          file,
+          {
+            upsert: true,
+            contentType: file.type,
+            cacheControl: "3600",
+          },
+        );
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const {
+        data: publicData,
+      } = supabase.storage
+        .from("business-avatars")
+        .getPublicUrl(objectPath);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const profileImageUrl =
+        `${publicData.publicUrl}?v=${Date.now()}`;
+
+      const response = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          analytics.business_id,
+        )}&view=business-profile`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            profile_image_url:
+              profileImageUrl,
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η ενημέρωση της φωτογραφίας.",
+        );
+      }
+
+      onAnalyticsChange({
+        ...analytics,
+        business: {
+          ...analytics.business,
+          profile_image_url:
+            profileImageUrl,
+        },
+      });
+    } catch (error) {
+      setAvatarError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η αλλαγή φωτογραφίας.",
+      );
+    } finally {
+      setUploadingAvatar(false);
+      event.target.value = "";
+    }
+  }
+
+  async function manageSubscription(
+    action:
+      | "cancel_renewal"
+      | "resume_renewal",
+  ) {
+    if (!subscription) {
+      return;
+    }
+
+    setSubscriptionError("");
+
+    if (
+      action === "cancel_renewal" &&
+      !window.confirm(
+        "Η συνδρομή θα παραμείνει ενεργή μέχρι το τέλος της ήδη πληρωμένης περιόδου και μετά δεν θα ανανεωθεί. Συνέχεια;",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setManagingSubscription(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          analytics.business_id,
+        )}&view=subscription`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action,
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η ενημέρωση της συνδρομής.",
+        );
+      }
+
+      onAnalyticsChange({
+        ...analytics,
+        subscription: {
+          ...subscription,
+          ...result.subscription,
+        },
+      });
+    } catch (error) {
+      setSubscriptionError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η ενημέρωση της συνδρομής.",
+      );
+    } finally {
+      setManagingSubscription(false);
+    }
+  }
+
+  const includedServices =
+    subscription?.notes
+      ? subscription.notes
+          .split(/[,\n+]/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : analytics.business
+          .dashboard_modules
+          .map((module) => {
+            const labels: Record<
+              DashboardModule,
+              string
+            > = {
+              analytics: "Analytics",
+              reviews: "Αξιολογήσεις",
+              menu: "Ψηφιακό μενού",
+              nfc: "NFC κάρτες",
+              appointments: "Ραντεβού",
+            };
+
+            return labels[module];
+          });
+
   return (
     <div className="space-y-6">
-      {/* Business information */}
-      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+      <section className="overflow-hidden rounded-[26px] border border-black/10 bg-white">
+        <div className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between md:p-8">
+          <div className="flex items-center gap-5">
+            <div className="relative h-20 w-20 overflow-hidden rounded-full bg-[#DC2727] text-white shadow-sm">
+              {analytics.business.profile_image_url ? (
+                <img
+                  src={
+                    analytics.business
+                      .profile_image_url
+                  }
+                  alt={
+                    analytics.business.name
+                  }
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="grid h-full w-full place-items-center text-2xl font-black">
+                  {analytics.business.name
+                    .charAt(0)
+                    .toLocaleUpperCase(
+                      "el-GR",
+                    )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Business Center
+              </p>
+              <h1 className="mt-2 text-[30px] font-black tracking-[-0.045em] md:text-[38px]">
+                {analytics.business.name}
+              </h1>
+              <p className="mt-1 text-[12px] text-[#222]/45">
+                {
+                  analytics.business
+                    .location_name ??
+                  "Zisto client"
+                }
+              </p>
+            </div>
+          </div>
+
+          <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-black/10 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition hover:border-[#222] hover:bg-[#222] hover:text-white">
+            {uploadingAvatar
+              ? "Ανέβασμα..."
+              : "Αλλαγή φωτογραφίας"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={
+                handleAvatarUpload
+              }
+              disabled={uploadingAvatar}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        {avatarError && (
+          <p className="mx-6 mb-6 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700 md:mx-8">
+            {avatarError}
+          </p>
+        )}
+
+        <div className="flex gap-2 overflow-x-auto border-t border-black/8 bg-[#F7F5F1] p-2">
+          {[
+            {
+              id: "profile" as const,
+              label: "Προφίλ",
+            },
+            {
+              id: "account" as const,
+              label: "Λογαριασμός",
+            },
+            {
+              id: "subscription" as const,
+              label: "Συνδρομή Zisto",
+            },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() =>
+                setCenterTab(item.id)
+              }
+              className={`whitespace-nowrap rounded-[14px] px-5 py-3 text-[11px] font-bold transition ${
+                centerTab === item.id
+                  ? "bg-[#222] text-white"
+                  : "text-[#222]/50 hover:bg-white hover:text-[#222]"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {centerTab === "profile" && (
+        <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Προφίλ επιχείρησης
+          </p>
+
+          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+            Στοιχεία επιχείρησης
+          </h2>
+
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                Επωνυμία
+              </p>
+              <p className="mt-3 text-[15px] font-bold">
+                {analytics.business.name}
+              </p>
+            </div>
+
+            <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                Τοποθεσία
+              </p>
+              <p className="mt-3 text-[15px] font-bold">
+                {
+                  analytics.business
+                    .location_name ??
+                  "Δεν έχει οριστεί"
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[16px] border border-[#DC2727]/15 bg-[#DC2727]/5 p-5">
+            <p className="text-[11px] leading-relaxed text-[#222]/55">
+              Για αλλαγή επωνυμίας,
+              τοποθεσίας ή σύνδεσης με
+              διαφορετικό project,
+              επικοινώνησε με τη Zisto.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {centerTab === "account" && (
+        <>
+          <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-              Επιχείρηση
+              Λογαριασμός
             </p>
 
             <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-              Στοιχεία επιχείρησης
+              Στοιχεία χρήστη
             </h2>
 
-            <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-[#222]/45">
-              Τα στοιχεία αυτά χρησιμοποιούνται
-              στο dashboard και στα reports του
-              Zisto.
-            </p>
-          </div>
+            <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Email
+                </p>
+                <p className="mt-3 break-all text-[14px] font-bold">
+                  {userEmail}
+                </p>
+              </div>
 
-          <span className="inline-flex w-fit rounded-full bg-green-50 px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-green-700">
-            Ενεργή σύνδεση
-          </span>
-        </div>
+              <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Ρόλος
+                </p>
+                <p className="mt-3 text-[14px] font-bold">
+                  {
+                    roleLabels[
+                      membershipRole
+                    ] ?? membershipRole
+                  }
+                </p>
+              </div>
+            </div>
+          </section>
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Επωνυμία
-            </p>
-
-            <p className="mt-3 text-[15px] font-bold">
-              {analytics.business.name}
-            </p>
-          </div>
-
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Τοποθεσία
-            </p>
-
-            <p className="mt-3 text-[15px] font-bold">
-              {analytics.business.location_name ??
-                "Δεν έχει οριστεί"}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-[16px] border border-[#DC2727]/15 bg-[#DC2727]/5 p-5">
-          <p className="text-[11px] leading-relaxed text-[#222]/55">
-            Για αλλαγή επωνυμίας, τοποθεσίας ή
-            σύνδεσης με διαφορετικό project,
-            επικοινώνησε με τον διαχειριστή του
-            Zisto.
-          </p>
-        </div>
-      </section>
-
-      {/* Account */}
-      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Λογαριασμός
-        </p>
-
-        <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-          Στοιχεία χρήστη
-        </h2>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Email
+          <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Ασφάλεια
             </p>
 
-            <p className="mt-3 break-all text-[14px] font-bold">
-              {userEmail}
-            </p>
-          </div>
+            <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+              Αλλαγή κωδικού
+            </h2>
 
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Ρόλος
-            </p>
-
-            <p className="mt-3 text-[14px] font-bold">
-              {roleLabels[membershipRole] ??
-                membershipRole}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Password */}
-      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Ασφάλεια
-        </p>
-
-        <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-          Αλλαγή κωδικού
-        </h2>
-
-        <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-[#222]/45">
-          Χρησιμοποίησε τουλάχιστον 8 χαρακτήρες
-          και απόφυγε κωδικούς που χρησιμοποιείς
-          σε άλλες υπηρεσίες.
-        </p>
-
-        <form
-          onSubmit={handlePasswordUpdate}
-          className="mt-8 max-w-2xl"
-        >
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <label className="block">
-              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40">
-                Νέος κωδικός
-              </span>
-
-              <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                value={newPassword}
-                onChange={(event) =>
-                  setNewPassword(
-                    event.target.value,
-                  )
-                }
-                autoComplete="new-password"
-                required
-                minLength={8}
-                className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40">
-                Επιβεβαίωση κωδικού
-              </span>
-
-              <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                value={confirmPassword}
-                onChange={(event) =>
-                  setConfirmPassword(
-                    event.target.value,
-                  )
-                }
-                autoComplete="new-password"
-                required
-                minLength={8}
-                className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]"
-              />
-            </label>
-          </div>
-
-          <label className="mt-5 flex cursor-pointer items-center gap-3 text-[11px] font-semibold text-[#222]/50">
-            <input
-              type="checkbox"
-              checked={showPassword}
-              onChange={(event) =>
-                setShowPassword(
-                  event.target.checked,
-                )
+            <form
+              onSubmit={
+                handlePasswordUpdate
               }
-              className="h-4 w-4 accent-[#DC2727]"
-            />
+              className="mt-8 max-w-2xl"
+            >
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <input
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
+                  value={newPassword}
+                  onChange={(event) =>
+                    setNewPassword(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Νέος κωδικός"
+                  minLength={8}
+                  required
+                  className="rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none focus:border-[#222]"
+                />
+                <input
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
+                  value={
+                    confirmPassword
+                  }
+                  onChange={(event) =>
+                    setConfirmPassword(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Επιβεβαίωση"
+                  minLength={8}
+                  required
+                  className="rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none focus:border-[#222]"
+                />
+              </div>
 
-            Εμφάνιση κωδικών
-          </label>
+              <label className="mt-5 flex cursor-pointer items-center gap-3 text-[11px] font-semibold text-[#222]/50">
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={(event) =>
+                    setShowPassword(
+                      event.target
+                        .checked,
+                    )
+                  }
+                  className="h-4 w-4 accent-[#DC2727]"
+                />
+                Εμφάνιση κωδικών
+              </label>
 
-          {passwordError && (
-            <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
-              {passwordError}
-            </p>
-          )}
+              {passwordError && (
+                <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                  {passwordError}
+                </p>
+              )}
 
-          {passwordSuccess && (
-            <p className="mt-5 rounded-[14px] bg-green-50 px-4 py-3 text-[11px] font-semibold text-green-700">
-              {passwordSuccess}
-            </p>
-          )}
+              {passwordSuccess && (
+                <p className="mt-5 rounded-[14px] bg-green-50 px-4 py-3 text-[11px] font-semibold text-green-700">
+                  {passwordSuccess}
+                </p>
+              )}
 
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="mt-7 inline-flex min-w-[190px] items-center justify-center rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {savingPassword
-              ? "Αποθήκευση..."
-              : "Αλλαγή κωδικού"}
-          </button>
-        </form>
-      </section>
+              <button
+                type="submit"
+                disabled={
+                  savingPassword
+                }
+                className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+              >
+                {savingPassword
+                  ? "Αποθήκευση..."
+                  : "Αλλαγή κωδικού"}
+              </button>
+            </form>
+          </section>
 
-      {/* Session */}
-      <section className="rounded-[22px] border border-red-200 bg-red-50 p-6 md:p-8">
-        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-red-600">
-          Session
-        </p>
-
-        <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[#222]">
-              Αποσύνδεση λογαριασμού
+          <section className="rounded-[22px] border border-red-200 bg-red-50 p-6 md:p-8">
+            <h2 className="text-[22px] font-black">
+              Αποσύνδεση
             </h2>
+            <button
+              type="button"
+              onClick={() => {
+                void onLogout();
+              }}
+              className="mt-5 rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-red-600 transition hover:bg-red-600 hover:text-white"
+            >
+              Αποσύνδεση
+            </button>
+          </section>
+        </>
+      )}
 
-            <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-[#222]/50">
-              Θα χρειαστεί να εισαγάγεις ξανά το
-              email και τον κωδικό σου για να
-              αποκτήσεις πρόσβαση στο dashboard.
-            </p>
+      {centerTab === "subscription" && (
+        <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Zisto Billing
+          </p>
+
+          <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-[28px] font-black tracking-[-0.04em]">
+                Η συνδρομή σου
+              </h2>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#222]/45">
+                Όλα τα στοιχεία της
+                συμφωνίας σου με τη Zisto
+                σε ένα σημείο.
+              </p>
+            </div>
+
+            {subscription && (
+              <span className={`w-fit rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-[0.14em] ${
+                subscription.access_status ===
+                "suspended"
+                  ? "bg-red-100 text-red-700"
+                  : subscription.billing_status ===
+                    "past_due"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-green-100 text-green-700"
+              }`}>
+                {
+                  subscription
+                    .cancel_at_period_end
+                    ? "Λήγει στην επόμενη ανανέωση"
+                    : subscription
+                          .billing_status ===
+                        "active"
+                      ? "Ενεργή"
+                      : subscription
+                          .billing_status
+                }
+              </span>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              void onLogout();
-            }}
-            className="w-full rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-red-600 transition hover:bg-red-600 hover:text-white sm:w-auto"
-          >
-            Αποσύνδεση
-          </button>
-        </div>
-      </section>
+          {!subscription ? (
+            <div className="mt-8 rounded-[18px] bg-[#F6F6F4] p-6">
+              <p className="text-sm font-bold">
+                Δεν υπάρχει ενεργή
+                συνδρομή για αυτή την
+                επιχείρηση.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Χρέωση
+                  </p>
+                  <p className="mt-3 text-[20px] font-black">
+                    {formatMoney(
+                      Math.round(
+                        subscription
+                          .amount_cents *
+                          (1 +
+                            Number(
+                              subscription
+                                .vat_rate,
+                            ) /
+                              100),
+                      ),
+                      subscription
+                        .currency,
+                    )}
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#222]/40">
+                    {intervalLabel(
+                      subscription
+                        .billing_interval_months,
+                    )}{" "}
+                    · με ΦΠΑ
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Πελάτης Zisto
+                  </p>
+                  <p className="mt-3 text-[15px] font-black">
+                    {subscriptionAgeText(
+                      subscription.starts_at,
+                    )}
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#222]/40">
+                    Από{" "}
+                    {formatDate(
+                      subscription.starts_at,
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Επόμενη χρέωση
+                  </p>
+                  <p className="mt-3 text-[15px] font-black">
+                    {formatDate(
+                      subscription
+                        .next_billing_at,
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Billing email
+                  </p>
+                  <p className="mt-3 break-all text-[13px] font-black">
+                    {subscription
+                      .billing_email ??
+                      "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-[18px] border border-black/8 p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Τι περιλαμβάνει η Zisto
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {includedServices.map(
+                    (service) => (
+                      <span
+                        key={service}
+                        className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[11px] font-bold text-[#222]/70"
+                      >
+                        {service}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              {subscription
+                .cancel_at_period_end && (
+                <div className="mt-6 rounded-[18px] border border-amber-200 bg-amber-50 p-5">
+                  <p className="text-[12px] font-bold text-amber-900">
+                    Η αυτόματη ανανέωση έχει
+                    ακυρωθεί.
+                  </p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-amber-800/70">
+                    Η υπηρεσία παραμένει
+                    ενεργή έως{" "}
+                    {formatDate(
+                      subscription
+                        .next_billing_at,
+                    )}
+                    . Μπορείς να συνεχίσεις
+                    την ανανέωση πριν από
+                    αυτή την ημερομηνία.
+                  </p>
+                </div>
+              )}
+
+              {subscriptionError && (
+                <p className="mt-6 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                  {subscriptionError}
+                </p>
+              )}
+
+              {membershipRole ===
+                "owner" &&
+                subscription
+                  .stripe_subscription_id && (
+                  <div className="mt-8 flex flex-col gap-3 border-t border-black/8 pt-6 sm:flex-row">
+                    {subscription
+                      .cancel_at_period_end ? (
+                      <button
+                        type="button"
+                        disabled={
+                          managingSubscription
+                        }
+                        onClick={() =>
+                          void manageSubscription(
+                            "resume_renewal",
+                          )
+                        }
+                        className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+                      >
+                        {managingSubscription
+                          ? "Ενημέρωση..."
+                          : "Συνέχιση ανανέωσης"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={
+                          managingSubscription
+                        }
+                        onClick={() =>
+                          void manageSubscription(
+                            "cancel_renewal",
+                          )
+                        }
+                        className="rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600 transition hover:bg-red-600 hover:text-white disabled:opacity-50"
+                      >
+                        {managingSubscription
+                          ? "Ενημέρωση..."
+                          : "Ακύρωση ανανέωσης"}
+                      </button>
+                    )}
+
+                    <a
+                      href="/#/payments"
+                      className="rounded-full border border-black/10 px-6 py-4 text-center text-[10px] font-bold uppercase tracking-[0.15em] text-[#222]/60 transition hover:border-[#222] hover:text-[#222]"
+                    >
+                      Πολιτική πληρωμών
+                    </a>
+                  </div>
+                )}
+            </>
+          )}
+        </section>
+      )}
     </div>
   );
 }
