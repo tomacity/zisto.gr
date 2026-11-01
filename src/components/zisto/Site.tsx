@@ -1927,7 +1927,35 @@ type AnalyticsResponse = {
     name: string;
     location_name: string | null;
     dashboard_modules: DashboardModule[];
+    profile_image_url: string | null;
   };
+  subscription: {
+    id: string;
+    billing_email: string | null;
+    amount_cents: number;
+    currency: string;
+    vat_rate: number;
+    billing_interval_months: number;
+    billing_status:
+      | "draft"
+      | "active"
+      | "past_due"
+      | "cancelled";
+    access_status:
+      | "active"
+      | "grace_period"
+      | "suspended";
+    starts_at: string;
+    next_billing_at: string | null;
+    payment_due_at: string | null;
+    grace_until: string | null;
+    last_paid_at: string | null;
+    notes: string | null;
+    stripe_customer_id: string | null;
+    stripe_subscription_id: string | null;
+    cancel_at_period_end: boolean;
+    cancellation_requested_at: string | null;
+  } | null;
   totals: {
     page_views_today: number;
     page_views_week: number;
@@ -5395,7 +5423,7 @@ type DashboardModule =
 type DashboardTab =
   | "overview"
   | DashboardModule
-  | "settings";
+  | "business_center";
 
 const DASHBOARD_NAV_ITEMS: {
   id: DashboardTab;
@@ -5408,7 +5436,6 @@ const DASHBOARD_NAV_ITEMS: {
   { id: "menu", icon: "☰", label: "Μενού" },
   { id: "nfc", icon: "⌁", label: "NFC κάρτες" },
   { id: "appointments", icon: "◷", label: "Ραντεβού" },
-  { id: "settings", icon: "⚙", label: "Ρυθμίσεις", system: true },
 ];
 
 function DashboardPage({
@@ -5661,13 +5688,13 @@ function DashboardPage({
     }
 
     if (
-      activeTab !== "settings" &&
+      activeTab !== "business_center" &&
       !enabledModules.includes(
         activeTab as DashboardModule,
       )
     ) {
       setActiveTab(
-        enabledModules[0] ?? "settings",
+        enabledModules[0] ?? "business_center",
       );
     }
   }, [
