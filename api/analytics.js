@@ -348,6 +348,304 @@ export default async function handler(
     }
 
     if (
+      requestedView === "billing-portal" &&
+      req.method === "POST"
+    ) {
+      if (
+        !isAdmin &&
+        membership?.role !== "owner"
+      ) {
+        return res.status(403).json({
+          error:
+            "Only the business owner can manage billing",
+        });
+      }
+
+      const subscriptionParams =
+        new URLSearchParams({
+          business_id:
+            `eq.${businessId}`,
+          select:
+            "id,business_id,stripe_customer_id,stripe_subscription_id",
+          limit: "1",
+        });
+
+      const subscriptionResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/subscriptions?${subscriptionParams.toString()}`,
+        });
+
+      if (!subscriptionResponse.ok) {
+        return res.status(500).json({
+          error:
+            "Could not load subscription",
+        });
+      }
+
+      const subscriptionRows =
+        await subscriptionResponse.json();
+
+      const subscription =
+        subscriptionRows[0];
+
+      if (!subscription) {
+        return res.status(404).json({
+          error:
+            "Subscription not found",
+        });
+      }
+
+      if (
+        !subscription.stripe_customer_id
+      ) {
+        return res.status(400).json({
+          error:
+            "Stripe customer is not connected yet",
+        });
+      }
+
+      const stripeSecretKey =
+        process.env.STRIPE_SECRET_KEY;
+
+      if (!stripeSecretKey) {
+        return res.status(500).json({
+          error:
+            "Stripe is not configured",
+        });
+      }
+
+      const stripeHeaders = {
+        Authorization:
+          `Bearer ${stripeSecretKey}`,
+        "Content-Type":
+          "application/x-www-form-urlencoded",
+      };
+
+      const configurationsResponse =
+        await fetch(
+          "https://api.stripe.com/v1/billing_portal/configurations?active=true&limit=100",
+          {
+            headers: {
+              Authorization:
+                `Bearer ${stripeSecretKey}`,
+            },
+          },
+        );
+
+      const configurationsResult =
+        await configurationsResponse.json();
+
+      if (!configurationsResponse.ok) {
+        console.error(
+          "Stripe portal configuration lookup failed:",
+          configurationsResult,
+        );
+
+        return res.status(502).json({
+          error:
+            configurationsResult?.error?.message ??
+            "Could not load Stripe billing portal",
+        });
+      }
+
+      let portalConfiguration =
+        configurationsResult?.data?.find(
+          (configuration) =>
+            configuration?.metadata
+              ?.zisto_portal_version ===
+              "1",
+        );
+
+      const configurationForm =
+        new URLSearchParams();
+
+      configurationForm.set(
+        "features[invoice_history][enabled]",
+        "true",
+      );
+      configurationForm.set(
+        "features[payment_method_update][enabled]",
+        "true",
+      );
+      configurationForm.set(
+        "features[customer_update][enabled]",
+        "false",
+      );
+      configurationForm.set(
+        "features[subscription_cancel][enabled]",
+        "false",
+      );
+      configurationForm.set(
+        "features[subscription_update][enabled]",
+        "false",
+      );
+      configurationForm.set(
+        "business_profile[headline]",
+        "Διαχείριση πληρωμών Zisto",
+      );
+      configurationForm.set(
+        "business_profile[privacy_policy_url]",
+        "https://zisto.app/#/privacy",
+      );
+      configurationForm.set(
+        "business_profile[terms_of_service_url]",
+        "https://zisto.app/#/payments",
+      );
+      configurationForm.set(
+        "metadata[zisto_portal_version]",
+        "1",
+      );
+
+      if (!portalConfiguration) {
+        configurationForm.set(
+          "name",
+          "Zisto Billing Portal",
+        );
+
+        const createConfigurationResponse =
+          await fetch(
+            "https://api.stripe.com/v1/billing_portal/configurations",
+            {
+              method: "POST",
+              headers: stripeHeaders,
+              body:
+                configurationForm.toString(),
+            },
+          );
+
+        const createConfigurationResult =
+          await createConfigurationResponse.json();
+
+        if (
+          !createConfigurationResponse.ok
+        ) {
+          console.error(
+            "Stripe portal configuration creation failed:",
+            createConfigurationResult,
+          );
+
+          return res.status(502).json({
+            error:
+              createConfigurationResult?.error?.message ??
+              "Could not configure Stripe billing portal",
+          });
+        }
+
+        portalConfiguration =
+          createConfigurationResult;
+      } else {
+        const updateConfigurationResponse =
+          await fetch(
+            `https://api.stripe.com/v1/billing_portal/configurations/${encodeURIComponent(
+              portalConfiguration.id,
+            )}`,
+            {
+              method: "POST",
+              headers: stripeHeaders,
+              body:
+                configurationForm.toString(),
+            },
+          );
+
+        const updateConfigurationResult =
+          await updateConfigurationResponse.json();
+
+        if (
+          !updateConfigurationResponse.ok
+        ) {
+          console.error(
+            "Stripe portal configuration update failed:",
+            updateConfigurationResult,
+          );
+
+          return res.status(502).json({
+            error:
+              updateConfigurationResult?.error?.message ??
+              "Could not configure Stripe billing portal",
+          });
+        }
+
+        portalConfiguration =
+          updateConfigurationResult;
+      }
+
+      const requestOrigin =
+        typeof req.headers.origin ===
+          "string" &&
+        /^https?:\/\//.test(
+          req.headers.origin,
+        )
+          ? req.headers.origin
+          : null;
+
+      const appUrl = (
+        requestOrigin ??
+        process.env.APP_URL ??
+        "https://zisto.app"
+      ).replace(/\/$/, "");
+
+      const returnUrl =
+        `${appUrl}/#/dashboard?business=${encodeURIComponent(
+          businessId,
+        )}&settings=subscription`;
+
+      const portalForm =
+        new URLSearchParams();
+
+      portalForm.set(
+        "customer",
+        subscription.stripe_customer_id,
+      );
+      portalForm.set(
+        "configuration",
+        portalConfiguration.id,
+      );
+      portalForm.set(
+        "return_url",
+        returnUrl,
+      );
+      portalForm.set(
+        "locale",
+        "auto",
+      );
+
+      const portalResponse =
+        await fetch(
+          "https://api.stripe.com/v1/billing_portal/sessions",
+          {
+            method: "POST",
+            headers: stripeHeaders,
+            body:
+              portalForm.toString(),
+          },
+        );
+
+      const portalResult =
+        await portalResponse.json();
+
+      if (!portalResponse.ok) {
+        console.error(
+          "Stripe billing portal session creation failed:",
+          portalResult,
+        );
+
+        return res.status(502).json({
+          error:
+            portalResult?.error?.message ??
+            "Could not open Stripe billing portal",
+        });
+      }
+
+      return res.status(200).json({
+        portal_url:
+          portalResult.url,
+      });
+    }
+
+    if (
       requestedView === "subscription" &&
       req.method === "PATCH"
     ) {
