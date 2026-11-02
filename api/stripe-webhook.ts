@@ -3,6 +3,7 @@ import type {
   VercelResponse,
 } from "@vercel/node";
 import {
+  createHash,
   createHmac,
   timingSafeEqual,
 } from "node:crypto";
@@ -202,6 +203,337 @@ function addDays(
   return date.toISOString();
 }
 
+
+function stripeDate(
+  value: unknown,
+) {
+  return typeof value === "number"
+    ? new Date(
+        value * 1000,
+      ).toISOString()
+    : null;
+}
+
+function invoiceTaxCents(
+  invoice: any,
+) {
+  const taxTotal =
+    (invoice?.total_tax_amounts ?? [])
+      .reduce(
+        (
+          sum: number,
+          item: any,
+        ) =>
+          sum +
+          (typeof item?.amount ===
+          "number"
+            ? item.amount
+            : 0),
+        0,
+      );
+
+  return Math.max(
+    0,
+    taxTotal,
+  );
+}
+
+async function subscriptionForStripeInvoice(
+  supabaseAdmin: any,
+  stripeSubscriptionId: string,
+) {
+  const {
+    data,
+    error,
+  } = await supabaseAdmin
+    .from("subscriptions")
+    .select(
+      "id,business_id,amount_cents,vat_rate,currency",
+    )
+    .eq(
+      "stripe_subscription_id",
+      stripeSubscriptionId,
+    )
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function upsertInvoiceLedger({
+  supabaseAdmin,
+  invoice,
+  subscription,
+  status,
+}: {
+  supabaseAdmin: any;
+  invoice: any;
+  subscription: any;
+  status:
+    | "open"
+    | "paid"
+    | "void"
+    | "uncollectible";
+}) {
+  if (
+    !invoice?.id ||
+    !subscription?.business_id
+  ) {
+    return null;
+  }
+
+  const baseAmountCents =
+    typeof subscription.amount_cents ===
+      "number"
+      ? subscription.amount_cents
+      : typeof invoice.subtotal ===
+          "number"
+        ? invoice.subtotal
+        : 0;
+
+  const configuredVatRate =
+    Number(
+      subscription.vat_rate ?? 0,
+    );
+
+  const configuredVatCents =
+    Math.max(
+      0,
+      Math.round(
+        baseAmountCents *
+          configuredVatRate /
+          100,
+      ),
+    );
+
+  const stripeTaxCents =
+    invoiceTaxCents(invoice);
+
+  const totalCents =
+    typeof invoice.total === "number"
+      ? invoice.total
+      : baseAmountCents +
+        configuredVatCents;
+
+  const vatCents =
+    stripeTaxCents > 0
+      ? stripeTaxCents
+      : Math.max(
+          0,
+          Math.min(
+            configuredVatCents,
+            totalCents -
+              baseAmountCents,
+          ),
+        );
+
+  const periodStart =
+    invoicePeriodStart(invoice);
+
+  const periodEnd =
+    invoicePeriodEnd(invoice);
+
+  const {
+    data,
+    error,
+  } = await supabaseAdmin
+    .from("billing_documents")
+    .upsert(
+      {
+        business_id:
+          subscription.business_id,
+        subscription_id:
+          subscription.id,
+        document_type: "invoice",
+        status,
+        source: "stripe",
+        currency:
+          (
+            invoice.currency ??
+            subscription.currency ??
+            "EUR"
+          ).toUpperCase(),
+        subtotal_cents:
+          Math.max(
+            0,
+            baseAmountCents,
+          ),
+        vat_cents:
+          vatCents,
+        total_cents:
+          Math.max(
+            0,
+            totalCents,
+          ),
+        document_number:
+          invoice.number ?? null,
+        stripe_invoice_id:
+          invoice.id,
+        stripe_payment_intent_id:
+          objectId(
+            invoice.payment_intent,
+          ),
+        hosted_url:
+          invoice.hosted_invoice_url ??
+          null,
+        pdf_url:
+          invoice.invoice_pdf ??
+          null,
+        issued_at:
+          stripeDate(
+            invoice.created,
+          ),
+        due_at:
+          stripeDate(
+            invoice.due_date,
+          ),
+        paid_at:
+          status === "paid"
+            ? stripeDate(
+                invoice
+                  ?.status_transitions
+                  ?.paid_at,
+              ) ??
+              new Date()
+                .toISOString()
+            : null,
+        period_start:
+          periodStart,
+        period_end:
+          periodEnd,
+        metadata: {
+          stripe_status:
+            invoice.status ?? null,
+          billing_reason:
+            invoice.billing_reason ??
+            null,
+        },
+        updated_at:
+          new Date()
+            .toISOString(),
+      },
+      {
+        onConflict:
+          "stripe_invoice_id",
+      },
+    )
+    .select("id")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.id ?? null;
+}
+
+async function upsertPaymentLedger({
+  supabaseAdmin,
+  invoice,
+  subscription,
+  billingDocumentId,
+  status,
+}: {
+  supabaseAdmin: any;
+  invoice: any;
+  subscription: any;
+  billingDocumentId:
+    | string
+    | null;
+  status:
+    | "succeeded"
+    | "failed";
+}) {
+  if (
+    !invoice?.id ||
+    !subscription?.business_id
+  ) {
+    return;
+  }
+
+  const paymentIntentId =
+    objectId(
+      invoice.payment_intent,
+    );
+
+  const externalPaymentId =
+    paymentIntentId ??
+    `${invoice.id}:${status}`;
+
+  const amountCents =
+    status === "succeeded"
+      ? typeof invoice.amount_paid ===
+          "number"
+        ? invoice.amount_paid
+        : typeof invoice.total ===
+            "number"
+          ? invoice.total
+          : 0
+      : typeof invoice.amount_due ===
+          "number"
+        ? invoice.amount_due
+        : typeof invoice.total ===
+            "number"
+          ? invoice.total
+          : 0;
+
+  const { error } =
+    await supabaseAdmin
+      .from("billing_payments")
+      .upsert(
+        {
+          business_id:
+            subscription.business_id,
+          subscription_id:
+            subscription.id,
+          billing_document_id:
+            billingDocumentId,
+          provider: "stripe",
+          external_payment_id:
+            externalPaymentId,
+          stripe_payment_intent_id:
+            paymentIntentId,
+          amount_cents:
+            Math.max(
+              0,
+              amountCents,
+            ),
+          currency:
+            (
+              invoice.currency ??
+              subscription.currency ??
+              "EUR"
+            ).toUpperCase(),
+          status,
+          paid_at:
+            status ===
+            "succeeded"
+              ? stripeDate(
+                  invoice
+                    ?.status_transitions
+                    ?.paid_at,
+                ) ??
+                new Date()
+                  .toISOString()
+              : null,
+          updated_at:
+            new Date()
+              .toISOString(),
+        },
+        {
+          onConflict:
+            "provider,external_payment_id",
+        },
+      );
+
+  if (error) {
+    throw error;
+  }
+}
+
 export default async function handler(
   request: VercelRequest,
   response: VercelResponse,
@@ -316,7 +648,66 @@ export default async function handler(
       },
     );
 
+  let billingEventId:
+    | string
+    | null = null;
+
   try {
+    const eventExternalId =
+      typeof event?.id ===
+        "string"
+        ? event.id
+        : null;
+
+    if (eventExternalId) {
+      const payloadHash =
+        createHash("sha256")
+          .update(rawBody)
+          .digest("hex");
+
+      const {
+        data: eventRecord,
+        error: eventInsertError,
+      } = await supabaseAdmin
+        .from("billing_events")
+        .insert({
+          provider: "stripe",
+          external_event_id:
+            eventExternalId,
+          event_type:
+            event.type ??
+            "unknown",
+          object_id:
+            objectId(
+              event.data?.object,
+            ),
+          status: "received",
+          payload_hash:
+            payloadHash,
+        })
+        .select("id")
+        .single();
+
+      if (eventInsertError) {
+        if (
+          eventInsertError.code ===
+          "23505"
+        ) {
+          return response
+            .status(200)
+            .json({
+              received: true,
+              duplicate: true,
+            });
+        }
+
+        throw eventInsertError;
+      }
+
+      billingEventId =
+        eventRecord?.id ?? null;
+    }
+
     const eventType =
       event.type;
 
@@ -491,6 +882,12 @@ export default async function handler(
       if (
         stripeSubscriptionId
       ) {
+        const subscription =
+          await subscriptionForStripeInvoice(
+            supabaseAdmin,
+            stripeSubscriptionId,
+          );
+
         const nextBillingAt =
           invoicePeriodEnd(
             invoice,
@@ -543,6 +940,40 @@ export default async function handler(
         if (error) {
           throw error;
         }
+
+        if (subscription) {
+          const billingDocumentId =
+            await upsertInvoiceLedger({
+              supabaseAdmin,
+              invoice,
+              subscription,
+              status: "paid",
+            });
+
+          await upsertPaymentLedger({
+            supabaseAdmin,
+            invoice,
+            subscription,
+            billingDocumentId,
+            status: "succeeded",
+          });
+
+          if (billingEventId) {
+            await supabaseAdmin
+              .from("billing_events")
+              .update({
+                business_id:
+                  subscription
+                    .business_id,
+                subscription_id:
+                  subscription.id,
+              })
+              .eq(
+                "id",
+                billingEventId,
+              );
+          }
+        }
       }
     }
 
@@ -563,6 +994,12 @@ export default async function handler(
       if (
         stripeSubscriptionId
       ) {
+        const subscription =
+          await subscriptionForStripeInvoice(
+            supabaseAdmin,
+            stripeSubscriptionId,
+          );
+
         const dueAt =
           invoicePeriodStart(
             invoice,
@@ -609,6 +1046,40 @@ export default async function handler(
         if (error) {
           throw error;
         }
+
+        if (subscription) {
+          const billingDocumentId =
+            await upsertInvoiceLedger({
+              supabaseAdmin,
+              invoice,
+              subscription,
+              status: "open",
+            });
+
+          await upsertPaymentLedger({
+            supabaseAdmin,
+            invoice,
+            subscription,
+            billingDocumentId,
+            status: "failed",
+          });
+
+          if (billingEventId) {
+            await supabaseAdmin
+              .from("billing_events")
+              .update({
+                business_id:
+                  subscription
+                    .business_id,
+                subscription_id:
+                  subscription.id,
+              })
+              .eq(
+                "id",
+                billingEventId,
+              );
+          }
+        }
       }
     }
 
@@ -652,6 +1123,21 @@ export default async function handler(
       }
     }
 
+    if (billingEventId) {
+      await supabaseAdmin
+        .from("billing_events")
+        .update({
+          status: "processed",
+          processed_at:
+            new Date()
+              .toISOString(),
+        })
+        .eq(
+          "id",
+          billingEventId,
+        );
+    }
+
     return response
       .status(200)
       .json({
@@ -662,6 +1148,37 @@ export default async function handler(
       "Stripe webhook processing failed:",
       error,
     );
+
+    if (billingEventId) {
+      try {
+        await supabaseAdmin
+          .from("billing_events")
+          .update({
+            status: "failed",
+            error_message:
+              error instanceof Error
+                ? error.message.slice(
+                    0,
+                    500,
+                  )
+                : "Unknown webhook error",
+            processed_at:
+              new Date()
+                .toISOString(),
+          })
+          .eq(
+            "id",
+            billingEventId,
+          );
+      } catch (
+        eventLogError
+      ) {
+        console.error(
+          "Billing event failure log failed:",
+          eventLogError,
+        );
+      }
+    }
 
     return response
       .status(500)
