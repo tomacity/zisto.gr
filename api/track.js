@@ -1584,6 +1584,15 @@ async function handleAppointmentPublicCancel(
               "Missing recipient email",
           };
 
+    console.info(
+      "Appointment reschedule email result:",
+      {
+        sent: rescheduleEmail.sent,
+        error:
+          rescheduleEmail.error || null,
+      },
+    );
+
     return response.status(200).json({
       success: true,
       email_sent:
