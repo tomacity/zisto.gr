@@ -410,7 +410,7 @@ export async function issuePendingFiscalDocuments({
   } = await supabaseAdmin
     .from("billing_issuer_profile")
     .select(
-      "legal_name,trade_name,tax_id,tax_country,tax_office,activity,address_line1,address_line2,address_number,city,region,postal_code,country_code,phone,email,website,registry_number,invoice_provider,provider_account_id,provider_series,live_billing_enabled",
+      "legal_name,trade_name,tax_id,tax_country,tax_office,activity,address_line1,address_line2,address_number,city,region,postal_code,country_code,phone,email,website,registry_number,invoice_provider,provider_account_id,provider_series,live_billing_enabled,live_billing_from",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -424,7 +424,8 @@ export async function issuePendingFiscalDocuments({
   if (
     !issuer?.live_billing_enabled ||
     issuer.invoice_provider !== "licensed_provider" ||
-    !issuer.tax_id
+    !issuer.tax_id ||
+    !issuer.live_billing_from
   ) {
     return {
       enabled: false,
@@ -444,6 +445,10 @@ export async function issuePendingFiscalDocuments({
       "id,business_id,subscription_id,status,currency,subtotal_cents,vat_cents,total_cents,provider_series,provider_aa,provider_attempts,metadata,paid_at,created_at,businesses(name),subscriptions(vat_rate)",
     )
     .eq("status", "paid")
+    .gte(
+      "paid_at",
+      issuer.live_billing_from,
+    )
     .in("fiscal_status", [
       "pending",
       "failed",
