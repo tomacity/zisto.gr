@@ -6,6 +6,7 @@ import {
   createClient,
   type SupabaseClient,
 } from "@supabase/supabase-js";
+import { issuePendingFiscalDocuments } from "../../src/server/einvoicing-provider";
 
 const BILLING_STATUSES = new Set([
   "draft",
@@ -665,15 +666,26 @@ export default async function handler(
       }
 
       try {
-        const result =
-          await runBillingAutomation({
+        const [
+          billingResult,
+          fiscalResult,
+        ] = await Promise.all([
+          runBillingAutomation({
             supabaseAdmin,
             resendApiKey,
-          });
+          }),
+          issuePendingFiscalDocuments({
+            supabaseAdmin,
+            limit: 10,
+          }),
+        ]);
 
         return response
           .status(200)
-          .json(result);
+          .json({
+            ...billingResult,
+            fiscal: fiscalResult,
+          });
       } catch (error) {
         console.error(
           "Billing cron failed:",
