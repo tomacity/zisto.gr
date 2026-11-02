@@ -3,6 +3,10 @@
     {
       "path": "/api/admin/subscriptions",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/fiscal-queue",
+      "schedule": "30 7 * * *"
     }
   ],
   "rewrites": [
@@ -10,5 +14,15 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/fiscal-worker.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "zisto-fiscal-invoices"
+        }
+      ]
+    }
+  }
 }
