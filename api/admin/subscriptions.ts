@@ -6,7 +6,7 @@ import {
   createClient,
   type SupabaseClient,
 } from "@supabase/supabase-js";
-import { issuePendingFiscalDocuments } from "../../src/server/einvoicing-provider";
+import { issuePendingFiscalDocuments } from "../../src/server/einvoicing-provider.js";
 
 const BILLING_STATUSES = new Set([
   "draft",

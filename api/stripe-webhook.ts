@@ -9,7 +9,7 @@ import {
 } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { waitUntil } from "@vercel/functions";
-import { issuePendingFiscalDocuments } from "../src/server/einvoicing-provider";
+import { issuePendingFiscalDocuments } from "../src/server/einvoicing-provider.js";
 
 export const config = {
   api: {
