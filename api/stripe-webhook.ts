@@ -404,12 +404,18 @@ async function upsertInvoiceLedger({
           periodStart,
         period_end:
           periodEnd,
+        fiscal_status:
+          status === "paid"
+            ? "pending"
+            : "not_requested",
         metadata: {
           stripe_status:
             invoice.status ?? null,
           billing_reason:
             invoice.billing_reason ??
             null,
+          vat_rate:
+            configuredVatRate,
         },
         updated_at:
           new Date()
