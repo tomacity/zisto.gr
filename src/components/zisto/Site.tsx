@@ -3519,7 +3519,23 @@ function SettingsTab({
     setCenterTab,
   ] = useState<
     "profile" | "account" | "subscription"
-  >("profile");
+  >(() => {
+    if (typeof window === "undefined") {
+      return "profile";
+    }
+
+    const rawHash =
+      window.location.hash.replace(/^#/, "");
+    const [, search = ""] =
+      rawHash.split("?");
+
+    return new URLSearchParams(
+      search,
+    ).get("settings") ===
+      "subscription"
+      ? "subscription"
+      : "profile";
+  });
 
   const [newPassword, setNewPassword] =
     useState("");
@@ -3587,6 +3603,10 @@ function SettingsTab({
   const [
     managingSubscription,
     setManagingSubscription,
+  ] = useState(false);
+  const [
+    openingBillingPortal,
+    setOpeningBillingPortal,
   ] = useState(false);
   const [
     subscriptionError,
@@ -4204,6 +4224,70 @@ function SettingsTab({
       );
     } finally {
       setUploadingAvatar(false);
+    }
+  }
+
+  async function openBillingPortal() {
+    if (!subscription) {
+      return;
+    }
+
+    setSubscriptionError("");
+
+    try {
+      setOpeningBillingPortal(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          analytics.business_id,
+        )}&view=billing-portal`,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατό να ανοίξει η διαχείριση πληρωμών.",
+        );
+      }
+
+      if (
+        typeof result.portal_url !==
+        "string"
+      ) {
+        throw new Error(
+          "Δεν επιστράφηκε έγκυρος σύνδεσμος πληρωμών.",
+        );
+      }
+
+      window.location.assign(
+        result.portal_url,
+      );
+    } catch (error) {
+      setSubscriptionError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατό να ανοίξει η διαχείριση πληρωμών.",
+      );
+      setOpeningBillingPortal(false);
     }
   }
 
@@ -5012,6 +5096,24 @@ function SettingsTab({
                         {managingSubscription
                           ? "Ενημέρωση..."
                           : "Ακύρωση συνδρομής"}
+                      </button>
+                    )}
+
+                    {subscription
+                      .stripe_customer_id && (
+                      <button
+                        type="button"
+                        disabled={
+                          openingBillingPortal
+                        }
+                        onClick={() =>
+                          void openBillingPortal()
+                        }
+                        className="rounded-full border border-black/10 bg-white px-6 py-4 text-center text-[10px] font-bold uppercase tracking-[0.15em] text-[#222] transition hover:border-[#222] hover:bg-[#222] hover:text-white disabled:opacity-50"
+                      >
+                        {openingBillingPortal
+                          ? "Άνοιγμα..."
+                          : "Πληρωμές & παραστατικά"}
                       </button>
                     )}
 
