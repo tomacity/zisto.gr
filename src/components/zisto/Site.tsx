@@ -4906,9 +4906,8 @@ function SettingsTab({
   ) {
     const previewWindow =
       window.open(
-        "",
+        "about:blank",
         "_blank",
-        "noopener,noreferrer",
       );
 
     if (!previewWindow) {
@@ -5404,6 +5403,12 @@ function SettingsTab({
     previewWindow.document.open();
     previewWindow.document.write(html);
     previewWindow.document.close();
+
+    // Detach only after writing the document.
+    // Using noopener/noreferrer in window.open can make Chrome return
+    // an unusable window reference and leave the new tab at about:blank.
+    previewWindow.opener = null;
+    previewWindow.focus();
   }
 
   function intervalLabel(months: number) {
