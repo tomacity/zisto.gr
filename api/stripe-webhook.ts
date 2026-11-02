@@ -8,7 +8,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { send } from "@vercel/queue";
+import { waitUntil } from "@vercel/functions";
+import { issuePendingFiscalDocuments } from "../src/server/einvoicing-provider";
 
 export const config = {
   api: {
@@ -966,27 +967,19 @@ export default async function handler(
           });
 
           if (billingDocumentId) {
-            try {
-              await send(
-                "zisto-fiscal-invoices",
-                {
+            waitUntil(
+              issuePendingFiscalDocuments({
+                supabaseAdmin,
+                documentId:
                   billingDocumentId,
-                },
-                {
-                  retentionSeconds:
-                    60 * 60 * 24 * 7,
-                  idempotencyKey:
-                    `stripe-invoice:${invoice.id}`,
-                },
-              );
-            } catch (queueError) {
-              // Do not fail Stripe acknowledgement because the fiscal
-              // ledger remains pending and the daily fallback can retry it.
-              console.error(
-                "Fiscal queue publish failed:",
-                queueError,
-              );
-            }
+                limit: 1,
+              }).catch((fiscalError) => {
+                console.error(
+                  "Fiscal issuance background task failed:",
+                  fiscalError,
+                );
+              }),
+            );
           }
 
           if (billingEventId) {
