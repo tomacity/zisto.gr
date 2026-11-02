@@ -9251,7 +9251,25 @@ function DashboardPage({
   const [cardsLoading, setCardsLoading] = useState(true);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>("analytics");
+  const [activeTab, setActiveTab] =
+    useState<DashboardTab>(() => {
+      if (typeof window === "undefined") {
+        return "analytics";
+      }
+
+      const rawHash =
+        window.location.hash.replace(/^#/, "");
+      const [, search = ""] =
+        rawHash.split("?");
+      const settings =
+        new URLSearchParams(search).get(
+          "settings",
+        );
+
+      return settings === "subscription"
+        ? "business_center"
+        : "analytics";
+    });
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [awaitingApproval, setAwaitingApproval] = useState(false);
