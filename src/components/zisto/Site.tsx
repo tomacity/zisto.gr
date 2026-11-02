@@ -4246,18 +4246,36 @@ function SettingsTab({
         return;
       }
 
-      const response = await fetch(
-        `/api/analytics?business_id=${encodeURIComponent(
-          analytics.business_id,
-        )}&view=billing-portal`,
-        {
-          method: "POST",
-          headers: {
-            Authorization:
-              `Bearer ${session.access_token}`,
+      const controller =
+        new AbortController();
+      const timeout =
+        window.setTimeout(
+          () => controller.abort(),
+          12000,
+        );
+
+      let response: Response;
+
+      try {
+        response = await fetch(
+          `/api/billing-portal?business_id=${encodeURIComponent(
+            analytics.business_id,
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            signal:
+              controller.signal,
           },
-        },
-      );
+        );
+      } finally {
+        window.clearTimeout(
+          timeout,
+        );
+      }
 
       const result =
         await response.json();
@@ -4283,9 +4301,12 @@ function SettingsTab({
       );
     } catch (error) {
       setSubscriptionError(
-        error instanceof Error
-          ? error.message
-          : "Δεν ήταν δυνατό να ανοίξει η διαχείριση πληρωμών.",
+        error instanceof DOMException &&
+          error.name === "AbortError"
+          ? "Η σύνδεση με το Stripe άργησε να απαντήσει. Δοκίμασε ξανά."
+          : error instanceof Error
+            ? error.message
+            : "Δεν ήταν δυνατό να ανοίξει η διαχείριση πληρωμών.",
       );
       setOpeningBillingPortal(false);
     }
