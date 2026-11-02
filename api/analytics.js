@@ -498,7 +498,7 @@ export default async function handler(
                 ? invoice.lines.data[0]
                 : null;
 
-            const taxCents =
+            const stripeTaxCents =
               Array.isArray(
                 invoice?.total_tax_amounts,
               )
@@ -516,24 +516,87 @@ export default async function handler(
                   )
                 : 0;
 
-            const subtotalCents =
-              typeof invoice?.subtotal ===
-              "number"
-                ? invoice.subtotal
-                : Math.max(
-                    0,
-                    Number(
-                      subscription.amount_cents ??
-                        0,
-                    ),
-                  );
-
-            const totalCents =
+            const stripeTotalCents =
               typeof invoice?.total ===
               "number"
                 ? invoice.total
+                : 0;
+
+            const configuredNetCents =
+              Math.max(
+                0,
+                Number(
+                  subscription.amount_cents ??
+                    0,
+                ),
+              );
+
+            const configuredVatRate =
+              Math.max(
+                0,
+                Number(
+                  subscription.vat_rate ??
+                    0,
+                ),
+              );
+
+            const configuredVatCents =
+              Math.round(
+                configuredNetCents *
+                  configuredVatRate /
+                  100,
+              );
+
+            const configuredGrossCents =
+              configuredNetCents +
+              configuredVatCents;
+
+            let subtotalCents =
+              typeof invoice?.subtotal ===
+              "number"
+                ? invoice.subtotal
+                : configuredNetCents;
+
+            let taxCents =
+              stripeTaxCents;
+
+            let totalCents =
+              stripeTotalCents > 0
+                ? stripeTotalCents
                 : subtotalCents +
                   taxCents;
+
+            if (
+              taxCents === 0 &&
+              configuredVatRate > 0 &&
+              totalCents > 0
+            ) {
+              if (
+                configuredNetCents > 0 &&
+                configuredGrossCents ===
+                  totalCents
+              ) {
+                subtotalCents =
+                  configuredNetCents;
+                taxCents =
+                  configuredVatCents;
+              } else {
+                subtotalCents =
+                  Math.round(
+                    totalCents /
+                      (1 +
+                        configuredVatRate /
+                          100),
+                  );
+
+                taxCents =
+                  Math.max(
+                    0,
+                    totalCents -
+                      subtotalCents,
+                  );
+              }
+            }
 
             const documentPayload = {
               business_id:
@@ -691,9 +754,43 @@ export default async function handler(
         });
       }
 
+      const [
+        billingProfileResponse,
+        issuerProfileResponse,
+      ] = await Promise.all([
+        supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/billing_profiles?business_id=eq.${encodeURIComponent(
+              businessId,
+            )}&select=customer_type,legal_name,trade_name,tax_id,tax_country,tax_office,activity,invoice_email,address_line1,address_line2,city,region,postal_code,country_code&limit=1`,
+        }),
+        supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            "/rest/v1/billing_issuer_profile?id=eq.1&select=legal_name,trade_name,tax_id,tax_country,tax_office,activity,address_line1,address_line2,city,region,postal_code,country_code,invoice_provider,provider_account_id,live_billing_enabled&limit=1",
+        }),
+      ]);
+
+      const billingProfiles =
+        billingProfileResponse.ok
+          ? await billingProfileResponse.json()
+          : [];
+
+      const issuerProfiles =
+        issuerProfileResponse.ok
+          ? await issuerProfileResponse.json()
+          : [];
+
       return res.status(200).json({
         documents:
           await historyResponse.json(),
+        billing_profile:
+          billingProfiles[0] ?? null,
+        issuer_profile:
+          issuerProfiles[0] ?? null,
       });
     }
 
