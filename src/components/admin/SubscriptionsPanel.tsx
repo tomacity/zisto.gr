@@ -962,7 +962,7 @@ export function SubscriptionsPanel({
         )}
       </section>
 
-      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
+      <section className="overflow-hidden rounded-[22px] border border-black/10 bg-white sm:rounded-[28px]">
         {subscriptions.length === 0 ? (
           <div className="p-10 text-center">
             <h3 className="text-xl font-black">
@@ -1179,35 +1179,66 @@ export function SubscriptionsPanel({
                   return (
                     <article
                       key={subscription.id}
-                      className="space-y-5 p-6"
+                      className="space-y-4 p-4 sm:space-y-5 sm:p-6"
                     >
-                      <div>
-                        <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
-                          Επιχείρηση
-                        </p>
-                        <p className="mt-2 font-black">
-                          {business?.name ??
-                            "Άγνωστη επιχείρηση"}
-                        </p>
-                        <p className="mt-1 font-mono text-[10px] text-[#999]">
-                          {business?.slug
-                            ? `/${business.slug}`
-                            : subscription.business_id}
-                        </p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
+                            Επιχείρηση
+                          </p>
+                          <p className="mt-1.5 break-words text-lg font-black leading-tight sm:text-xl">
+                            {business?.name ??
+                              "Άγνωστη επιχείρηση"}
+                          </p>
+                          <p className="mt-1 font-mono text-[10px] text-[#999]">
+                            {business?.slug
+                              ? `/${business.slug}`
+                              : subscription.business_id}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <span className={`inline-flex rounded-full px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.08em] ${
+                            subscription.billing_status ===
+                            "past_due"
+                              ? "bg-red-100 text-red-700"
+                              : subscription.billing_status ===
+                                  "active"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-[#F1F1EF] text-[#666]"
+                          }`}>
+                            {billingStatusLabel(
+                              subscription.billing_status,
+                            )}
+                          </span>
+                          <span className={`inline-flex rounded-full px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.08em] ${
+                            subscription.access_status ===
+                            "suspended"
+                              ? "bg-red-100 text-red-700"
+                              : subscription.access_status ===
+                                  "grace_period"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-[#F1F1EF] text-[#555]"
+                          }`}>
+                            {accessStatusLabel(
+                              subscription.access_status,
+                            )}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-5">
-                        <div>
+                      <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#F7F5F1] p-3.5 sm:gap-5 sm:p-4">
+                        <div className="min-w-0">
                           <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
                             Χρέωση
                           </p>
-                          <p className="mt-2 font-black">
+                          <p className="mt-1.5 text-xl font-black tracking-[-0.03em]">
                             {formatMoney(
                               subscription.amount_cents,
                               subscription.currency,
                             )}
                           </p>
-                          <p className="mt-1 text-xs text-[#777]">
+                          <p className="mt-1 text-[11px] leading-4 text-[#777]">
                             {intervalLabel(
                               subscription.billing_interval_months,
                             )}{" "}
@@ -1224,55 +1255,69 @@ export function SubscriptionsPanel({
                           </p>
                         </div>
 
-                        <div>
+                        <div className="min-w-0 border-l border-black/[0.06] pl-3 sm:pl-5">
                           <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
                             Επόμενη
                           </p>
-                          <p className="mt-2 text-sm font-bold">
+                          <p className="mt-1.5 text-sm font-black leading-5">
                             {formatDate(
                               subscription.next_billing_at,
                             )}
                           </p>
+                          {subscription.payment_due_at && (
+                            <p className="mt-1 text-[10px] leading-4 text-[#999]">
+                              Due{" "}
+                              {formatDate(
+                                subscription.payment_due_at,
+                              )}
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <span className={`inline-flex rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] ${
-                          subscription.billing_status ===
-                          "past_due"
-                            ? "bg-red-100 text-red-700"
-                            : subscription.billing_status ===
-                              "active"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-[#F1F1EF] text-[#666]"
-                        }`}>
-                          {billingStatusLabel(
-                            subscription.billing_status,
-                          )}
-                        </span>
-                        <span className={`inline-flex rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] ${
-                          subscription.access_status ===
-                          "suspended"
-                            ? "bg-red-100 text-red-700"
-                            : subscription.access_status ===
-                              "grace_period"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-[#F1F1EF] text-[#555]"
-                        }`}>
-                          {accessStatusLabel(
-                            subscription.access_status,
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="border-t border-black/[0.06] pt-4">
+                      <div className="min-w-0 border-t border-black/[0.06] pt-4">
                         <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
                           Billing email
                         </p>
-                        <p className="mt-2 break-all text-sm text-[#666]">
+                        <p className="mt-1.5 break-words text-[13px] leading-5 text-[#666] [overflow-wrap:anywhere]">
                           {subscription.billing_email ??
                             "—"}
                         </p>
+                      </div>
+
+                      <div className="border-t border-black/[0.06] pt-4">
+                        <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
+                          Stripe
+                        </p>
+
+                        {subscription.stripe_subscription_id ? (
+                          <span className="inline-flex rounded-full bg-green-100 px-3 py-2 text-[9px] font-black uppercase tracking-[0.1em] text-green-700">
+                            Connected
+                          </span>
+                        ) : subscription.billing_status === "draft" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openStripeCheckout(
+                                subscription,
+                              )
+                            }
+                            disabled={
+                              openingCheckoutId ===
+                              subscription.id
+                            }
+                            className="w-full rounded-xl bg-[#635BFF] px-4 py-3.5 text-[11px] font-black text-white transition active:scale-[0.99] disabled:opacity-50"
+                          >
+                            {openingCheckoutId ===
+                            subscription.id
+                              ? "Άνοιγμα..."
+                              : "Stripe Checkout"}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-[#999]">
+                            —
+                          </span>
+                        )}
                       </div>
                     </article>
                   );
