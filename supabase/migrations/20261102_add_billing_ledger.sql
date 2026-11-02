@@ -89,9 +89,9 @@ create table if not exists public.billing_documents (
   updated_at timestamptz not null default now()
 );
 
-create unique index if not exists billing_documents_stripe_invoice_idx
-  on public.billing_documents (stripe_invoice_id)
-  where stripe_invoice_id is not null;
+alter table public.billing_documents
+  add constraint billing_documents_stripe_invoice_unique
+  unique (stripe_invoice_id);
 
 create index if not exists billing_documents_business_date_idx
   on public.billing_documents (business_id, issued_at desc);
@@ -124,9 +124,9 @@ create table if not exists public.billing_payments (
   updated_at timestamptz not null default now()
 );
 
-create unique index if not exists billing_payments_provider_external_idx
-  on public.billing_payments (provider, external_payment_id)
-  where external_payment_id is not null;
+alter table public.billing_payments
+  add constraint billing_payments_provider_external_unique
+  unique (provider, external_payment_id);
 
 create index if not exists billing_payments_business_date_idx
   on public.billing_payments (business_id, created_at desc);
