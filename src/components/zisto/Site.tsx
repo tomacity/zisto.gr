@@ -39,6 +39,430 @@ const MONOGRAM = "/images/zisto-monogram.png";
 const RED = "#DC2727";
 const INK = "#222222";
 
+const GREEK_REGIONS = [
+  "Ανατολική Μακεδονία και Θράκη",
+  "Αττική",
+  "Βόρειο Αιγαίο",
+  "Δυτική Ελλάδα",
+  "Δυτική Μακεδονία",
+  "Ήπειρος",
+  "Θεσσαλία",
+  "Ιόνια Νησιά",
+  "Κεντρική Μακεδονία",
+  "Κρήτη",
+  "Νότιο Αιγαίο",
+  "Πελοπόννησος",
+  "Στερεά Ελλάδα",
+].sort((a, b) =>
+  a.localeCompare(b, "el-GR"),
+);
+
+const ELSTAT_SETTLEMENTS_URL =
+  "https://sdigmap.tee.gov.gr/mapping/rest/services/UDM/UDM_SERVICE_ELSTAT/MapServer/18/query";
+
+let greekSettlementsCache:
+  | string[]
+  | null = null;
+
+let greekSettlementsPromise:
+  | Promise<string[]>
+  | null = null;
+
+function normalizeGreekSearch(
+  value: string,
+) {
+  return value
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      "",
+    )
+    .toLocaleLowerCase(
+      "el-GR",
+    )
+    .trim();
+}
+
+async function loadGreekSettlements() {
+  if (greekSettlementsCache) {
+    return greekSettlementsCache;
+  }
+
+  if (greekSettlementsPromise) {
+    return greekSettlementsPromise;
+  }
+
+  greekSettlementsPromise =
+    (async () => {
+      const collected:
+        string[] = [];
+
+      const pageSize = 2000;
+
+      for (
+        let offset = 0;
+        offset < 30000;
+        offset += pageSize
+      ) {
+        const params =
+          new URLSearchParams({
+            where:
+              "OIKISMOS IS NOT NULL",
+            outFields:
+              "OIKISMOS",
+            returnGeometry:
+              "false",
+            returnDistinctValues:
+              "true",
+            orderByFields:
+              "OIKISMOS",
+            resultOffset:
+              String(offset),
+            resultRecordCount:
+              String(pageSize),
+            f: "json",
+          });
+
+        const response =
+          await fetch(
+            `${ELSTAT_SETTLEMENTS_URL}?${params.toString()}`,
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            "Δεν ήταν δυνατή η φόρτωση των πόλεων.",
+          );
+        }
+
+        const result =
+          await response.json();
+
+        const page =
+          Array.isArray(
+            result.features,
+          )
+            ? result.features
+                .map(
+                  (
+                    feature: any,
+                  ) =>
+                    feature
+                      ?.attributes
+                      ?.OIKISMOS,
+                )
+                .filter(
+                  (
+                    name: unknown,
+                  ): name is string =>
+                    typeof name ===
+                      "string" &&
+                    name.trim()
+                      .length > 0,
+                )
+            : [];
+
+        collected.push(
+          ...page,
+        );
+
+        if (
+          page.length <
+            pageSize &&
+          !result.exceededTransferLimit
+        ) {
+          break;
+        }
+      }
+
+      greekSettlementsCache =
+        Array.from(
+          new Set(
+            collected.map(
+              (name) =>
+                name.trim(),
+            ),
+          ),
+        ).sort((a, b) =>
+          a.localeCompare(
+            b,
+            "el-GR",
+          ),
+        );
+
+      return greekSettlementsCache;
+    })().catch((error) => {
+      greekSettlementsPromise =
+        null;
+      throw error;
+    });
+
+  return greekSettlementsPromise;
+}
+
+function SearchableSelect({
+  value,
+  onChange,
+  options,
+  loadOptions,
+  placeholder,
+  emptyMessage =
+    "Δεν βρέθηκε επιλογή.",
+}: {
+  value: string;
+  onChange: (
+    value: string,
+  ) => void;
+  options?: string[];
+  loadOptions?: () =>
+    Promise<string[]>;
+  placeholder: string;
+  emptyMessage?: string;
+}) {
+  const rootRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+  const [
+    availableOptions,
+    setAvailableOptions,
+  ] = useState<string[]>(
+    options ?? [],
+  );
+  const [open, setOpen] =
+    useState(false);
+  const [loading, setLoading] =
+    useState(false);
+  const [loadError, setLoadError] =
+    useState("");
+
+  useEffect(() => {
+    if (options) {
+      setAvailableOptions(
+        options,
+      );
+    }
+  }, [options]);
+
+  useEffect(() => {
+    function handlePointerDown(
+      event: MouseEvent,
+    ) {
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(
+          event.target as Node,
+        )
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handlePointerDown,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handlePointerDown,
+      );
+    };
+  }, []);
+
+  async function ensureOptions() {
+    if (
+      !loadOptions ||
+      availableOptions.length >
+        0 ||
+      loading
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setLoadError("");
+
+      const loaded =
+        await loadOptions();
+
+      setAvailableOptions(
+        loaded,
+      );
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η φόρτωση.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const normalizedQuery =
+    normalizeGreekSearch(value);
+
+  const filteredOptions =
+    availableOptions
+      .filter((option) => {
+        if (!normalizedQuery) {
+          return true;
+        }
+
+        return normalizeGreekSearch(
+          option,
+        ).includes(
+          normalizedQuery,
+        );
+      })
+      .slice(0, 250);
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative"
+    >
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(event) => {
+            onChange(
+              event.target.value,
+            );
+            setOpen(true);
+            void ensureOptions();
+          }}
+          onFocus={() => {
+            setOpen(true);
+            void ensureOptions();
+          }}
+          placeholder={
+            placeholder
+          }
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 pr-11 text-[13px] font-semibold outline-none focus:border-[#222]"
+        />
+
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(
+              (current) =>
+                !current,
+            );
+            void ensureOptions();
+          }}
+          className="absolute inset-y-0 right-0 grid w-11 place-items-center text-[#222]/40 transition hover:text-[#222]"
+          aria-label="Άνοιγμα επιλογών"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            className={`h-4 w-4 transition-transform ${
+              open
+                ? "rotate-180"
+                : ""
+            }`}
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="m4 6 4 4 4-4"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute z-[80] mt-2 max-h-72 w-full overflow-y-auto rounded-[14px] border border-black/10 bg-white p-1.5 shadow-[0_18px_45px_-20px_rgba(0,0,0,0.28)]">
+          {loading ? (
+            <p className="px-3 py-4 text-[11px] font-semibold text-[#222]/40">
+              Φόρτωση επιλογών...
+            </p>
+          ) : loadError ? (
+            <button
+              type="button"
+              onClick={() => {
+                setAvailableOptions(
+                  [],
+                );
+                void ensureOptions();
+              }}
+              className="w-full rounded-[10px] px-3 py-4 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
+            >
+              {loadError} Πάτησε για
+              νέα προσπάθεια.
+            </button>
+          ) : filteredOptions.length >
+            0 ? (
+            filteredOptions.map(
+              (option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onMouseDown={(
+                    event,
+                  ) =>
+                    event.preventDefault()
+                  }
+                  onClick={() => {
+                    onChange(
+                      option,
+                    );
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-[10px] px-3 py-2.5 text-left text-[12px] font-semibold transition hover:bg-[#F6F6F4] ${
+                    option === value
+                      ? "bg-[#222] text-white hover:bg-[#222]"
+                      : "text-[#222]"
+                  }`}
+                >
+                  <span>
+                    {option}
+                  </span>
+
+                  {option ===
+                    value && (
+                    <span className="text-[10px]">
+                      ✓
+                    </span>
+                  )}
+                </button>
+              ),
+            )
+          ) : (
+            <p className="px-3 py-4 text-[11px] font-semibold text-[#222]/40">
+              {emptyMessage}
+            </p>
+          )}
+
+          {!loading &&
+            !loadError &&
+            availableOptions.length >
+              250 &&
+            filteredOptions.length ===
+              250 && (
+              <p className="border-t border-black/5 px-3 py-3 text-[10px] text-[#222]/35">
+                Γράψε περισσότερα
+                γράμματα για να
+                περιορίσεις τα
+                αποτελέσματα.
+              </p>
+            )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Shared: reveal on scroll                                          */
 /* ------------------------------------------------------------------ */
@@ -5304,21 +5728,23 @@ function SettingsTab({
                       <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
                         Πόλη
                       </span>
-                      <input
+                      <SearchableSelect
                         value={
                           billingProfile.city
                         }
-                        onChange={(event) =>
+                        onChange={(city) =>
                           setBillingProfile(
                             (current) => ({
                               ...current,
-                              city:
-                                event.target.value,
+                              city,
                             }),
                           )
                         }
-                        placeholder="Πόλη"
-                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                        loadOptions={
+                          loadGreekSettlements
+                        }
+                        placeholder="Αναζήτησε πόλη ή οικισμό"
+                        emptyMessage="Δεν βρέθηκε πόλη ή οικισμός."
                       />
                     </label>
 
@@ -5348,21 +5774,25 @@ function SettingsTab({
                       <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
                         Περιφέρεια
                       </span>
-                      <input
+                      <SearchableSelect
                         value={
                           billingProfile.region
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          region,
+                        ) =>
                           setBillingProfile(
                             (current) => ({
                               ...current,
-                              region:
-                                event.target.value,
+                              region,
                             }),
                           )
                         }
-                        placeholder="Περιφέρεια"
-                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                        options={
+                          GREEK_REGIONS
+                        }
+                        placeholder="Αναζήτησε περιφέρεια"
+                        emptyMessage="Δεν βρέθηκε περιφέρεια."
                       />
                     </label>
 
