@@ -4,10 +4,19 @@ const ALLOWED_ORIGINS = new Set([
   "https://www.zisto.app",
 ]);
 
+function isAllowedOrigin(origin) {
+  return (
+    ALLOWED_ORIGINS.has(origin) ||
+    /^https:\/\/zisto-[a-z0-9-]+-tomacitys-projects\.vercel\.app$/i.test(
+      origin,
+    )
+  );
+}
+
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin;
 
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
+  if (origin && isAllowedOrigin(origin)) {
     res.setHeader(
       "Access-Control-Allow-Origin",
       origin,
@@ -30,6 +39,29 @@ function setCorsHeaders(req, res) {
     "Cache-Control",
     "no-store, no-cache, must-revalidate",
   );
+}
+
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = 7000,
+) {
+  const controller =
+    new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    timeoutMs,
+  );
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function supabaseRequest({
@@ -425,7 +457,7 @@ export default async function handler(
       };
 
       const configurationsResponse =
-        await fetch(
+        await fetchWithTimeout(
           "https://api.stripe.com/v1/billing_portal/configurations?active=true&limit=100",
           {
             headers: {
@@ -506,7 +538,7 @@ export default async function handler(
         );
 
         const createConfigurationResponse =
-          await fetch(
+          await fetchWithTimeout(
             "https://api.stripe.com/v1/billing_portal/configurations",
             {
               method: "POST",
@@ -536,40 +568,6 @@ export default async function handler(
 
         portalConfiguration =
           createConfigurationResult;
-      } else {
-        const updateConfigurationResponse =
-          await fetch(
-            `https://api.stripe.com/v1/billing_portal/configurations/${encodeURIComponent(
-              portalConfiguration.id,
-            )}`,
-            {
-              method: "POST",
-              headers: stripeHeaders,
-              body:
-                configurationForm.toString(),
-            },
-          );
-
-        const updateConfigurationResult =
-          await updateConfigurationResponse.json();
-
-        if (
-          !updateConfigurationResponse.ok
-        ) {
-          console.error(
-            "Stripe portal configuration update failed:",
-            updateConfigurationResult,
-          );
-
-          return res.status(502).json({
-            error:
-              updateConfigurationResult?.error?.message ??
-              "Could not configure Stripe billing portal",
-          });
-        }
-
-        portalConfiguration =
-          updateConfigurationResult;
       }
 
       const requestOrigin =
@@ -613,7 +611,7 @@ export default async function handler(
       );
 
       const portalResponse =
-        await fetch(
+        await fetchWithTimeout(
           "https://api.stripe.com/v1/billing_portal/sessions",
           {
             method: "POST",
