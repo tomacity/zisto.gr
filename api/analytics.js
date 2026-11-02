@@ -728,7 +728,7 @@ export default async function handler(
           business_id:
             `eq.${businessId}`,
           select:
-            "id,document_type,status,source,currency,subtotal_cents,vat_cents,total_cents,document_number,stripe_invoice_id,provider_name,provider_document_id,provider_mark,provider_uid,hosted_url,pdf_url,issued_at,due_at,paid_at,period_start,period_end,created_at",
+            "id,document_type,status,source,currency,subtotal_cents,vat_cents,total_cents,document_number,stripe_invoice_id,provider_name,provider_document_id,provider_mark,provider_uid,hosted_url,pdf_url,issued_at,due_at,paid_at,period_start,period_end,created_at,metadata",
           order:
             "issued_at.desc.nullslast,created_at.desc",
           limit: "50",
