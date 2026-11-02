@@ -4886,6 +4886,20 @@ function SettingsTab({
       provider_uid:
         | string
         | null;
+      provider_name?:
+        | string
+        | null;
+      provider_document_id?:
+        | string
+        | null;
+      metadata?: {
+        provider_qr_url?: string | null;
+        provider_qr_image_url?: string | null;
+        provider_auth_string?: string | null;
+        provider_software_license?: string | null;
+        provider_website?: string | null;
+        [key: string]: unknown;
+      } | null;
       issued_at:
         | string
         | null;
@@ -4917,6 +4931,43 @@ function SettingsTab({
       return;
     }
 
+    const providerQrUrl =
+      (document.metadata
+        ?.provider_qr_image_url as
+        | string
+        | null
+        | undefined) ||
+      (document.metadata
+        ?.provider_qr_url as
+        | string
+        | null
+        | undefined) ||
+      "";
+
+    const providerAuthString =
+      (document.metadata
+        ?.provider_auth_string as
+        | string
+        | null
+        | undefined) ||
+      "";
+
+    const providerSoftwareLicense =
+      (document.metadata
+        ?.provider_software_license as
+        | string
+        | null
+        | undefined) ||
+      "";
+
+    const providerWebsite =
+      (document.metadata
+        ?.provider_website as
+        | string
+        | null
+        | undefined) ||
+      "";
+
     const isFiscalDocument =
       billingIssuerProfile
         .live_billing_enabled &&
@@ -4924,8 +4975,10 @@ function SettingsTab({
         .invoice_provider !==
         "unconfigured" &&
       Boolean(
-        document.provider_mark ||
-          document.provider_uid,
+        document.provider_mark &&
+          document.provider_document_id &&
+          providerQrUrl &&
+          providerAuthString,
       );
 
     const issuerName =
@@ -4944,6 +4997,7 @@ function SettingsTab({
       billingProfile.address_line1,
       billingProfile.address_line2,
       billingProfile.city,
+      billingProfile.region,
       billingProfile.postal_code,
       billingProfile.country_code,
     ]
@@ -4956,6 +5010,7 @@ function SettingsTab({
       billingIssuerProfile
         .address_line2,
       billingIssuerProfile.city,
+      billingIssuerProfile.region,
       billingIssuerProfile
         .postal_code,
       billingIssuerProfile
@@ -4980,33 +5035,81 @@ function SettingsTab({
         ? ""
         : `
           <div class="warning">
-            ΠΡΟΕΠΙΣΚΟΠΗΣΗ — ΜΗ ΦΟΡΟΛΟΓΙΚΟ ΠΑΡΑΣΤΑΤΙΚΟ
+            ΠΡΟΕΠΙΣΚΟΠΗΣΗ — ΔΕΝ ΑΠΟΤΕΛΕΙ ΦΟΡΟΛΟΓΙΚΟ ΠΑΡΑΣΤΑΤΙΚΟ
           </div>
         `;
 
+    const issuedAtValue =
+      document.issued_at ??
+      document.created_at;
+
+    const issuedTime =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        },
+      ).format(
+        new Date(issuedAtValue),
+      );
+
     const fiscalHtml =
-      document.provider_mark ||
-      document.provider_uid
+      isFiscalDocument
         ? `
-          <div class="fiscal">
-            ${
-              document.provider_mark
-                ? `<span><b>MARK</b> ${escapeInvoiceHtml(
-                    document.provider_mark,
-                  )}</span>`
-                : ""
-            }
-            ${
-              document.provider_uid
-                ? `<span><b>UID</b> ${escapeInvoiceHtml(
-                    document.provider_uid,
-                  )}</span>`
-                : ""
-            }
-          </div>
+          <section class="provider-proof">
+            <div class="provider-proof-copy">
+              <div class="eyebrow">Στοιχεία ηλεκτρονικής έκδοσης</div>
+              <div class="proof-grid">
+                <div><span>MARK</span><strong>${escapeInvoiceHtml(
+                  document.provider_mark,
+                )}</strong></div>
+                <div><span>Αναγνωριστικό</span><strong>${escapeInvoiceHtml(
+                  document.provider_document_id,
+                )}</strong></div>
+                <div><span>UID</span><strong>${escapeInvoiceHtml(
+                  document.provider_uid || "—",
+                )}</strong></div>
+                <div><span>Ώρα έκδοσης</span><strong>${escapeInvoiceHtml(
+                  issuedTime,
+                )}</strong></div>
+                <div><span>Πάροχος</span><strong>${escapeInvoiceHtml(
+                  document.provider_name ||
+                    billingIssuerProfile.invoice_provider,
+                )}</strong></div>
+                <div><span>Άδεια λογισμικού ΥΠΑΗΕΣ</span><strong>${escapeInvoiceHtml(
+                  providerSoftwareLicense || "—",
+                )}</strong></div>
+              </div>
+              <div class="auth-string">
+                <span>Συμβολοσειρά αυθεντικοποίησης</span>
+                <code>${escapeInvoiceHtml(
+                  providerAuthString,
+                )}</code>
+              </div>
+              ${
+                providerWebsite
+                  ? `<a class="provider-site" href="${escapeInvoiceHtml(
+                      providerWebsite,
+                    )}" target="_blank" rel="noreferrer">Website παρόχου</a>`
+                  : ""
+              }
+            </div>
+            <div class="provider-qr">
+              <img
+                src="${escapeInvoiceHtml(
+                  providerQrUrl,
+                )}"
+                alt="QR επαλήθευσης ηλεκτρονικού τιμολογίου"
+              />
+              <span>Σάρωση για επαλήθευση</span>
+            </div>
+          </section>
         `
         : "";
-
+    
     const stripeReference =
       document.pdf_url
         ? `
@@ -5097,6 +5200,80 @@ function SettingsTab({
     color: #777;
     font-size: 12px;
   }
+  .doc-detail {
+    margin-top: 7px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    color: #777;
+    font-size: 9px;
+  }
+  .provider-proof {
+    margin-top: 14mm;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 1fr 112px;
+    gap: 16px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+  }
+  .proof-grid {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px 18px;
+  }
+  .proof-grid div {
+    min-width: 0;
+  }
+  .proof-grid span,
+  .auth-string span {
+    display: block;
+    margin-bottom: 3px;
+    color: #888;
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .proof-grid strong {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: 9px;
+  }
+  .auth-string {
+    margin-top: 12px;
+  }
+  .auth-string code {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: 8px;
+    line-height: 1.45;
+  }
+  .provider-site {
+    display: inline-block;
+    margin-top: 10px;
+    color: #555;
+    font-size: 9px;
+    text-decoration: underline;
+  }
+  .provider-qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+  .provider-qr img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+  }
+  .provider-qr span {
+    color: #777;
+    font-size: 8px;
+    text-align: center;
+  }
   .warning {
     margin-top: 24px;
     padding: 12px 14px;
@@ -5179,15 +5356,6 @@ function SettingsTab({
     font-weight: 900;
     letter-spacing: .1em;
   }
-  .fiscal {
-    margin-top: 12mm;
-    padding: 12px;
-    display: flex;
-    gap: 24px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    font-size: 10px;
-  }
   .footer {
     margin-top: 22mm;
     padding-top: 10px;
@@ -5240,14 +5408,22 @@ function SettingsTab({
         <div class="eyebrow">Zisto Billing</div>
         <h1>${
           isFiscalDocument
-            ? "Τιμολόγιο"
+            ? "Τιμολόγιο Παροχής Υπηρεσιών"
             : "Invoice Preview"
         }</h1>
         <div class="doc-number">
-          ${escapeInvoiceHtml(
+          Αρ. παραστατικού: ${escapeInvoiceHtml(
             document.document_number ??
               "Χωρίς αριθμό",
           )}
+        </div>
+        <div class="doc-detail">
+          <span>Ημερομηνία έκδοσης: <b>${escapeInvoiceHtml(
+            formatDate(issuedAtValue),
+          )}</b></span>
+          <span>Ώρα: <b>${escapeInvoiceHtml(
+            issuedTime,
+          )}</b></span>
         </div>
       </div>
     </div>
@@ -5309,15 +5485,18 @@ function SettingsTab({
     <table>
       <thead>
         <tr>
-          <th>Περιγραφή</th>
-          <th>Περίοδος</th>
+          <th>Περιγραφή υπηρεσίας</th>
+          <th>Περίοδος παροχής</th>
+          <th class="right">Ποσ.</th>
+          <th class="right">Τιμή μονάδας</th>
+          <th class="right">ΦΠΑ</th>
           <th class="right">Καθαρή αξία</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td>
-            Zisto — ${escapeInvoiceHtml(
+            Συνδρομητική υπηρεσία Zisto — ${escapeInvoiceHtml(
               analytics.business.name,
             )}
           </td>
@@ -5338,6 +5517,18 @@ function SettingsTab({
                 : "—",
             )}
           </td>
+          <td class="right">1</td>
+          <td class="right">
+            ${escapeInvoiceHtml(
+              formatMoney(
+                document.subtotal_cents,
+                document.currency,
+              ),
+            )}
+          </td>
+          <td class="right">${escapeInvoiceHtml(
+            vatRate,
+          )}%</td>
           <td class="right">
             ${escapeInvoiceHtml(
               formatMoney(
