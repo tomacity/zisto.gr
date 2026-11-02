@@ -1025,9 +1025,38 @@ export default async function handler(
                 100),
         );
 
+      const forwardedHostHeader =
+        request.headers[
+          "x-forwarded-host"
+        ];
+      const hostHeader =
+        request.headers.host;
+      const protoHeader =
+        request.headers[
+          "x-forwarded-proto"
+        ];
+
+      const requestHost =
+        Array.isArray(
+          forwardedHostHeader,
+        )
+          ? forwardedHostHeader[0]
+          : forwardedHostHeader ??
+            (Array.isArray(hostHeader)
+              ? hostHeader[0]
+              : hostHeader);
+
+      const requestProto =
+        Array.isArray(protoHeader)
+          ? protoHeader[0]
+          : protoHeader ??
+            "https";
+
       const appUrl = (
         process.env.APP_URL ??
-        "https://zisto.app"
+        (requestHost
+          ? `${requestProto}://${requestHost}`
+          : "https://zisto.app")
       ).replace(/\/$/, "");
 
       const form =
@@ -1040,7 +1069,7 @@ export default async function handler(
       );
       form.set(
         "custom_text[terms_of_service_acceptance][message]",
-        "Με την εγγραφή αποδέχεσαι την Πολιτική Πληρωμών & Συνδρομών του Zisto: https://zisto.app/#/payments",
+        `Με την εγγραφή αποδέχεσαι την Πολιτική Πληρωμών & Συνδρομών του Zisto: ${appUrl}/#/payments`,
       );
       form.set(
         "custom_text[submit][message]",
@@ -1056,11 +1085,11 @@ export default async function handler(
       );
       form.set(
         "success_url",
-        `${appUrl}/#/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+        `${appUrl}/#/admin?tab=subscriptions&billing=success&session_id={CHECKOUT_SESSION_ID}`,
       );
       form.set(
         "cancel_url",
-        `${appUrl}/#/dashboard?billing=cancelled`,
+        `${appUrl}/#/admin?tab=subscriptions&billing=cancelled`,
       );
       form.set(
         "line_items[0][quantity]",
