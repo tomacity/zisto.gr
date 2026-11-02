@@ -62,6 +62,30 @@ const ADMIN_TABS: {
   },
 ];
 
+function adminTabFromHash(): AdminTab {
+  if (typeof window === "undefined") {
+    return "home";
+  }
+
+  const rawHash =
+    window.location.hash.replace(/^#/, "");
+
+  const [, search = ""] =
+    rawHash.split("?");
+
+  const tab =
+    new URLSearchParams(
+      search,
+    ).get("tab");
+
+  return ADMIN_TABS.some(
+    (item) => item.id === tab,
+  )
+    ? (tab as AdminTab)
+    : "home";
+}
+
+
 type DashboardModule =
   | "analytics"
   | "reviews"
@@ -220,7 +244,9 @@ const [invitationsError, setInvitationsError] =
   const [adminEmail, setAdminEmail] = useState("");
   const [error, setError] = useState("");
   const [activeAdminTab, setActiveAdminTab] =
-  useState<AdminTab>("home");
+    useState<AdminTab>(
+      adminTabFromHash,
+    );
   
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [businessesLoading, setBusinessesLoading] = useState(false);
@@ -232,6 +258,46 @@ const [invitationsError, setInvitationsError] =
     useState(false);
   const [subscriptionsError, setSubscriptionsError] =
     useState("");
+
+  useEffect(() => {
+    const syncAdminTabFromHash =
+      () => {
+        setActiveAdminTab(
+          adminTabFromHash(),
+        );
+      };
+
+    window.addEventListener(
+      "hashchange",
+      syncAdminTabFromHash,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "hashchange",
+        syncAdminTabFromHash,
+      );
+    };
+  }, []);
+
+  function handleAdminTabChange(
+    tab: AdminTab,
+  ) {
+    setActiveAdminTab(tab);
+
+    const nextHash =
+      tab === "home"
+        ? "/admin"
+        : `/admin?tab=${tab}`;
+
+    if (
+      window.location.hash !==
+      `#${nextHash}`
+    ) {
+      window.location.hash =
+        nextHash;
+    }
+  }
 
   useEffect(() => {
     if (!isAdmin || (activeAdminTab !== "home" && activeAdminTab !== "projects")) {
@@ -835,7 +901,7 @@ useEffect(() => {
           adminEmail={adminEmail}
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
-          onTabChange={setActiveAdminTab}
+          onTabChange={handleAdminTabChange}
           onLogout={handleLogout}
         />
 
@@ -899,7 +965,7 @@ useEffect(() => {
                   invitationsLoading={invitationsLoading}
                   projectsLoading={projectsLoading}
                   subscriptionsLoading={subscriptionsLoading}
-                  onTabChange={setActiveAdminTab}
+                  onTabChange={handleAdminTabChange}
                 />
               )}
   
