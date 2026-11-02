@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { GlobalLoader } from "../ui/GlobalLoader";
 import { supabase } from "../../lib/supabase";
 
@@ -173,6 +177,85 @@ export function SubscriptionsPanel({
     suspended: number;
     suspension_emails_sent: number;
   } | null>(null);
+
+  const [
+    billingDocuments,
+    setBillingDocuments,
+  ] = useState<any[]>([]);
+  const [
+    billingEvents,
+    setBillingEvents,
+  ] = useState<any[]>([]);
+  const [
+    loadingBillingHistory,
+    setLoadingBillingHistory,
+  ] = useState(false);
+  const [
+    billingHistoryError,
+    setBillingHistoryError,
+  ] = useState("");
+
+  async function loadAdminBillingHistory() {
+    try {
+      setLoadingBillingHistory(true);
+      setBillingHistoryError("");
+
+      const {
+        data: { session },
+      } =
+        await supabase.auth.getSession();
+
+      if (!session) {
+        return;
+      }
+
+      const response =
+        await fetch(
+          "/api/admin/subscriptions?view=billing-history",
+          {
+            headers: {
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν φορτώθηκε το billing history.",
+        );
+      }
+
+      setBillingDocuments(
+        Array.isArray(result.documents)
+          ? result.documents
+          : [],
+      );
+      setBillingEvents(
+        Array.isArray(result.events)
+          ? result.events
+          : [],
+      );
+    } catch (historyError) {
+      setBillingHistoryError(
+        historyError instanceof Error
+          ? historyError.message
+          : "Δεν φορτώθηκε το billing history.",
+      );
+    } finally {
+      setLoadingBillingHistory(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadAdminBillingHistory();
+  }, []);
+
 
   const subscribedBusinessIds =
     useMemo(
@@ -1199,6 +1282,199 @@ export function SubscriptionsPanel({
           </>
         )}
       </section>
+
+      <section className="rounded-[28px] border border-black/10 bg-white p-6 sm:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Billing history
+            </p>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
+              Παραστατικά
+            </h2>
+            <p className="mt-2 text-sm text-[#666]">
+              Οι πιο πρόσφατες χρεώσεις όλων των πελατών.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              void loadAdminBillingHistory()
+            }
+            disabled={loadingBillingHistory}
+            className="rounded-2xl border border-black/10 px-4 py-3 text-xs font-bold transition hover:border-[#222] disabled:opacity-50"
+          >
+            Ανανέωση
+          </button>
+        </div>
+
+        {billingHistoryError && (
+          <p className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {billingHistoryError}
+          </p>
+        )}
+
+        {loadingBillingHistory ? (
+          <p className="mt-6 text-sm font-semibold text-[#777]">
+            Φόρτωση ιστορικού...
+          </p>
+        ) : billingDocuments.length === 0 ? (
+          <p className="mt-6 text-sm text-[#777]">
+            Δεν υπάρχουν παραστατικά ακόμη.
+          </p>
+        ) : (
+          <div className="mt-6 overflow-hidden rounded-[20px] border border-black/8">
+            <div className="divide-y divide-black/[0.06]">
+              {billingDocuments.map(
+                (document) => {
+                  const business =
+                    Array.isArray(
+                      document.businesses,
+                    )
+                      ? document.businesses[0]
+                      : document.businesses;
+
+                  return (
+                    <div
+                      key={document.id}
+                      className="grid gap-4 p-5 md:grid-cols-[1.2fr_1fr_0.8fr_auto] md:items-center"
+                    >
+                      <div>
+                        <p className="font-black">
+                          {business?.name ??
+                            "Άγνωστη επιχείρηση"}
+                        </p>
+                        <p className="mt-1 text-[10px] text-[#999]">
+                          {document.document_number ??
+                            document.stripe_invoice_id ??
+                            "Χωρίς αριθμό"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#999]">
+                          Ημερομηνία
+                        </p>
+                        <p className="mt-1 text-sm font-bold">
+                          {formatDate(
+                            document.issued_at ??
+                              document.created_at,
+                          )}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-black">
+                          {formatMoney(
+                            document.total_cents,
+                            document.currency,
+                          )}
+                        </p>
+                        <span className={`mt-1 inline-flex rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.1em] ${
+                          document.status === "paid"
+                            ? "bg-green-100 text-green-700"
+                            : document.status === "open"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-[#F1F1EF] text-[#666]"
+                        }`}>
+                          {document.status}
+                        </span>
+                      </div>
+
+                      {document.pdf_url ||
+                      document.hosted_url ? (
+                        <a
+                          href={
+                            document.pdf_url ??
+                            document.hosted_url
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-xl border border-black/10 px-4 py-3 text-center text-[9px] font-bold uppercase tracking-[0.12em] transition hover:bg-[#222] hover:text-white"
+                        >
+                          Άνοιγμα
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-[#999]">
+                          —
+                        </span>
+                      )}
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-[28px] border border-black/10 bg-white p-6 sm:p-8">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+          Audit trail
+        </p>
+        <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
+          Billing activity
+        </h2>
+        <p className="mt-2 text-sm text-[#666]">
+          Stripe webhook events και κατάσταση επεξεργασίας.
+        </p>
+
+        {billingEvents.length === 0 ? (
+          <p className="mt-6 text-sm text-[#777]">
+            Δεν υπάρχουν καταγεγραμμένα billing events ακόμη.
+          </p>
+        ) : (
+          <div className="mt-6 space-y-2">
+            {billingEvents
+              .slice(0, 30)
+              .map((event) => {
+                const business =
+                  Array.isArray(
+                    event.businesses,
+                  )
+                    ? event.businesses[0]
+                    : event.businesses;
+
+                return (
+                  <div
+                    key={event.id}
+                    className="grid gap-3 rounded-[16px] border border-black/[0.06] bg-[#FAF9F7] px-4 py-4 sm:grid-cols-[1.2fr_1fr_auto] sm:items-center"
+                  >
+                    <div>
+                      <p className="text-sm font-black">
+                        {event.event_type}
+                      </p>
+                      <p className="mt-1 text-[10px] text-[#999]">
+                        {business?.name ??
+                          event.object_id ??
+                          "Stripe"}
+                      </p>
+                    </div>
+
+                    <p className="text-xs font-semibold text-[#666]">
+                      {formatDate(
+                        event.received_at,
+                      )}
+                    </p>
+
+                    <span className={`inline-flex w-fit rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.1em] ${
+                      event.status === "processed"
+                        ? "bg-green-100 text-green-700"
+                        : event.status === "failed"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-[#EEEDEA] text-[#666]"
+                    }`}>
+                      {event.status}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </section>
+
+
     </div>
   );
 }
