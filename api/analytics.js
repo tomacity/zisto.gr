@@ -380,6 +380,228 @@ export default async function handler(
     }
 
     if (
+      requestedView === "billing-profile" &&
+      (req.method === "GET" ||
+        req.method === "PATCH")
+    ) {
+      if (
+        !isAdmin &&
+        membership?.role !== "owner"
+      ) {
+        return res.status(403).json({
+          error:
+            "Only the business owner can manage billing details",
+        });
+      }
+
+      const profileParams =
+        new URLSearchParams({
+          business_id:
+            `eq.${businessId}`,
+          select:
+            "id,business_id,customer_type,legal_name,trade_name,tax_id,tax_country,tax_office,activity,invoice_email,address_line1,address_line2,city,region,postal_code,country_code,created_at,updated_at",
+          limit: "1",
+        });
+
+      if (req.method === "GET") {
+        const profileResponse =
+          await supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/billing_profiles?${profileParams.toString()}`,
+          });
+
+        if (!profileResponse.ok) {
+          const errorText =
+            await profileResponse.text();
+
+          console.error(
+            "Billing profile load failed:",
+            errorText,
+          );
+
+          return res.status(500).json({
+            error:
+              "Could not load billing profile",
+          });
+        }
+
+        const rows =
+          await profileResponse.json();
+
+        return res.status(200).json({
+          billing_profile:
+            rows[0] ?? null,
+        });
+      }
+
+      const body =
+        req.body ?? {};
+
+      const cleanText = (
+        value,
+        maxLength = 180,
+      ) => {
+        if (
+          typeof value !== "string"
+        ) {
+          return null;
+        }
+
+        const cleaned =
+          value.trim();
+
+        return cleaned
+          ? cleaned.slice(
+              0,
+              maxLength,
+            )
+          : null;
+      };
+
+      const customerType =
+        body.customer_type ===
+        "individual"
+          ? "individual"
+          : "business";
+
+      const taxCountry =
+        (
+          cleanText(
+            body.tax_country,
+            2,
+          ) ?? "GR"
+        ).toUpperCase();
+
+      const countryCode =
+        (
+          cleanText(
+            body.country_code,
+            2,
+          ) ?? "GR"
+        ).toUpperCase();
+
+      const invoiceEmail =
+        cleanText(
+          body.invoice_email,
+          254,
+        );
+
+      if (
+        invoiceEmail &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+          invoiceEmail,
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Το email παραστατικών δεν είναι έγκυρο.",
+        });
+      }
+
+      const payload = {
+        business_id:
+          businessId,
+        customer_type:
+          customerType,
+        legal_name:
+          cleanText(
+            body.legal_name,
+          ),
+        trade_name:
+          cleanText(
+            body.trade_name,
+          ),
+        tax_id:
+          cleanText(
+            body.tax_id,
+            40,
+          )?.toUpperCase() ??
+          null,
+        tax_country:
+          taxCountry,
+        tax_office:
+          cleanText(
+            body.tax_office,
+            120,
+          ),
+        activity:
+          cleanText(
+            body.activity,
+            180,
+          ),
+        invoice_email:
+          invoiceEmail,
+        address_line1:
+          cleanText(
+            body.address_line1,
+          ),
+        address_line2:
+          cleanText(
+            body.address_line2,
+          ),
+        city:
+          cleanText(
+            body.city,
+            120,
+          ),
+        region:
+          cleanText(
+            body.region,
+            120,
+          ),
+        postal_code:
+          cleanText(
+            body.postal_code,
+            30,
+          ),
+        country_code:
+          countryCode,
+        updated_at:
+          new Date()
+            .toISOString(),
+      };
+
+      const upsertResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            "/rest/v1/billing_profiles?on_conflict=business_id",
+          method: "POST",
+          headers: {
+            Prefer:
+              "resolution=merge-duplicates,return=representation",
+          },
+          body: payload,
+        });
+
+      if (!upsertResponse.ok) {
+        const errorText =
+          await upsertResponse.text();
+
+        console.error(
+          "Billing profile save failed:",
+          errorText,
+        );
+
+        return res.status(500).json({
+          error:
+            "Could not save billing profile",
+        });
+      }
+
+      const rows =
+        await upsertResponse.json();
+
+      return res.status(200).json({
+        billing_profile:
+          rows[0] ?? payload,
+      });
+    }
+
+    if (
       requestedView === "billing-portal" &&
       req.method === "POST"
     ) {
