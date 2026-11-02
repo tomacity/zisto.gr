@@ -4306,6 +4306,29 @@ function SettingsTab({
 
 
   const [
+    billingIssuerProfile,
+    setBillingIssuerProfile,
+  ] = useState({
+    legal_name: "",
+    trade_name: "Zisto",
+    tax_id: "",
+    tax_country: "GR",
+    tax_office: "",
+    activity: "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    region: "",
+    postal_code: "",
+    country_code: "GR",
+    invoice_provider:
+      "unconfigured",
+    provider_account_id: "",
+    live_billing_enabled:
+      false,
+  });
+
+  const [
     billingProfile,
     setBillingProfile,
   ] = useState({
@@ -4417,6 +4440,113 @@ function SettingsTab({
               ? result.documents
               : [],
           );
+
+          if (
+            result.billing_profile
+          ) {
+            const profile =
+              result.billing_profile;
+
+            setBillingProfile(
+              (current) => ({
+                ...current,
+                customer_type:
+                  profile.customer_type ??
+                  current.customer_type,
+                legal_name:
+                  profile.legal_name ??
+                  "",
+                trade_name:
+                  profile.trade_name ??
+                  "",
+                tax_id:
+                  profile.tax_id ?? "",
+                tax_country:
+                  profile.tax_country ??
+                  "GR",
+                tax_office:
+                  profile.tax_office ??
+                  "",
+                activity:
+                  profile.activity ??
+                  "",
+                invoice_email:
+                  profile.invoice_email ??
+                  "",
+                address_line1:
+                  profile.address_line1 ??
+                  "",
+                address_line2:
+                  profile.address_line2 ??
+                  "",
+                city:
+                  profile.city ?? "",
+                region:
+                  profile.region ?? "",
+                postal_code:
+                  profile.postal_code ??
+                  "",
+                country_code:
+                  profile.country_code ??
+                  "GR",
+              }),
+            );
+          }
+
+          if (
+            result.issuer_profile
+          ) {
+            const issuer =
+              result.issuer_profile;
+
+            setBillingIssuerProfile(
+              (current) => ({
+                ...current,
+                legal_name:
+                  issuer.legal_name ??
+                  "",
+                trade_name:
+                  issuer.trade_name ??
+                  "Zisto",
+                tax_id:
+                  issuer.tax_id ?? "",
+                tax_country:
+                  issuer.tax_country ??
+                  "GR",
+                tax_office:
+                  issuer.tax_office ??
+                  "",
+                activity:
+                  issuer.activity ?? "",
+                address_line1:
+                  issuer.address_line1 ??
+                  "",
+                address_line2:
+                  issuer.address_line2 ??
+                  "",
+                city:
+                  issuer.city ?? "",
+                region:
+                  issuer.region ?? "",
+                postal_code:
+                  issuer.postal_code ??
+                  "",
+                country_code:
+                  issuer.country_code ??
+                  "GR",
+                invoice_provider:
+                  issuer.invoice_provider ??
+                  "unconfigured",
+                provider_account_id:
+                  issuer.provider_account_id ??
+                  "",
+                live_billing_enabled:
+                  Boolean(
+                    issuer.live_billing_enabled,
+                  ),
+              }),
+            );
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -4720,6 +4850,560 @@ function SettingsTab({
     return new Intl.DateTimeFormat("el-GR", {
       dateStyle: "long",
     }).format(new Date(value));
+  }
+
+  function escapeInvoiceHtml(
+    value:
+      | string
+      | number
+      | null
+      | undefined,
+  ) {
+    return String(
+      value ?? "",
+    )
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function openZistoInvoice(
+    document: {
+      id: string;
+      status: string;
+      currency: string;
+      subtotal_cents: number;
+      vat_cents: number;
+      total_cents: number;
+      document_number:
+        | string
+        | null;
+      provider_mark:
+        | string
+        | null;
+      provider_uid:
+        | string
+        | null;
+      issued_at:
+        | string
+        | null;
+      paid_at:
+        | string
+        | null;
+      period_start:
+        | string
+        | null;
+      period_end:
+        | string
+        | null;
+      created_at: string;
+      pdf_url:
+        | string
+        | null;
+    },
+  ) {
+    const previewWindow =
+      window.open(
+        "",
+        "_blank",
+        "noopener,noreferrer",
+      );
+
+    if (!previewWindow) {
+      setSubscriptionError(
+        "Ο browser μπλόκαρε το παράθυρο του παραστατικού. Επίτρεψε pop-ups για το Zisto.",
+      );
+      return;
+    }
+
+    const isFiscalDocument =
+      billingIssuerProfile
+        .live_billing_enabled &&
+      billingIssuerProfile
+        .invoice_provider !==
+        "unconfigured" &&
+      Boolean(
+        document.provider_mark ||
+          document.provider_uid,
+      );
+
+    const issuerName =
+      billingIssuerProfile
+        .legal_name ||
+      billingIssuerProfile
+        .trade_name ||
+      "Zisto";
+
+    const customerName =
+      billingProfile.legal_name ||
+      billingProfile.trade_name ||
+      analytics.business.name;
+
+    const customerAddress = [
+      billingProfile.address_line1,
+      billingProfile.address_line2,
+      billingProfile.city,
+      billingProfile.postal_code,
+      billingProfile.country_code,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const issuerAddress = [
+      billingIssuerProfile
+        .address_line1,
+      billingIssuerProfile
+        .address_line2,
+      billingIssuerProfile.city,
+      billingIssuerProfile
+        .postal_code,
+      billingIssuerProfile
+        .country_code,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const vatRate =
+      subscription?.vat_rate ??
+      0;
+
+    const statusLabel =
+      document.status === "paid"
+        ? "ΠΛΗΡΩΘΗΚΕ"
+        : document.status === "open"
+          ? "ΕΚΚΡΕΜΕΙ"
+          : document.status.toUpperCase();
+
+    const warningHtml =
+      isFiscalDocument
+        ? ""
+        : `
+          <div class="warning">
+            ΠΡΟΕΠΙΣΚΟΠΗΣΗ — ΜΗ ΦΟΡΟΛΟΓΙΚΟ ΠΑΡΑΣΤΑΤΙΚΟ
+          </div>
+        `;
+
+    const fiscalHtml =
+      document.provider_mark ||
+      document.provider_uid
+        ? `
+          <div class="fiscal">
+            ${
+              document.provider_mark
+                ? `<span><b>MARK</b> ${escapeInvoiceHtml(
+                    document.provider_mark,
+                  )}</span>`
+                : ""
+            }
+            ${
+              document.provider_uid
+                ? `<span><b>UID</b> ${escapeInvoiceHtml(
+                    document.provider_uid,
+                  )}</span>`
+                : ""
+            }
+          </div>
+        `
+        : "";
+
+    const stripeReference =
+      document.pdf_url
+        ? `
+          <a class="stripe-link" href="${escapeInvoiceHtml(
+            document.pdf_url,
+          )}" target="_blank" rel="noreferrer">
+            Stripe payment document
+          </a>
+        `
+        : "";
+
+    const html = `
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>${escapeInvoiceHtml(
+      document.document_number ??
+        "Zisto Invoice",
+    )}</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #efefed;
+    color: #222;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(239,239,237,.96);
+    border-bottom: 1px solid rgba(0,0,0,.08);
+  }
+  .toolbar button {
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 20px;
+    background: #222;
+    color: white;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .sheet {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 24px auto;
+    background: white;
+    padding: 18mm 17mm;
+    box-shadow: 0 24px 80px rgba(0,0,0,.12);
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    gap: 30px;
+    align-items: flex-start;
+  }
+  .logo {
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: -2px;
+  }
+  .logo-dot { color: #DC2727; }
+  .doc-meta { text-align: right; }
+  .eyebrow {
+    font-size: 9px;
+    letter-spacing: .18em;
+    font-weight: 800;
+    color: #DC2727;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 8px 0 0;
+    font-size: 28px;
+    letter-spacing: -1px;
+  }
+  .doc-number {
+    margin-top: 8px;
+    color: #777;
+    font-size: 12px;
+  }
+  .warning {
+    margin-top: 24px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff3f3;
+    color: #c52525;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-align: center;
+  }
+  .party-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14mm;
+    margin-top: 18mm;
+  }
+  .party {
+    border-top: 1px solid #ddd;
+    padding-top: 12px;
+  }
+  .party h2 {
+    margin: 8px 0 10px;
+    font-size: 15px;
+  }
+  .line {
+    margin: 5px 0;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #555;
+  }
+  .line strong { color: #222; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 18mm;
+  }
+  th {
+    padding: 10px 8px;
+    border-bottom: 1px solid #222;
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+  td {
+    padding: 15px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 11px;
+    vertical-align: top;
+  }
+  .right { text-align: right; }
+  .summary {
+    width: 48%;
+    margin-left: auto;
+    margin-top: 14mm;
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 8px 0;
+    font-size: 11px;
+  }
+  .summary-row.total {
+    margin-top: 5px;
+    padding-top: 12px;
+    border-top: 2px solid #222;
+    font-size: 18px;
+    font-weight: 900;
+  }
+  .status {
+    margin-top: 14mm;
+    display: inline-block;
+    border-radius: 999px;
+    padding: 8px 12px;
+    background: #dff7e8;
+    color: #13763a;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .1em;
+  }
+  .fiscal {
+    margin-top: 12mm;
+    padding: 12px;
+    display: flex;
+    gap: 24px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 10px;
+  }
+  .footer {
+    margin-top: 22mm;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    color: #999;
+    font-size: 9px;
+  }
+  .stripe-link {
+    color: #777;
+    text-decoration: underline;
+  }
+  @media print {
+    body { background: white; }
+    .toolbar { display: none; }
+    .sheet {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      min-height: 297mm;
+    }
+    @page {
+      size: A4;
+      margin: 0;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">Εκτύπωση / Αποθήκευση PDF</button>
+  </div>
+  <main class="sheet">
+    <div class="top">
+      <div class="logo">zi<span class="logo-dot">s</span>to</div>
+      <div class="doc-meta">
+        <div class="eyebrow">Zisto Billing</div>
+        <h1>${
+          isFiscalDocument
+            ? "Τιμολόγιο"
+            : "Invoice Preview"
+        }</h1>
+        <div class="doc-number">
+          ${escapeInvoiceHtml(
+            document.document_number ??
+              "Χωρίς αριθμό",
+          )}
+        </div>
+      </div>
+    </div>
+
+    ${warningHtml}
+
+    <section class="party-grid">
+      <div class="party">
+        <div class="eyebrow">Εκδότης</div>
+        <h2>${escapeInvoiceHtml(
+          issuerName,
+        )}</h2>
+        <div class="line"><strong>ΑΦΜ:</strong> ${escapeInvoiceHtml(
+          billingIssuerProfile
+            .tax_id ||
+            "Δεν έχει οριστεί",
+        )}</div>
+        <div class="line"><strong>ΔΟΥ:</strong> ${escapeInvoiceHtml(
+          billingIssuerProfile
+            .tax_office ||
+            "Δεν έχει οριστεί",
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          billingIssuerProfile
+            .activity,
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          issuerAddress ||
+            "Στοιχεία εκδότη θα συμπληρωθούν με την έναρξη της εταιρείας.",
+        )}</div>
+      </div>
+
+      <div class="party">
+        <div class="eyebrow">Πελάτης</div>
+        <h2>${escapeInvoiceHtml(
+          customerName,
+        )}</h2>
+        <div class="line"><strong>ΑΦΜ:</strong> ${escapeInvoiceHtml(
+          billingProfile.tax_id ||
+            "—",
+        )}</div>
+        <div class="line"><strong>ΔΟΥ:</strong> ${escapeInvoiceHtml(
+          billingProfile
+            .tax_office || "—",
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          billingProfile.activity,
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          customerAddress,
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          billingProfile
+            .invoice_email,
+        )}</div>
+      </div>
+    </section>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Περιγραφή</th>
+          <th>Περίοδος</th>
+          <th class="right">Καθαρή αξία</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            Zisto — ${escapeInvoiceHtml(
+              analytics.business.name,
+            )}
+          </td>
+          <td>
+            ${escapeInvoiceHtml(
+              document.period_start
+                ? formatDate(
+                    document.period_start,
+                  )
+                : "—",
+            )}
+            —
+            ${escapeInvoiceHtml(
+              document.period_end
+                ? formatDate(
+                    document.period_end,
+                  )
+                : "—",
+            )}
+          </td>
+          <td class="right">
+            ${escapeInvoiceHtml(
+              formatMoney(
+                document.subtotal_cents,
+                document.currency,
+              ),
+            )}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div class="summary-row">
+        <span>Καθαρή αξία</span>
+        <strong>${escapeInvoiceHtml(
+          formatMoney(
+            document.subtotal_cents,
+            document.currency,
+          ),
+        )}</strong>
+      </div>
+      <div class="summary-row">
+        <span>ΦΠΑ ${escapeInvoiceHtml(
+          vatRate,
+        )}%</span>
+        <strong>${escapeInvoiceHtml(
+          formatMoney(
+            document.vat_cents,
+            document.currency,
+          ),
+        )}</strong>
+      </div>
+      <div class="summary-row total">
+        <span>Σύνολο</span>
+        <span>${escapeInvoiceHtml(
+          formatMoney(
+            document.total_cents,
+            document.currency,
+          ),
+        )}</span>
+      </div>
+    </section>
+
+    <div class="status">${escapeInvoiceHtml(
+      statusLabel,
+    )}</div>
+
+    ${fiscalHtml}
+
+    <footer class="footer">
+      <span>
+        Έκδοση: ${escapeInvoiceHtml(
+          formatDate(
+            document.issued_at ??
+              document.created_at,
+          ),
+        )}
+      </span>
+      <span>
+        ${
+          document.paid_at
+            ? `Πληρωμή: ${escapeInvoiceHtml(
+                formatDate(
+                  document.paid_at,
+                ),
+              )}`
+            : ""
+        }
+      </span>
+      ${stripeReference}
+    </footer>
+  </main>
+</body>
+</html>`;
+
+    previewWindow.document.open();
+    previewWindow.document.write(html);
+    previewWindow.document.close();
   }
 
   function intervalLabel(months: number) {
@@ -6622,24 +7306,32 @@ function SettingsTab({
                                   </span>
                                 </div>
 
-                                {documentUrl ? (
-                                  <a
-                                    href={
-                                      documentUrl
+                                <div className="flex flex-col gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openZistoInvoice(
+                                        document,
+                                      )
                                     }
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex justify-center rounded-full border border-black/10 px-4 py-3 text-[9px] font-bold uppercase tracking-[0.12em] text-[#222] transition hover:border-[#222] hover:bg-[#222] hover:text-white"
+                                    className="inline-flex justify-center rounded-full bg-[#222] px-4 py-3 text-[9px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#DC2727]"
                                   >
-                                    {document.pdf_url
-                                      ? "PDF"
-                                      : "Προβολή"}
-                                  </a>
-                                ) : (
-                                  <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#222]/25">
-                                    Χωρίς αρχείο
-                                  </span>
-                                )}
+                                    Zisto Invoice
+                                  </button>
+
+                                  {documentUrl && (
+                                    <a
+                                      href={
+                                        documentUrl
+                                      }
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-center text-[8px] font-bold uppercase tracking-[0.1em] text-[#222]/35 underline underline-offset-2"
+                                    >
+                                      Stripe PDF
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             );
                           },
