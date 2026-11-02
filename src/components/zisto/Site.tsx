@@ -5071,11 +5071,14 @@ function SettingsTab({
     align-items: flex-start;
   }
   .logo {
-    font-size: 34px;
-    font-weight: 900;
-    letter-spacing: -2px;
+    display: flex;
+    align-items: center;
   }
-  .logo-dot { color: #DC2727; }
+  .logo-image {
+    display: block;
+    height: 30px;
+    width: auto;
+  }
   .doc-meta { text-align: right; }
   .eyebrow {
     font-size: 9px;
@@ -5221,7 +5224,18 @@ function SettingsTab({
   </div>
   <main class="sheet">
     <div class="top">
-      <div class="logo">zi<span class="logo-dot">s</span>to</div>
+      <div class="logo">
+        <img
+          src="${escapeInvoiceHtml(
+            new URL(
+              WORDMARK,
+              window.location.origin,
+            ).toString(),
+          )}"
+          alt="Zisto"
+          class="logo-image"
+        />
+      </div>
       <div class="doc-meta">
         <div class="eyebrow">Zisto Billing</div>
         <h1>${
