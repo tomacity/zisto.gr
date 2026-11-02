@@ -1477,8 +1477,117 @@ async function handleAppointmentPublicCancel(
       });
     }
 
+    const {
+      data: connectedProject,
+      error: connectedProjectError,
+    } = await supabaseAdmin
+      .from("connected_projects")
+      .select("live_url")
+      .eq(
+        "business_id",
+        appointment.business_id,
+      )
+      .eq("status", "active")
+      .order("updated_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
+
+    if (connectedProjectError) {
+      console.error(
+        "Reschedule management link lookup failed:",
+        connectedProjectError,
+      );
+    }
+
+    const changeUrl =
+      connectedProject?.live_url
+        ? appointmentManageUrl(
+            connectedProject.live_url,
+            appointment.public_token,
+            "reschedule",
+          )
+        : null;
+
+    const cancelUrl =
+      connectedProject?.live_url
+        ? appointmentManageUrl(
+            connectedProject.live_url,
+            appointment.public_token,
+            "cancel",
+          )
+        : null;
+
+    const businessName =
+      appointment.businesses?.name ||
+      "η επιχείρηση";
+
+    const formattedDate =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          timeZone,
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        },
+      ).format(startsAt);
+
+    const formattedTime =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          timeZone,
+          hour: "2-digit",
+          minute: "2-digit",
+        },
+      ).format(startsAt);
+
+    const rescheduleEmail =
+      appointment.customer_email
+        ? await sendAppointmentEmail({
+            to:
+              appointment.customer_email,
+            subject:
+              `Αλλαγή ραντεβού — ${businessName}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;background:#f4f4f2;padding:36px 16px;color:#222;">
+                <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:24px;padding:36px;">
+                  <div style="font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#DC2727;">ZISTO APPOINTMENTS</div>
+                  <h1 style="margin:12px 0 0;font-size:32px;line-height:1.08;">Το ραντεβού σου άλλαξε.</h1>
+                  <p style="margin:22px 0 0;color:#555;line-height:1.7;">Η νέα ημερομηνία και ώρα για το ραντεβού σου στο <strong>${escapeAppointmentHtml(businessName)}</strong> είναι:</p>
+
+                  <div style="margin:26px 0;padding:20px;background:#f6f6f4;border-radius:16px;line-height:1.8;">
+                    <div><strong>Υπηρεσία:</strong> ${escapeAppointmentHtml(service.name)}</div>
+                    <div><strong>Ημερομηνία:</strong> ${formattedDate}</div>
+                    <div><strong>Ώρα:</strong> ${formattedTime}</div>
+                  </div>
+
+                  <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#555;">Χρειάζεσαι κι άλλη αλλαγή;</p>
+
+                  <div style="display:block;margin-top:12px;">
+                    ${changeUrl ? `<a href="${escapeAppointmentHtml(changeUrl)}" style="display:block;text-align:center;text-decoration:none;background:#222;color:#fff;padding:15px 18px;border-radius:12px;font-weight:800;margin-bottom:10px;">Αλλαγή ημερομηνίας</a>` : ""}
+                    ${cancelUrl ? `<a href="${escapeAppointmentHtml(cancelUrl)}" style="display:block;text-align:center;text-decoration:none;background:#fff;color:#DC2727;padding:14px 18px;border-radius:12px;font-weight:800;border:1px solid #DC2727;">Ακύρωση ραντεβού</a>` : ""}
+                  </div>
+
+                  <p style="margin:26px 0 0;color:#999;font-size:12px;line-height:1.6;">Τα παραπάνω links είναι προσωπικά για το συγκεκριμένο ραντεβού. Μην τα προωθήσεις σε τρίτους.</p>
+                  <div style="margin-top:28px;padding-top:18px;border-top:1px solid #eee;color:#999;font-size:12px;">Εστάλη μέσω Zisto.</div>
+                </div>
+              </div>
+            `,
+          })
+        : {
+            sent: false,
+            error:
+              "Missing recipient email",
+          };
+
     return response.status(200).json({
       success: true,
+      email_sent:
+        rescheduleEmail.sent,
       appointment: updated,
     });
   } catch (error) {
