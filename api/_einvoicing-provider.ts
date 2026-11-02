@@ -389,10 +389,12 @@ export async function issuePendingFiscalDocuments({
   supabaseAdmin,
   now = new Date(),
   limit = 5,
+  documentId,
 }: {
   supabaseAdmin: SupabaseClient;
   now?: Date;
   limit?: number;
+  documentId?: string | null;
 }) {
   if (!providerEnabled()) {
     return {
@@ -436,29 +438,40 @@ export async function issuePendingFiscalDocuments({
     };
   }
 
+  let documentsQuery =
+    supabaseAdmin
+      .from("billing_documents")
+      .select(
+        "id,business_id,subscription_id,status,currency,subtotal_cents,vat_cents,total_cents,provider_series,provider_aa,provider_attempts,metadata,paid_at,created_at,businesses(name),subscriptions(vat_rate)",
+      )
+      .eq("status", "paid")
+      .gte(
+        "paid_at",
+        issuer.live_billing_from,
+      )
+      .in("fiscal_status", [
+        "pending",
+        "failed",
+      ])
+      .lt("provider_attempts", 5)
+      .order("paid_at", {
+        ascending: true,
+        nullsFirst: false,
+      })
+      .limit(limit);
+
+  if (documentId) {
+    documentsQuery =
+      documentsQuery.eq(
+        "id",
+        documentId,
+      );
+  }
+
   const {
     data: documents,
     error: documentsError,
-  } = await supabaseAdmin
-    .from("billing_documents")
-    .select(
-      "id,business_id,subscription_id,status,currency,subtotal_cents,vat_cents,total_cents,provider_series,provider_aa,provider_attempts,metadata,paid_at,created_at,businesses(name),subscriptions(vat_rate)",
-    )
-    .eq("status", "paid")
-    .gte(
-      "paid_at",
-      issuer.live_billing_from,
-    )
-    .in("fiscal_status", [
-      "pending",
-      "failed",
-    ])
-    .lt("provider_attempts", 5)
-    .order("paid_at", {
-      ascending: true,
-      nullsFirst: false,
-    })
-    .limit(limit);
+  } = await documentsQuery;
 
   if (documentsError) {
     throw new Error(
@@ -542,7 +555,10 @@ export async function issuePendingFiscalDocuments({
           document.provider_aa,
       );
 
-    await supabaseAdmin
+    const {
+      data: claimed,
+      error: claimError,
+    } = await supabaseAdmin
       .from("billing_documents")
       .update({
         fiscal_status: "issuing",
@@ -553,7 +569,26 @@ export async function issuePendingFiscalDocuments({
         updated_at:
           now.toISOString(),
       })
-      .eq("id", document.id);
+      .eq("id", document.id)
+      .in("fiscal_status", [
+        "pending",
+        "failed",
+      ])
+      .select("id")
+      .maybeSingle();
+
+    if (claimError) {
+      console.error(
+        "Fiscal document claim failed:",
+        document.id,
+        claimError,
+      );
+      continue;
+    }
+
+    if (!claimed) {
+      continue;
+    }
 
     try {
       const richDocument = {
