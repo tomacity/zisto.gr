@@ -732,6 +732,87 @@ export default async function handler(
       });
     }
 
+    if (
+      request.method === "GET" &&
+      request.query.view === "billing-history"
+    ) {
+      const [documentsResult, eventsResult] =
+        await Promise.all([
+          supabaseAdmin
+            .from("billing_documents")
+            .select(`
+              id,
+              business_id,
+              subscription_id,
+              document_type,
+              status,
+              currency,
+              total_cents,
+              document_number,
+              stripe_invoice_id,
+              hosted_url,
+              pdf_url,
+              issued_at,
+              created_at,
+              businesses (
+                id,
+                name,
+                slug
+              )
+            `)
+            .order("issued_at", {
+              ascending: false,
+              nullsFirst: false,
+            })
+            .limit(50),
+          supabaseAdmin
+            .from("billing_events")
+            .select(`
+              id,
+              provider,
+              external_event_id,
+              event_type,
+              object_id,
+              business_id,
+              subscription_id,
+              status,
+              error_message,
+              received_at,
+              processed_at,
+              businesses (
+                id,
+                name,
+                slug
+              )
+            `)
+            .order("received_at", {
+              ascending: false,
+            })
+            .limit(100),
+        ]);
+
+      if (documentsResult.error) {
+        console.error(
+          "Admin billing documents loading failed:",
+          documentsResult.error,
+        );
+      }
+
+      if (eventsResult.error) {
+        console.error(
+          "Admin billing events loading failed:",
+          eventsResult.error,
+        );
+      }
+
+      return response.status(200).json({
+        documents:
+          documentsResult.data ?? [],
+        events:
+          eventsResult.data ?? [],
+      });
+    }
+
     if (request.method === "GET") {
       const {
         data,
