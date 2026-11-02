@@ -1,7 +1,3 @@
-import type {
-  VercelRequest,
-  VercelResponse,
-} from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { QueueClient } from "@vercel/queue";
 import { issuePendingFiscalDocuments } from "./_einvoicing-provider";
