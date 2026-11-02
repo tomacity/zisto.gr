@@ -380,6 +380,324 @@ export default async function handler(
     }
 
     if (
+      requestedView === "billing-history" &&
+      req.method === "GET"
+    ) {
+      if (
+        !isAdmin &&
+        membership?.role !== "owner"
+      ) {
+        return res.status(403).json({
+          error:
+            "Only the business owner can view billing history",
+        });
+      }
+
+      const subscriptionParams =
+        new URLSearchParams({
+          business_id:
+            `eq.${businessId}`,
+          select:
+            "id,business_id,amount_cents,currency,vat_rate,stripe_customer_id,stripe_subscription_id",
+          limit: "1",
+        });
+
+      const subscriptionResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/subscriptions?${subscriptionParams.toString()}`,
+        });
+
+      if (!subscriptionResponse.ok) {
+        return res.status(500).json({
+          error:
+            "Could not load subscription",
+        });
+      }
+
+      const subscriptionRows =
+        await subscriptionResponse.json();
+
+      const subscription =
+        subscriptionRows[0] ?? null;
+
+      const stripeSecretKey =
+        process.env.STRIPE_SECRET_KEY;
+
+      if (
+        subscription?.stripe_customer_id &&
+        stripeSecretKey
+      ) {
+        const invoiceParams =
+          new URLSearchParams({
+            customer:
+              subscription.stripe_customer_id,
+            limit: "50",
+          });
+
+        const stripeResponse =
+          await fetchWithTimeout(
+            `https://api.stripe.com/v1/invoices?${invoiceParams.toString()}`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${stripeSecretKey}`,
+              },
+            },
+          );
+
+        if (stripeResponse.ok) {
+          const stripeResult =
+            await stripeResponse.json();
+
+          const invoices =
+            Array.isArray(
+              stripeResult?.data,
+            )
+              ? stripeResult.data
+              : [];
+
+          const toIso = (
+            unixValue,
+          ) =>
+            typeof unixValue ===
+            "number"
+              ? new Date(
+                  unixValue * 1000,
+                ).toISOString()
+              : null;
+
+          const statusMap = {
+            draft: "draft",
+            open: "open",
+            paid: "paid",
+            void: "void",
+            uncollectible:
+              "uncollectible",
+          };
+
+          for (
+            const invoice of invoices
+          ) {
+            const stripeStatus =
+              typeof invoice?.status ===
+              "string"
+                ? invoice.status
+                : "open";
+
+            const documentStatus =
+              statusMap[stripeStatus] ??
+              "open";
+
+            const firstLine =
+              Array.isArray(
+                invoice?.lines?.data,
+              )
+                ? invoice.lines.data[0]
+                : null;
+
+            const taxCents =
+              Array.isArray(
+                invoice?.total_tax_amounts,
+              )
+                ? invoice.total_tax_amounts.reduce(
+                    (
+                      sum,
+                      item,
+                    ) =>
+                      sum +
+                      (typeof item?.amount ===
+                      "number"
+                        ? item.amount
+                        : 0),
+                    0,
+                  )
+                : 0;
+
+            const subtotalCents =
+              typeof invoice?.subtotal ===
+              "number"
+                ? invoice.subtotal
+                : Math.max(
+                    0,
+                    Number(
+                      subscription.amount_cents ??
+                        0,
+                    ),
+                  );
+
+            const totalCents =
+              typeof invoice?.total ===
+              "number"
+                ? invoice.total
+                : subtotalCents +
+                  taxCents;
+
+            const documentPayload = {
+              business_id:
+                businessId,
+              subscription_id:
+                subscription.id,
+              document_type:
+                "invoice",
+              status:
+                documentStatus,
+              source: "stripe",
+              currency:
+                (
+                  invoice?.currency ??
+                  subscription.currency ??
+                  "EUR"
+                ).toUpperCase(),
+              subtotal_cents:
+                Math.max(
+                  0,
+                  subtotalCents,
+                ),
+              vat_cents:
+                Math.max(
+                  0,
+                  taxCents,
+                ),
+              total_cents:
+                Math.max(
+                  0,
+                  totalCents,
+                ),
+              document_number:
+                invoice?.number ??
+                null,
+              stripe_invoice_id:
+                invoice?.id ??
+                null,
+              stripe_payment_intent_id:
+                typeof invoice
+                  ?.payment_intent ===
+                  "string"
+                  ? invoice.payment_intent
+                  : invoice
+                      ?.payment_intent
+                      ?.id ??
+                    null,
+              hosted_url:
+                invoice
+                  ?.hosted_invoice_url ??
+                null,
+              pdf_url:
+                invoice?.invoice_pdf ??
+                null,
+              issued_at:
+                toIso(
+                  invoice?.created,
+                ),
+              due_at:
+                toIso(
+                  invoice?.due_date,
+                ),
+              paid_at:
+                documentStatus ===
+                "paid"
+                  ? toIso(
+                      invoice
+                        ?.status_transitions
+                        ?.paid_at,
+                    )
+                  : null,
+              period_start:
+                toIso(
+                  firstLine
+                    ?.period
+                    ?.start,
+                ),
+              period_end:
+                toIso(
+                  firstLine
+                    ?.period
+                    ?.end,
+                ),
+              metadata: {
+                stripe_status:
+                  stripeStatus,
+                billing_reason:
+                  invoice
+                    ?.billing_reason ??
+                  null,
+              },
+              updated_at:
+                new Date()
+                  .toISOString(),
+            };
+
+            const upsertResponse =
+              await supabaseRequest({
+                supabaseUrl,
+                supabaseSecretKey,
+                path:
+                  "/rest/v1/billing_documents?on_conflict=stripe_invoice_id",
+                method: "POST",
+                headers: {
+                  Prefer:
+                    "resolution=merge-duplicates",
+                },
+                body:
+                  documentPayload,
+              });
+
+            if (!upsertResponse.ok) {
+              console.error(
+                "Billing history backfill failed:",
+                await upsertResponse.text(),
+              );
+            }
+          }
+        } else {
+          console.error(
+            "Stripe invoice history load failed:",
+            await stripeResponse.text(),
+          );
+        }
+      }
+
+      const historyParams =
+        new URLSearchParams({
+          business_id:
+            `eq.${businessId}`,
+          select:
+            "id,document_type,status,source,currency,subtotal_cents,vat_cents,total_cents,document_number,stripe_invoice_id,provider_name,provider_document_id,provider_mark,provider_uid,hosted_url,pdf_url,issued_at,due_at,paid_at,period_start,period_end,created_at",
+          order:
+            "issued_at.desc.nullslast,created_at.desc",
+          limit: "50",
+        });
+
+      const historyResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/billing_documents?${historyParams.toString()}`,
+        });
+
+      if (!historyResponse.ok) {
+        console.error(
+          "Billing history query failed:",
+          await historyResponse.text(),
+        );
+
+        return res.status(500).json({
+          error:
+            "Could not load billing history",
+        });
+      }
+
+      return res.status(200).json({
+        documents:
+          await historyResponse.json(),
+      });
+    }
+
+    if (
       requestedView === "billing-profile" &&
       (req.method === "GET" ||
         req.method === "PATCH")
