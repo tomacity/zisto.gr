@@ -7,7 +7,8 @@ alter table public.billing_issuer_profile
   add column if not exists email text,
   add column if not exists website text,
   add column if not exists registry_number text,
-  add column if not exists provider_series text not null default 'Z';
+  add column if not exists provider_series text not null default 'Z',
+  add column if not exists live_billing_from timestamptz;
 
 alter table public.billing_profiles
   add column if not exists address_number text,
