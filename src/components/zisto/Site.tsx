@@ -162,6 +162,36 @@ function pointInPolygon(
   return inside;
 }
 
+function formatRegionalUnitName(
+  value: string,
+) {
+  const cleaned = value
+    .trim()
+    .replace(
+      /^ΠΕΡΙΦΕΡΕΙΑΚΗ\s+ΕΝΟΤΗΤΑ\s+/iu,
+      "",
+    )
+    .replace(
+      /^Π\.\s*Ε\.\s*/iu,
+      "",
+    )
+    .toLocaleLowerCase(
+      "el-GR",
+    );
+
+  return cleaned.replace(
+    /(^|[\s-])([\p{L}])/gu,
+    (
+      match,
+      prefix: string,
+      letter: string,
+    ) =>
+      `${prefix}${letter.toLocaleUpperCase(
+        "el-GR",
+      )}`,
+  );
+}
+
 async function loadRegionalUnits() {
   const params =
     new URLSearchParams({
@@ -199,7 +229,9 @@ async function loadRegionalUnits() {
                 ?.attributes
                 ?.NAME_GR ===
               "string"
-                ? feature.attributes.NAME_GR.trim()
+                ? formatRegionalUnitName(
+                    feature.attributes.NAME_GR,
+                  )
                 : "",
             rings:
               Array.isArray(
