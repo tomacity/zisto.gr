@@ -4258,9 +4258,9 @@ function SettingsTab({
 
       try {
         response = await fetch(
-          `/api/billing-portal?business_id=${encodeURIComponent(
+          `/api/analytics?business_id=${encodeURIComponent(
             analytics.business_id,
-          )}`,
+          )}&view=billing-portal`,
           {
             method: "POST",
             headers: {
