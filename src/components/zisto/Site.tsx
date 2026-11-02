@@ -4241,6 +4241,71 @@ function SettingsTab({
   ] = useState("");
 
   const [
+    billingDocuments,
+    setBillingDocuments,
+  ] = useState<
+    Array<{
+      id: string;
+      document_type: string;
+      status: string;
+      source: string;
+      currency: string;
+      subtotal_cents: number;
+      vat_cents: number;
+      total_cents: number;
+      document_number:
+        | string
+        | null;
+      stripe_invoice_id:
+        | string
+        | null;
+      provider_name:
+        | string
+        | null;
+      provider_document_id:
+        | string
+        | null;
+      provider_mark:
+        | string
+        | null;
+      provider_uid:
+        | string
+        | null;
+      hosted_url:
+        | string
+        | null;
+      pdf_url:
+        | string
+        | null;
+      issued_at:
+        | string
+        | null;
+      due_at:
+        | string
+        | null;
+      paid_at:
+        | string
+        | null;
+      period_start:
+        | string
+        | null;
+      period_end:
+        | string
+        | null;
+      created_at: string;
+    }>
+  >([]);
+  const [
+    loadingBillingHistory,
+    setLoadingBillingHistory,
+  ] = useState(false);
+  const [
+    billingHistoryError,
+    setBillingHistoryError,
+  ] = useState("");
+
+
+  const [
     billingProfile,
     setBillingProfile,
   ] = useState({
@@ -4290,6 +4355,97 @@ function SettingsTab({
 
   const subscription =
     analytics.subscription;
+
+  useEffect(() => {
+    if (
+      centerTab !== "subscription" ||
+      membershipRole !== "owner"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadBillingHistory() {
+      setBillingHistoryError("");
+
+      try {
+        setLoadingBillingHistory(
+          true,
+        );
+
+        const {
+          data: { session },
+        } =
+          await supabase.auth.getSession();
+
+        if (!session) {
+          window.location.hash =
+            "/login";
+          return;
+        }
+
+        const response =
+          await fetch(
+            `/api/analytics?business_id=${encodeURIComponent(
+              analytics.business_id,
+            )}&view=billing-history`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${session.access_token}`,
+              },
+              cache: "no-store",
+            },
+          );
+
+        const result =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Δεν ήταν δυνατή η φόρτωση του ιστορικού πληρωμών.",
+          );
+        }
+
+        if (!cancelled) {
+          setBillingDocuments(
+            Array.isArray(
+              result.documents,
+            )
+              ? result.documents
+              : [],
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBillingHistoryError(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η φόρτωση του ιστορικού πληρωμών.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingBillingHistory(
+            false,
+          );
+        }
+      }
+    }
+
+    void loadBillingHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    centerTab,
+    analytics.business_id,
+    membershipRole,
+  ]);
+
 
   useEffect(() => {
     if (
@@ -6334,6 +6490,164 @@ function SettingsTab({
                   {subscriptionError}
                 </p>
               )}
+
+              {membershipRole ===
+                "owner" && (
+                  <div className="mt-6 rounded-[18px] border border-black/8">
+                    <div className="flex flex-col gap-3 border-b border-black/8 p-5 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                          Billing history
+                        </p>
+                        <h3 className="mt-2 text-[20px] font-black tracking-[-0.03em]">
+                          Παραστατικά & πληρωμές
+                        </h3>
+                      </div>
+
+                      <p className="text-[10px] text-[#222]/35">
+                        Τελευταία 50 παραστατικά
+                      </p>
+                    </div>
+
+                    {loadingBillingHistory ? (
+                      <div className="p-6 text-[12px] font-semibold text-[#222]/40">
+                        Φόρτωση ιστορικού...
+                      </div>
+                    ) : billingHistoryError ? (
+                      <div className="p-6">
+                        <p className="rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                          {billingHistoryError}
+                        </p>
+                      </div>
+                    ) : billingDocuments.length ===
+                      0 ? (
+                      <div className="p-6">
+                        <p className="text-[13px] font-bold">
+                          Δεν υπάρχουν ακόμη παραστατικά.
+                        </p>
+                        <p className="mt-2 text-[11px] leading-relaxed text-[#222]/40">
+                          Μόλις ολοκληρωθεί μια χρέωση, θα εμφανιστεί εδώ αυτόματα.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-black/8">
+                        {billingDocuments.map(
+                          (document) => {
+                            const statusLabels: Record<
+                              string,
+                              string
+                            > = {
+                              paid:
+                                "Πληρώθηκε",
+                              open:
+                                "Εκκρεμεί",
+                              draft:
+                                "Πρόχειρο",
+                              void:
+                                "Ακυρώθηκε",
+                              uncollectible:
+                                "Μη εισπράξιμο",
+                              refunded:
+                                "Επιστροφή",
+                            };
+
+                            const statusClass =
+                              document.status ===
+                              "paid"
+                                ? "bg-green-100 text-green-700"
+                                : document.status ===
+                                    "open"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : document.status ===
+                                      "void"
+                                    ? "bg-red-50 text-red-600"
+                                    : "bg-[#F6F6F4] text-[#222]/55";
+
+                            const documentUrl =
+                              document.pdf_url ??
+                              document.hosted_url;
+
+                            return (
+                              <div
+                                key={
+                                  document.id
+                                }
+                                className="grid gap-4 p-5 md:grid-cols-[1.2fr_0.9fr_0.8fr_auto] md:items-center"
+                              >
+                                <div>
+                                  <p className="text-[12px] font-black">
+                                    {document.document_number ??
+                                      "Παραστατικό Zisto"}
+                                  </p>
+                                  <p className="mt-1 text-[10px] text-[#222]/40">
+                                    {formatDate(
+                                      document.issued_at ??
+                                        document.created_at,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/30">
+                                    Περίοδος
+                                  </p>
+                                  <p className="mt-1 text-[11px] font-bold">
+                                    {document.period_start
+                                      ? formatDate(
+                                          document.period_start,
+                                        )
+                                      : "—"}
+                                    {document.period_end
+                                      ? ` → ${formatDate(
+                                          document.period_end,
+                                        )}`
+                                      : ""}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-3 md:block">
+                                  <p className="text-[15px] font-black">
+                                    {formatMoney(
+                                      document.total_cents,
+                                      document.currency,
+                                    )}
+                                  </p>
+                                  <span
+                                    className={`mt-1 inline-flex rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] ${statusClass}`}
+                                  >
+                                    {statusLabels[
+                                      document.status
+                                    ] ??
+                                      document.status}
+                                  </span>
+                                </div>
+
+                                {documentUrl ? (
+                                  <a
+                                    href={
+                                      documentUrl
+                                    }
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex justify-center rounded-full border border-black/10 px-4 py-3 text-[9px] font-bold uppercase tracking-[0.12em] text-[#222] transition hover:border-[#222] hover:bg-[#222] hover:text-white"
+                                  >
+                                    {document.pdf_url
+                                      ? "PDF"
+                                      : "Προβολή"}
+                                  </a>
+                                ) : (
+                                  <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#222]/25">
+                                    Χωρίς αρχείο
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
               {membershipRole ===
                 "owner" && (
