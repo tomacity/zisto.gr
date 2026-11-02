@@ -60,6 +60,9 @@ const GREEK_REGIONS = [
 const ELSTAT_SETTLEMENTS_URL =
   "https://sdigmap.tee.gov.gr/mapping/rest/services/UDM/UDM_SERVICE_ELSTAT/MapServer/18/query";
 
+const ELSTAT_REGIONAL_UNITS_URL =
+  "https://sdigmap.tee.gov.gr/mapping/rest/services/UDM/UDM_SERVICE_ELSTAT/MapServer/3/query";
+
 let greekSettlementsCache:
   | string[]
   | null = null;
@@ -83,6 +86,146 @@ function normalizeGreekSearch(
     .trim();
 }
 
+function cleanSettlementName(
+  value: string,
+) {
+  return value
+    .trim()
+    .replace(
+      /,\s*(ο|η|το|οι|τα)\s*$/iu,
+      "",
+    )
+    .trim();
+}
+
+function pointInRing(
+  point: [number, number],
+  ring: number[][],
+) {
+  const [x, y] = point;
+  let inside = false;
+
+  for (
+    let i = 0,
+      j = ring.length - 1;
+    i < ring.length;
+    j = i++
+  ) {
+    const xi = ring[i]?.[0];
+    const yi = ring[i]?.[1];
+    const xj = ring[j]?.[0];
+    const yj = ring[j]?.[1];
+
+    if (
+      typeof xi !== "number" ||
+      typeof yi !== "number" ||
+      typeof xj !== "number" ||
+      typeof yj !== "number"
+    ) {
+      continue;
+    }
+
+    const intersects =
+      yi > y !== yj > y &&
+      x <
+        ((xj - xi) *
+          (y - yi)) /
+          (yj - yi || 1e-12) +
+          xi;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function pointInPolygon(
+  point: [number, number],
+  rings: number[][][],
+) {
+  let inside = false;
+
+  for (const ring of rings) {
+    if (
+      ring.length >= 3 &&
+      pointInRing(
+        point,
+        ring,
+      )
+    ) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+async function loadRegionalUnits() {
+  const params =
+    new URLSearchParams({
+      where: "1=1",
+      outFields: "NAME_GR",
+      returnGeometry: "true",
+      outSR: "2100",
+      f: "json",
+    });
+
+  const response =
+    await fetch(
+      `${ELSTAT_REGIONAL_UNITS_URL}?${params.toString()}`,
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      "Δεν ήταν δυνατή η φόρτωση των Περιφερειακών Ενοτήτων.",
+    );
+  }
+
+  const result =
+    await response.json();
+
+  return Array.isArray(
+    result.features,
+  )
+    ? result.features
+        .map(
+          (
+            feature: any,
+          ) => ({
+            name:
+              typeof feature
+                ?.attributes
+                ?.NAME_GR ===
+              "string"
+                ? feature.attributes.NAME_GR.trim()
+                : "",
+            rings:
+              Array.isArray(
+                feature
+                  ?.geometry
+                  ?.rings,
+              )
+                ? feature.geometry.rings
+                : [],
+          }),
+        )
+        .filter(
+          (
+            unit: {
+              name: string;
+              rings: number[][][];
+            },
+          ) =>
+            unit.name.length >
+              0 &&
+            unit.rings.length >
+              0,
+        )
+    : [];
+}
+
 async function loadGreekSettlements() {
   if (greekSettlementsCache) {
     return greekSettlementsCache;
@@ -94,6 +237,9 @@ async function loadGreekSettlements() {
 
   greekSettlementsPromise =
     (async () => {
+      const regionalUnits =
+        await loadRegionalUnits();
+
       const collected:
         string[] = [];
 
@@ -111,9 +257,8 @@ async function loadGreekSettlements() {
             outFields:
               "OIKISMOS",
             returnGeometry:
-              "false",
-            returnDistinctValues:
               "true",
+            outSR: "2100",
             orderByFields:
               "OIKISMOS",
             resultOffset:
@@ -137,36 +282,65 @@ async function loadGreekSettlements() {
         const result =
           await response.json();
 
-        const page =
+        const features =
           Array.isArray(
             result.features,
           )
             ? result.features
-                .map(
-                  (
-                    feature: any,
-                  ) =>
-                    feature
-                      ?.attributes
-                      ?.OIKISMOS,
-                )
-                .filter(
-                  (
-                    name: unknown,
-                  ): name is string =>
-                    typeof name ===
-                      "string" &&
-                    name.trim()
-                      .length > 0,
-                )
             : [];
 
-        collected.push(
-          ...page,
-        );
+        for (
+          const feature of features
+        ) {
+          const rawName =
+            feature
+              ?.attributes
+              ?.OIKISMOS;
+
+          const x =
+            feature
+              ?.geometry
+              ?.x;
+
+          const y =
+            feature
+              ?.geometry
+              ?.y;
+
+          if (
+            typeof rawName !==
+              "string" ||
+            typeof x !==
+              "number" ||
+            typeof y !==
+              "number"
+          ) {
+            continue;
+          }
+
+          const settlementName =
+            cleanSettlementName(
+              rawName,
+            );
+
+          const regionalUnit =
+            regionalUnits.find(
+              (unit) =>
+                pointInPolygon(
+                  [x, y],
+                  unit.rings,
+                ),
+            );
+
+          collected.push(
+            regionalUnit
+              ? `${settlementName}, ${regionalUnit.name}`
+              : settlementName,
+          );
+        }
 
         if (
-          page.length <
+          features.length <
             pageSize &&
           !result.exceededTransferLimit
         ) {
@@ -177,10 +351,7 @@ async function loadGreekSettlements() {
       greekSettlementsCache =
         Array.from(
           new Set(
-            collected.map(
-              (name) =>
-                name.trim(),
-            ),
+            collected,
           ),
         ).sort((a, b) =>
           a.localeCompare(
