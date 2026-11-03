@@ -700,7 +700,7 @@ export function SubscriptionsPanel({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-              Billing
+              Χρεώσεις
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
               Custom συνδρομές
@@ -994,10 +994,10 @@ export function SubscriptionsPanel({
                     Χρέωση
                   </th>
                   <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
-                    Billing
+                    Χρεώσεις
                   </th>
                   <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
-                    Access
+                    Πρόσβαση
                   </th>
                   <th className="h-14 border-l border-black/[0.05] px-5 font-bold">
                     Επόμενη
@@ -1126,7 +1126,7 @@ export function SubscriptionsPanel({
                         <td className="h-[96px] border-l border-black/[0.05] px-5">
                           {subscription.stripe_subscription_id ? (
                             <span className="inline-flex rounded-full bg-green-100 px-3 py-2 text-[9px] font-black uppercase tracking-[0.1em] text-green-700">
-                              Connected
+                              Συνδεδεμένη
                             </span>
                           ) : subscription.billing_status === "draft" ? (
                             <button
@@ -1292,7 +1292,7 @@ export function SubscriptionsPanel({
 
                         {subscription.stripe_subscription_id ? (
                           <span className="inline-flex rounded-full bg-green-100 px-3 py-2 text-[9px] font-black uppercase tracking-[0.1em] text-green-700">
-                            Connected
+                            Συνδεδεμένη
                           </span>
                         ) : subscription.billing_status === "draft" ? (
                           <button
