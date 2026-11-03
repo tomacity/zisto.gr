@@ -32,9 +32,9 @@ const ADMIN_TABS: {
   },
   {
     id: "projects",
-    label: "Συνδεδεμένα έργα",
+    label: "Smart Links",
     description:
-      "Σύνδεση και διαχείριση των public Smart Links και των GitHub repositories τους.",
+      "Διαχείριση των Smart Links κάθε επιχείρησης, των live URLs και των συνδεδεμένων repositories.",
   },
   {
     id: "clients",
@@ -1244,104 +1244,248 @@ function AdminOverview({
   subscriptionsLoading: boolean;
   onTabChange: (tab: AdminTab) => void;
 }) {
+  const activeBusinesses = businesses.filter(
+    (business) => business.status === "active",
+  ).length;
+
+  const setupRequired = businesses.filter(
+    (business) => business.setup_status === "setup_required",
+  ).length;
+
+  const activeClients = clients.filter(
+    (client) => client.status === "active",
+  ).length;
+
+  const activeSmartLinks = projects.filter(
+    (project) => project.status === "active",
+  ).length;
+
+  const activeSubscriptions = subscriptions.filter(
+    (subscription) =>
+      subscription.billing_status === "active",
+  ).length;
+
+  const pendingInvitations = invitations.filter(
+    (invitation) => invitation.status === "pending",
+  ).length;
+
+  const draftSubscriptions = subscriptions.filter(
+    (subscription) => subscription.billing_status === "draft",
+  ).length;
+
+  const attentionItems = [
+    {
+      label: "Επιχειρήσεις που θέλουν setup",
+      value: setupRequired,
+      tab: "businesses" as AdminTab,
+    },
+    {
+      label: "Εκκρεμείς προσκλήσεις",
+      value: pendingInvitations,
+      tab: "invitations" as AdminTab,
+    },
+    {
+      label: "Συνδρομές που περιμένουν ενεργοποίηση",
+      value: draftSubscriptions,
+      tab: "subscriptions" as AdminTab,
+    },
+  ];
+
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-      <AdminCard
-        eyebrow="Management"
-        title="Επιχειρήσεις"
-        description={businessesLoading ? "Φόρτωση…" : `${businesses.length} συνολικά`}
-        onClick={() =>
-          onTabChange("businesses")
-        }
-      />
+    <div className="space-y-6">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard
+          label="Ενεργές επιχειρήσεις"
+          value={
+            businessesLoading
+              ? "—"
+              : String(activeBusinesses)
+          }
+          helper={
+            businessesLoading
+              ? "Φόρτωση..."
+              : `${businesses.length} συνολικά`
+          }
+        />
 
-      <AdminCard
-        eyebrow="Accounts"
-        title="Πελάτες"
-        description={clientsLoading ? "Φόρτωση…" : `${clients.length} συνολικά`}
-        onClick={() =>
-          onTabChange("clients")
-        }
-      />
+        <AdminMetricCard
+          label="Ενεργοί πελάτες"
+          value={
+            clientsLoading
+              ? "—"
+              : String(activeClients)
+          }
+          helper={
+            clientsLoading
+              ? "Φόρτωση..."
+              : `${clients.length} συνολικά`
+          }
+        />
 
-      <AdminCard
-        eyebrow="Custom projects"
-        title="Συνδεδεμένα έργα"
-        description={projectsLoading ? "Φόρτωση…" : `${projects.length} συνολικά`}
-        onClick={() =>
-          onTabChange("projects")
-        }
-      />
+        <AdminMetricCard
+          label="Ενεργά Smart Links"
+          value={
+            projectsLoading
+              ? "—"
+              : String(activeSmartLinks)
+          }
+          helper={
+            projectsLoading
+              ? "Φόρτωση..."
+              : `${projects.length} συνολικά`
+          }
+        />
 
-      <AdminCard
-        eyebrow="Προσκλήσεις"
-        title="Προσκλήσεις"
-        description={invitationsLoading ? "Φόρτωση…" : `${invitations.length} συνολικά`}
-        onClick={() =>
-          onTabChange("invitations")
-        }
-      />
+        <AdminMetricCard
+          label="Ενεργές συνδρομές"
+          value={
+            subscriptionsLoading
+              ? "—"
+              : String(activeSubscriptions)
+          }
+          helper={
+            subscriptionsLoading
+              ? "Φόρτωση..."
+              : `${subscriptions.length} συνολικά`
+          }
+          dark
+        />
+      </section>
 
-      <AdminCard
-        eyebrow="Χρεώσεις"
-        title="Συνδρομές"
-        description={subscriptionsLoading ? "Φόρτωση…" : `${subscriptions.length} συνολικά`}
-        onClick={() =>
-          onTabChange("subscriptions")
-        }
-        dark
-      />
+      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-[28px] border border-black/10 bg-white p-6 sm:p-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Χρειάζεται προσοχή
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
+                Τι μένει να κλείσει.
+              </h2>
+            </div>
+
+            <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 text-[10px] font-bold text-[#666]">
+              {invitationsLoading ||
+              businessesLoading ||
+              subscriptionsLoading
+                ? "..."
+                : `${setupRequired + pendingInvitations + draftSubscriptions} θέματα`}
+            </span>
+          </div>
+
+          <div className="mt-6 divide-y divide-black/[0.06]">
+            {attentionItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() =>
+                  onTabChange(item.tab)
+                }
+                className="flex w-full items-center justify-between gap-4 py-4 text-left transition hover:translate-x-1"
+              >
+                <span className="text-sm font-bold text-[#222]">
+                  {item.label}
+                </span>
+
+                <span
+                  className={`grid min-w-9 place-items-center rounded-full px-3 py-1.5 text-xs font-black ${
+                    item.value > 0
+                      ? "bg-[#FFF0F0] text-[#DC2727]"
+                      : "bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  {item.value}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[28px] bg-[#222] p-6 text-white sm:p-8">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/45">
+            Γρήγορες ενέργειες
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
+            Από εδώ ξεκινάς.
+          </h2>
+
+          <div className="mt-6 grid gap-3">
+            {[
+              {
+                label: "Νέα επιχείρηση",
+                tab: "businesses" as AdminTab,
+              },
+              {
+                label: "Νέο Smart Link",
+                tab: "projects" as AdminTab,
+              },
+              {
+                label: "Πρόσκληση πελάτη",
+                tab: "invite" as AdminTab,
+              },
+              {
+                label: "Διαχείριση συνδρομών",
+                tab: "subscriptions" as AdminTab,
+              },
+            ].map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={() =>
+                  onTabChange(action.tab)
+                }
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-left text-sm font-bold transition hover:bg-white hover:text-[#222]"
+              >
+                <span>{action.label}</span>
+                <span>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 
-function AdminCard({
-  eyebrow,
-  title,
-  description,
-  onClick,
+function AdminMetricCard({
+  label,
+  value,
+  helper,
   dark = false,
 }: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  onClick: () => void;
+  label: string;
+  value: string;
+  helper: string;
   dark?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group min-h-[210px] rounded-[28px] p-7 text-left transition hover:-translate-y-1 hover:shadow-lg ${
+    <article
+      className={`rounded-[24px] border p-5 sm:p-6 ${
         dark
-          ? "bg-[#222] text-white hover:bg-[#DC2727]"
-          : "border border-black/10 bg-white text-[#222] hover:border-[#222]"
+          ? "border-[#222] bg-[#222] text-white"
+          : "border-black/10 bg-white text-[#222]"
       }`}
     >
       <p
-        className={`text-xs font-bold uppercase tracking-[0.22em] ${
-          dark ? "text-white/50" : "text-[#999]"
+        className={`text-[10px] font-bold uppercase tracking-[0.18em] ${
+          dark ? "text-white/45" : "text-[#999]"
         }`}
       >
-        {eyebrow}
+        {label}
       </p>
 
-      <h2 className="mt-6 text-2xl font-black tracking-[-0.03em]">
-        {title}
-      </h2>
+      <p className="mt-5 text-4xl font-black tracking-[-0.05em]">
+        {value}
+      </p>
 
       <p
-        className={`mt-3 text-sm leading-6 ${
-          dark ? "text-white/70" : "text-[#666]"
+        className={`mt-2 text-xs ${
+          dark ? "text-white/55" : "text-[#777]"
         }`}
       >
-        {description}
+        {helper}
       </p>
-
-      <p className="mt-7 text-sm font-bold transition group-hover:translate-x-1">
-        Προβολή →
-      </p>
-    </button>
+    </article>
   );
 }
 
@@ -3032,7 +3176,7 @@ function ProjectsPanel({
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
-          Δεν φορτώθηκαν τα projects
+          Δεν φορτώθηκαν τα Smart Links
         </h3>
 
         <p className="mt-3 text-sm text-red-700">
@@ -3047,7 +3191,7 @@ function ProjectsPanel({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Συνδεδεμένα προσαρμοσμένα έργα
+            Smart Links
           </p>
 
           <p className="mt-2 text-sm text-[#666]">
@@ -3069,7 +3213,7 @@ function ProjectsPanel({
         >
           {showCreateForm
             ? "Κλείσιμο φόρμας"
-            : "+ Connect Project"}
+            : "+ Νέο Smart Link"}
         </button>
       </div>
 
@@ -3080,11 +3224,11 @@ function ProjectsPanel({
         >
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-              Connect custom page
+              Σύνδεση Smart Link
             </p>
 
             <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
-              Νέο συνδεδεμένο έργο
+              Νέο Smart Link
             </h3>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#666]">
@@ -3259,7 +3403,7 @@ function ProjectsPanel({
           </h3>
 
           <p className="mt-3 text-sm text-[#666]">
-            Πάτησε «+ Connect Project» για να
+            Πάτησε «+ Νέο Smart Link» για να
             συνδέσεις το πρώτο custom project.
           </p>
         </div>
@@ -3394,7 +3538,7 @@ function ProjectsPanel({
             <div className="flex items-start justify-between gap-5">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
-                  Επεξεργασία συνδεδεμένου έργου
+                  Επεξεργασία Smart Link
                 </p>
 
                 <h3 className="mt-3 text-3xl font-black tracking-[-0.04em]">
