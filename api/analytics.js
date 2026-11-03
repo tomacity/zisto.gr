@@ -1065,6 +1065,41 @@ export default async function handler(
       const rows =
         await upsertResponse.json();
 
+      if (invoiceEmail) {
+        const subscriptionEmailUpdate =
+          await supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/subscriptions?business_id=eq.${encodeURIComponent(
+                businessId,
+              )}`,
+            method: "PATCH",
+            headers: {
+              Prefer:
+                "return=minimal",
+            },
+            body: {
+              billing_email:
+                invoiceEmail,
+              updated_at:
+                new Date().toISOString(),
+            },
+          });
+
+        if (!subscriptionEmailUpdate.ok) {
+          console.error(
+            "Subscription billing email sync failed:",
+            await subscriptionEmailUpdate.text(),
+          );
+
+          return res.status(500).json({
+            error:
+              "Could not sync billing email",
+          });
+        }
+      }
+
       return res.status(200).json({
         billing_profile:
           rows[0] ?? payload,
