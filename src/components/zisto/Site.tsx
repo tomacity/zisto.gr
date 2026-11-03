@@ -2605,12 +2605,38 @@ type AnalyticsResponse = {
   recent_activity: AnalyticsEvent[];
 };
 
+type BillingSetupPayload = {
+  error:
+    | "subscription_setup_required"
+    | "subscription_pending_owner_activation";
+  message: string;
+  membership_role:
+    | "owner"
+    | "manager"
+    | "staff"
+    | null;
+  subscription: NonNullable<
+    AnalyticsResponse["subscription"]
+  >;
+  business: {
+    id: string;
+    name: string;
+    dashboard_modules: DashboardModule[];
+  };
+};
+
 class AnalyticsRequestError extends Error {
   status: number;
+  payload: Record<string, unknown> | null;
 
-  constructor(status: number, message: string) {
+  constructor(
+    status: number,
+    message: string,
+    payload: Record<string, unknown> | null = null,
+  ) {
     super(message);
     this.status = status;
+    this.payload = payload;
   }
 }
 
@@ -2639,15 +2665,23 @@ async function fetchAnalytics(
 
   if (!response.ok) {
     let message = `Analytics request failed: ${response.status}`;
+    let payload: Record<string, unknown> | null = null;
 
     try {
-      const payload = await response.json();
-      message = payload.error ?? message;
+      payload = await response.json();
+      message =
+        typeof payload?.error === "string"
+          ? payload.error
+          : message;
     } catch {
       // Keep the fallback message.
     }
 
-    throw new AnalyticsRequestError(response.status, message);
+    throw new AnalyticsRequestError(
+      response.status,
+      message,
+      payload,
+    );
   }
 
   return response.json();
@@ -9288,6 +9322,14 @@ function DashboardPage({
   const [tutorialStep, setTutorialStep] = useState(0);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [
+    billingSetup,
+    setBillingSetup,
+  ] = useState<BillingSetupPayload | null>(null);
+  const [
+    openingInitialCheckout,
+    setOpeningInitialCheckout,
+  ] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -9377,6 +9419,7 @@ function DashboardPage({
 
           if (active) {
             setAnalytics(data);
+            setBillingSetup(null);
             setAwaitingApproval(false);
             setSubscriptionSuspended(false);
             setSubscriptionBlockReason(null);
@@ -9402,8 +9445,25 @@ function DashboardPage({
               setAnalyticsError(null);
             } else if (
               error instanceof AnalyticsRequestError &&
+              error.status === 402 &&
+              (error.message ===
+                "subscription_setup_required" ||
+                error.message ===
+                  "subscription_pending_owner_activation") &&
+              error.payload
+            ) {
+              setBillingSetup(
+                error.payload as unknown as BillingSetupPayload,
+              );
+              setSubscriptionSuspended(false);
+              setSubscriptionBlockReason(null);
+              setAwaitingApproval(false);
+              setAnalyticsError(null);
+            } else if (
+              error instanceof AnalyticsRequestError &&
               error.status === 402
             ) {
+              setBillingSetup(null);
               setSubscriptionSuspended(true);
               setSubscriptionBlockReason(
                 error.message ===
@@ -9549,13 +9609,262 @@ function DashboardPage({
     analyticsLoading &&
     !analytics &&
     !awaitingApproval &&
-    !subscriptionSuspended
+    !subscriptionSuspended &&
+    !billingSetup
   ) {
     return (
       <GlobalLoader
         fullScreen
         message="Φόρτωση dashboard..."
       />
+    );
+  }
+
+  async function openInitialSubscriptionCheckout() {
+    if (
+      !billingSetup ||
+      billingSetup.membership_role !== "owner"
+    ) {
+      return;
+    }
+
+    try {
+      setOpeningInitialCheckout(true);
+      setAnalyticsError(null);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          billingSetup.business.id,
+        )}&view=subscription`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "resume_renewal",
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατό να ανοίξει το Stripe Checkout.",
+        );
+      }
+
+      if (
+        typeof result.checkout_url !== "string" ||
+        !result.checkout_url
+      ) {
+        throw new Error(
+          "Η Stripe δεν επέστρεψε Checkout URL.",
+        );
+      }
+
+      window.location.href = result.checkout_url;
+    } catch (error) {
+      console.error(
+        "Initial subscription checkout failed:",
+        error,
+      );
+      setAnalyticsError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατό να ανοίξει το Stripe Checkout.",
+      );
+      setOpeningInitialCheckout(false);
+    }
+  }
+
+  if (billingSetup) {
+    const subscription =
+      billingSetup.subscription;
+    const isOwner =
+      billingSetup.membership_role === "owner";
+    const totalCents = Math.round(
+      subscription.amount_cents *
+        (1 + Number(subscription.vat_rate) / 100),
+    );
+
+    const moduleLabels: Record<
+      DashboardModule,
+      string
+    > = {
+      analytics: "Analytics",
+      reviews: "Reviews",
+      menu: "Μενού",
+      nfc: "NFC",
+      appointments: "Ραντεβού",
+    };
+
+    return (
+      <main className="min-h-screen bg-[#F6F6F4] px-5 py-10 font-sans text-[#222] sm:px-8 sm:py-16">
+        <section className="mx-auto w-full max-w-[760px] overflow-hidden rounded-[30px] border border-black/10 bg-white shadow-[0_30px_80px_-45px_rgba(34,34,34,0.35)]">
+          <div className="border-b border-black/[0.06] p-6 sm:p-10">
+            <img
+              src={WORDMARK}
+              alt="Zisto"
+              className="h-7 w-auto"
+              draggable={false}
+            />
+
+            <p className="mt-10 text-[10px] font-black uppercase tracking-[0.24em] text-[#DC2727]">
+              Zisto Billing
+            </p>
+            <h1 className="mt-3 text-[36px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[52px]">
+              Η συνδρομή σου είναι έτοιμη.
+            </h1>
+            <p className="mt-5 max-w-xl text-[14px] leading-7 text-[#222]/55">
+              {isOwner
+                ? "Έλεγξε τη συμφωνία της επιχείρησής σου και ενεργοποίησε τη συνδρομή για να ανοίξει το Zisto dashboard."
+                : "Η συνδρομή έχει δημιουργηθεί και περιμένει ενεργοποίηση από τον ιδιοκτήτη της επιχείρησης."}
+            </p>
+          </div>
+
+          <div className="p-6 sm:p-10">
+            <div className="rounded-[22px] bg-[#F6F6F4] p-5 sm:p-6">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                Επιχείρηση
+              </p>
+              <h2 className="mt-2 text-[24px] font-black tracking-[-0.035em]">
+                {billingSetup.business.name}
+              </h2>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[16px] bg-white p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/35">
+                    Χρέωση
+                  </p>
+                  <p className="mt-2 text-[27px] font-black tracking-[-0.04em]">
+                    {formatMoney(
+                      totalCents,
+                      subscription.currency,
+                    )}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#222]/45">
+                    {intervalLabel(
+                      subscription.billing_interval_months,
+                    )}{" "}
+                    · περιλαμβάνει {subscription.vat_rate}% ΦΠΑ
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-white p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/35">
+                    Billing email
+                  </p>
+                  <p className="mt-2 break-all text-[13px] font-black">
+                    {subscription.billing_email ?? "—"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#222]/45">
+                    Η απόδειξη της πληρωμής θα συνδεθεί με αυτό το email.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {billingSetup.business.dashboard_modules.length > 0 && (
+              <div className="mt-5 rounded-[20px] border border-black/[0.08] p-5 sm:p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Τι περιλαμβάνει
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {billingSetup.business.dashboard_modules.map(
+                    (module) => (
+                      <span
+                        key={module}
+                        className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[11px] font-bold"
+                      >
+                        {moduleLabels[module] ?? module}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
+            {subscription.notes && (
+              <div className="mt-5 rounded-[20px] border border-black/[0.08] p-5 sm:p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Συμφωνία
+                </p>
+                <p className="mt-3 text-[13px] leading-6 text-[#222]/65">
+                  {subscription.notes}
+                </p>
+              </div>
+            )}
+
+            {analyticsError && (
+              <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                {analyticsError}
+              </p>
+            )}
+
+            {isOwner ? (
+              <>
+                <button
+                  type="button"
+                  disabled={openingInitialCheckout}
+                  onClick={() =>
+                    void openInitialSubscriptionCheckout()
+                  }
+                  className="mt-7 flex w-full items-center justify-between rounded-full bg-[#222] px-6 py-4 text-[11px] font-black uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+                >
+                  <span>
+                    {openingInitialCheckout
+                      ? "Άνοιγμα Stripe..."
+                      : "Ενεργοποίηση συνδρομής"}
+                  </span>
+                  <span>→</span>
+                </button>
+
+                <p className="mt-4 text-center text-[10px] leading-5 text-[#222]/40">
+                  Θα μεταφερθείς στο ασφαλές Stripe Checkout. Με την επιτυχημένη πληρωμή το dashboard ενεργοποιείται αυτόματα.
+                </p>
+              </>
+            ) : (
+              <div className="mt-7 rounded-[18px] bg-amber-50 p-5 text-[12px] font-bold leading-6 text-amber-900">
+                Περιμένουμε τον ιδιοκτήτη της επιχείρησης να ολοκληρώσει την πρώτη πληρωμή.
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-between gap-4 border-t border-black/[0.06] pt-5">
+              <a
+                href="/#/payments"
+                className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#222]/45 underline underline-offset-4"
+              >
+                Πολιτική πληρωμών
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  window.location.hash = "/login";
+                }}
+                className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#222]/45"
+              >
+                Αποσύνδεση
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
     );
   }
 
