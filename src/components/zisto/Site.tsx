@@ -1355,7 +1355,7 @@ function DashboardHeroPreview() {
           </h2>
 
           <p className="mx-auto mt-5 max-w-3xl text-[16px] leading-relaxed text-[#222]/60">
-            Παρακολούθησε επισκέψεις, conversions, reviews, μενού και
+            Παρακολούθησε επισκέψεις, μετατροπές, κριτικές, μενού και
             την απόδοση κάθε NFC κάρτας σε πραγματικό χρόνο.
           </p>
         </div>
@@ -7849,7 +7849,7 @@ function NfcCardsTab({
       if (!response.ok) {
         throw new Error(
           result.error ||
-            "Δεν ήταν δυνατή η φόρτωση των analytics.",
+            "Δεν ήταν δυνατή η φόρτωση των στατιστικών.",
         );
       }
 
@@ -9476,7 +9476,7 @@ function DashboardPage({
             } else {
               setSubscriptionSuspended(false);
               setSubscriptionBlockReason(null);
-              setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
+              setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των στατιστικών.");
             }
           }
         } finally {
