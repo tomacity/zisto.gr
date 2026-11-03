@@ -222,7 +222,7 @@ export default async function handler(
       });
     }
 
-    const baseUrl = "https://zisto.app";
+    const baseUrl = "https://www.zisto.app";
 
     const redirectTo = `${baseUrl}/?invite=1`;
 
