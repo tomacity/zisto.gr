@@ -2518,6 +2518,194 @@ export default async function handler(
         subscriptionRows[0] ?? null;
     }
 
+
+    let appointmentAnalytics = null;
+
+    const enabledDashboardModules =
+      Array.isArray(business.dashboard_modules)
+        ? business.dashboard_modules
+        : ["analytics", "reviews", "menu", "nfc"];
+
+    if (
+      enabledDashboardModules.includes(
+        "appointments",
+      )
+    ) {
+      const appointmentAnalyticsQuery =
+        new URLSearchParams({
+          business_id:
+            `eq.${businessId}`,
+          select:
+            "starts_at,status,created_at",
+          order: "starts_at.asc",
+          limit: "10000",
+        });
+
+      const appointmentAnalyticsResponse =
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/appointments?${appointmentAnalyticsQuery.toString()}`,
+        });
+
+      if (!appointmentAnalyticsResponse.ok) {
+        console.error(
+          "Appointment analytics query failed",
+          await appointmentAnalyticsResponse.text(),
+        );
+      } else {
+        const appointmentRows =
+          await appointmentAnalyticsResponse.json();
+
+        const analyticsNow = new Date();
+        const analyticsTodayStart =
+          getStartOfToday(analyticsNow);
+        const analyticsTomorrow =
+          new Date(analyticsTodayStart);
+        analyticsTomorrow.setDate(
+          analyticsTomorrow.getDate() + 1,
+        );
+
+        const analyticsWeekStart =
+          getStartOfWeek(analyticsNow);
+        const analyticsNextWeek =
+          new Date(analyticsWeekStart);
+        analyticsNextWeek.setDate(
+          analyticsNextWeek.getDate() + 7,
+        );
+
+        const analyticsMonthStart =
+          getStartOfMonth(analyticsNow);
+        const analyticsNextMonth =
+          new Date(analyticsMonthStart);
+        analyticsNextMonth.setMonth(
+          analyticsNextMonth.getMonth() + 1,
+        );
+
+        const upcomingSevenDaysEnd =
+          new Date(analyticsNow);
+        upcomingSevenDaysEnd.setDate(
+          upcomingSevenDaysEnd.getDate() + 7,
+        );
+
+        const confirmedAppointments =
+          appointmentRows.filter(
+            (appointment) =>
+              appointment.status !==
+              "cancelled",
+          );
+
+        const inRange = (
+          appointment,
+          start,
+          end,
+        ) => {
+          const startsAt =
+            new Date(appointment.starts_at);
+
+          return (
+            startsAt >= start &&
+            startsAt < end
+          );
+        };
+
+        const hourCounts =
+          confirmedAppointments.reduce(
+            (accumulator, appointment) => {
+              const startsAt =
+                new Date(
+                  appointment.starts_at,
+                );
+
+              if (startsAt < analyticsNow) {
+                return accumulator;
+              }
+
+              const hour =
+                startsAt.getHours();
+
+              accumulator[hour] =
+                (accumulator[hour] || 0) +
+                1;
+
+              return accumulator;
+            },
+            {},
+          );
+
+        const busiestHourEntry =
+          Object.entries(hourCounts)
+            .sort(
+              (a, b) =>
+                Number(b[1]) -
+                Number(a[1]),
+            )[0] ?? null;
+
+        appointmentAnalytics = {
+          today:
+            confirmedAppointments.filter(
+              (appointment) =>
+                inRange(
+                  appointment,
+                  analyticsTodayStart,
+                  analyticsTomorrow,
+                ),
+            ).length,
+          week:
+            confirmedAppointments.filter(
+              (appointment) =>
+                inRange(
+                  appointment,
+                  analyticsWeekStart,
+                  analyticsNextWeek,
+                ),
+            ).length,
+          month:
+            confirmedAppointments.filter(
+              (appointment) =>
+                inRange(
+                  appointment,
+                  analyticsMonthStart,
+                  analyticsNextMonth,
+                ),
+            ).length,
+          cancelled_month:
+            appointmentRows.filter(
+              (appointment) =>
+                appointment.status ===
+                  "cancelled" &&
+                inRange(
+                  appointment,
+                  analyticsMonthStart,
+                  analyticsNextMonth,
+                ),
+            ).length,
+          upcoming_7_days:
+            confirmedAppointments.filter(
+              (appointment) => {
+                const startsAt =
+                  new Date(
+                    appointment.starts_at,
+                  );
+
+                return (
+                  startsAt >= analyticsNow &&
+                  startsAt <
+                    upcomingSevenDaysEnd
+                );
+              },
+            ).length,
+          busiest_hour:
+            busiestHourEntry
+              ? Number(
+                  busiestHourEntry[0],
+                )
+              : null,
+        };
+      }
+    }
+
     if (
       subscriptionState?.billing_status ===
         "draft" &&
@@ -2754,9 +2942,7 @@ export default async function handler(
           locations[0]?.name ?? null,
 
         dashboard_modules:
-          Array.isArray(business.dashboard_modules)
-            ? business.dashboard_modules
-            : ["analytics", "reviews", "menu", "nfc"],
+          enabledDashboardModules,
 
         profile_image_url:
           business.profile_image_url ?? null,
@@ -2828,6 +3014,9 @@ export default async function handler(
 
       recent_activity:
         events.slice(0, 10),
+
+      appointments:
+        appointmentAnalytics,
     });
   } catch (error) {
     console.error(
