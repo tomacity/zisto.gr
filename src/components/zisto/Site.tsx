@@ -2414,10 +2414,11 @@ function InvitationSetupPage() {
           ? session.user.user_metadata.business_id
           : "";
 
-      window.history.replaceState({}, "", window.location.origin);
-      window.location.hash = businessId
-        ? `/dashboard?business=${encodeURIComponent(businessId)}`
-        : "/dashboard";
+      const dashboardUrl = businessId
+        ? `https://www.zisto.app/#/dashboard?business=${encodeURIComponent(businessId)}`
+        : "https://www.zisto.app/#/dashboard";
+
+      window.location.replace(dashboardUrl);
     } catch (error) {
       console.error("Invitation setup failed:", error);
       setErrorMessage(
