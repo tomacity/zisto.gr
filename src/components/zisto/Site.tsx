@@ -1293,7 +1293,7 @@ const SERVICES = [
   },
   {
     n: "05",
-    title: "Το δικό σου Dashboard",
+    title: "Ο δικός σου πίνακας",
     body: "Κάθε επιχείρηση αποκτά προσωπικό dashboard με live analytics, στατιστικά ανά τραπέζι και πλήρη διαχείριση των NFC καρτών της.",
     span: "md:col-span-12",
     big: true,
@@ -2893,12 +2893,12 @@ function DashboardChart({ data }: { data: DailyActivity[] }) {
 
             <div className="mt-3 space-y-1 text-[10px] text-white/65">
               <p className="flex justify-between gap-4">
-                <span>Menu opens</span>
+                <span>Ανοίγματα μενού</span>
                 <strong className="text-white">{activeItem.menu}</strong>
               </p>
 
               <p className="flex justify-between gap-4">
-                <span>Review clicks</span>
+                <span>Κλικ για κριτική</span>
                 <strong className="text-white">{activeItem.reviews}</strong>
               </p>
             </div>
@@ -3035,7 +3035,7 @@ function BusinessHealth({
       active: menuActive,
     },
     {
-      label: "Analytics tracking",
+      label: "Παρακολούθηση στατιστικών",
       active: trackingActive,
     },
     {
@@ -3043,7 +3043,7 @@ function BusinessHealth({
       active: nfcOrQrActive,
     },
     {
-      label: `${sevenDayReviewClicks} review clicks / 7 ημέρες`,
+      label: `${sevenDayReviewClicks} κλικ για κριτική / 7 ημέρες`,
       active: sevenDayReviewClicks > 0,
     },
   ];
@@ -3531,7 +3531,7 @@ function ReviewsTab({
         {[
           {
             label:
-              "Review clicks σήμερα",
+              "Κλικ για κριτική σήμερα",
             value:
               analytics.totals
                 .review_clicks_today,
@@ -3613,7 +3613,7 @@ function ReviewsTab({
               </p>
 
               <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-                Review clicks τελευταίων 7 ημερών
+                Κλικ για κριτική τελευταίων 7 ημερών
               </h2>
             </div>
 
@@ -4403,7 +4403,7 @@ function SettingsTab({
 
   const roleLabels: Record<string, string> = {
     owner: "Ιδιοκτήτης",
-    manager: "Manager",
+    manager: "Διαχειριστής",
     staff: "Προσωπικό",
   };
 
@@ -5439,11 +5439,11 @@ function SettingsTab({
         />
       </div>
       <div class="doc-meta">
-        <div class="eyebrow">Zisto Billing</div>
+        <div class="eyebrow">Χρεώσεις Zisto</div>
         <h1>${
           isFiscalDocument
             ? "Τιμολόγιο Παροχής Υπηρεσιών"
-            : "Invoice Preview"
+            : "Προεπισκόπηση τιμολογίου"
         }</h1>
         <div class="doc-number">
           Αρ. παραστατικού: ${escapeInvoiceHtml(
@@ -6420,7 +6420,7 @@ function SettingsTab({
               DashboardModule,
               string
             > = {
-              analytics: "Analytics",
+              analytics: "Στατιστικά",
               reviews: "Αξιολογήσεις",
               menu: "Ψηφιακό μενού",
               nfc: "NFC κάρτες",
@@ -6798,7 +6798,7 @@ function SettingsTab({
           {membershipRole === "owner" && (
             <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Billing profile
+                Στοιχεία χρέωσης
               </p>
 
               <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
@@ -6812,7 +6812,7 @@ function SettingsTab({
                 </div>
 
                 <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
-                  Owner only
+                  Μόνο για ιδιοκτήτη
                 </span>
               </div>
 
@@ -7252,7 +7252,7 @@ function SettingsTab({
       {centerTab === "subscription" && (
         <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
           <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Zisto Billing
+            Χρεώσεις Zisto
           </p>
 
           <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -7363,7 +7363,7 @@ function SettingsTab({
 
                 <div className="rounded-[16px] bg-[#F6F6F4] p-5">
                   <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-                    Billing email
+                    Email χρέωσης
                   </p>
                   <p className="mt-3 break-all text-[13px] font-black">
                     {subscription
@@ -7425,7 +7425,7 @@ function SettingsTab({
                     <div className="flex flex-col gap-3 border-b border-black/8 p-5 sm:flex-row sm:items-end sm:justify-between">
                       <div>
                         <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-                          Billing history
+                          Ιστορικό χρεώσεων
                         </p>
                         <h3 className="mt-2 text-[20px] font-black tracking-[-0.03em]">
                           Παραστατικά & πληρωμές
@@ -8343,7 +8343,7 @@ if (loading) {
               </button>
     
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Analytics τραπεζιού
+                Στατιστικά τραπεζιού
               </p>
     
               <div className="mt-2 flex items-center gap-3">
@@ -8432,7 +8432,7 @@ if (loading) {
     
             <article className="rounded-[20px] border border-black/10 bg-white p-6">
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
-                Menu opens
+                Ανοίγματα μενού
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
@@ -8442,7 +8442,7 @@ if (loading) {
     
             <article className="rounded-[20px] border border-black/10 bg-white p-6">
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
-                Review clicks
+                Κλικ για κριτική
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
@@ -9001,7 +9001,7 @@ function DashboardTabPlaceholder({
     { eyebrow: string; title: string; description: string }
   > = {
     analytics: {
-      eyebrow: "Analytics",
+      eyebrow: "Στατιστικά",
       title: "Αναλυτικά δεδομένα",
       description:
         "Εδώ θα μπουν φίλτρα ημερομηνιών, σύγκριση NFC με QR, ώρες αιχμής και αναλυτικά conversion rates.",
@@ -9066,7 +9066,7 @@ function DashboardTabPlaceholder({
 
         <div className="rounded-[16px] bg-[#F6F6F4] p-5">
           <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-            Menu opens σήμερα
+            Ανοίγματα μενού σήμερα
           </p>
           <p className="mt-3 text-[34px] font-black">
             {numberFormatter.format(analytics?.totals.menu_opens_today ?? 0)}
@@ -9075,7 +9075,7 @@ function DashboardTabPlaceholder({
 
         <div className="rounded-[16px] bg-[#F6F6F4] p-5">
           <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-            Review clicks σήμερα
+            Κλικ για κριτική σήμερα
           </p>
           <p className="mt-3 text-[34px] font-black">
             {numberFormatter.format(analytics?.totals.review_clicks_today ?? 0)}
@@ -9269,7 +9269,7 @@ const DASHBOARD_NAV_ITEMS: {
   label: string;
   system?: boolean;
 }[] = [
-  { id: "analytics", icon: "↗", label: "Analytics" },
+  { id: "analytics", icon: "↗", label: "Στατιστικά" },
   { id: "reviews", icon: "★", label: "Αξιολογήσεις" },
   { id: "menu", icon: "☰", label: "Μενού" },
   { id: "nfc", icon: "⌁", label: "NFC κάρτες" },
@@ -9527,7 +9527,7 @@ function DashboardPage({
           note: `${percentFormatter.format(analytics.totals.menu_conversion_rate)}% των σημερινών επισκέψεων`,
         },
         {
-          label: "Review clicks σήμερα",
+          label: "Κλικ για κριτική σήμερα",
           value: numberFormatter.format(analytics.totals.review_clicks_today),
           change: "Live",
           note: `${percentFormatter.format(analytics.totals.review_conversion_rate)}% των σημερινών επισκέψεων`,
@@ -9706,8 +9706,8 @@ function DashboardPage({
       DashboardModule,
       string
     > = {
-      analytics: "Analytics",
-      reviews: "Reviews",
+      analytics: "Στατιστικά",
+      reviews: "Κριτικές",
       menu: "Μενού",
       nfc: "NFC",
       appointments: "Ραντεβού",
@@ -9725,7 +9725,7 @@ function DashboardPage({
             />
 
             <p className="mt-10 text-[10px] font-black uppercase tracking-[0.24em] text-[#DC2727]">
-              Zisto Billing
+              Χρεώσεις Zisto
             </p>
             <h1 className="mt-3 text-[36px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[52px]">
               Η συνδρομή σου είναι έτοιμη.
@@ -9767,7 +9767,7 @@ function DashboardPage({
 
                 <div className="rounded-[16px] bg-white p-5">
                   <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/35">
-                    Billing email
+                    Email χρέωσης
                   </p>
                   <p className="mt-2 break-all text-[13px] font-black">
                     {subscription.billing_email ?? "—"}
@@ -10925,7 +10925,7 @@ function CookiePolicyPage() {
 
           <section>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
-              03 — Analytics
+              03 — Στατιστικά
             </p>
 
             <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
