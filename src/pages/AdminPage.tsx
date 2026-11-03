@@ -20,7 +20,7 @@ const ADMIN_TABS: {
 }[] = [
   {
     id: "home",
-    label: "Overview",
+    label: "Επισκόπηση",
     description:
       "Κεντρική εικόνα και γρήγορη πρόσβαση σε όλες τις λειτουργίες του Zisto Admin.",
   },
@@ -32,13 +32,13 @@ const ADMIN_TABS: {
   },
   {
     id: "projects",
-    label: "Projects",
+    label: "Συνδεδεμένα έργα",
     description:
       "Σύνδεση και διαχείριση των public Smart Links και των GitHub repositories τους.",
   },
   {
     id: "clients",
-    label: "Clients",
+    label: "Πελάτες",
     description:
       "Διαχείριση των clients και της πρόσβασής τους στις επιχειρήσεις.",
   },
@@ -56,7 +56,7 @@ const ADMIN_TABS: {
   },
   {
     id: "invite",
-    label: "Invite Client",
+    label: "Πρόσκληση πελάτη",
     description:
       "Αποστολή νέας πρόσκλησης και σύνδεση client με επιχείρηση.",
   },
@@ -253,14 +253,14 @@ const [invitationsError, setInvitationsError] =
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [error, setError] = useState("");
-  const [activeAdminTab, setActiveAdminTab] =
+  const [activeAdminTab, setΕνεργόAdminTab] =
     useState<AdminTab>(
       adminTabFromHash,
     );
   
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [businessesLoading, setBusinessesLoading] = useState(false);
-  const [businessesError, setBusinessesError] = useState("");
+  const [businesses, setΕπιχειρήσεις] = useState<Business[]>([]);
+  const [businessesLoading, setΕπιχειρήσειςLoading] = useState(false);
+  const [businessesError, setΕπιχειρήσειςError] = useState("");
 
   const [subscriptions, setSubscriptions] =
     useState<AdminSubscription[]>([]);
@@ -272,7 +272,7 @@ const [invitationsError, setInvitationsError] =
   useEffect(() => {
     const syncAdminTabFromHash =
       () => {
-        setActiveAdminTab(
+        setΕνεργόAdminTab(
           adminTabFromHash(),
         );
       };
@@ -293,7 +293,7 @@ const [invitationsError, setInvitationsError] =
   function handleAdminTabChange(
     tab: AdminTab,
   ) {
-    setActiveAdminTab(tab);
+    setΕνεργόAdminTab(tab);
 
     const nextHash =
       tab === "home"
@@ -532,10 +532,10 @@ const [invitationsError, setInvitationsError] =
 
   let active = true;
 
-  async function loadBusinesses() {
+  async function loadΕπιχειρήσεις() {
     try {
-      setBusinessesLoading(true);
-      setBusinessesError("");
+      setΕπιχειρήσειςLoading(true);
+      setΕπιχειρήσειςError("");
 
       const {
         data: { session },
@@ -573,13 +573,13 @@ const [invitationsError, setInvitationsError] =
       }
 
       if (active) {
-        setBusinesses(result.businesses ?? []);
+        setΕπιχειρήσεις(result.businesses ?? []);
       }
     } catch (loadError) {
-      console.error("Businesses loading failed:", loadError);
+      console.error("Επιχειρήσεις loading failed:", loadError);
 
       if (active) {
-        setBusinessesError(
+        setΕπιχειρήσειςError(
           loadError instanceof Error
             ? loadError.message
             : "Δεν ήταν δυνατή η φόρτωση των επιχειρήσεων.",
@@ -587,12 +587,12 @@ const [invitationsError, setInvitationsError] =
       }
     } finally {
       if (active) {
-        setBusinessesLoading(false);
+        setΕπιχειρήσειςLoading(false);
       }
     }
   }
 
-  loadBusinesses();
+  loadΕπιχειρήσεις();
 
   return () => {
     active = false;
@@ -938,7 +938,7 @@ useEffect(() => {
               </button>
           
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35">
-                Admin Dashboard
+                Πίνακας διαχείρισης
               </p>
           
               <div className="grid h-10 w-10 place-items-center rounded-full bg-[#222] text-xs font-black uppercase text-white">
@@ -951,7 +951,7 @@ useEffect(() => {
         
             <header className="border-b border-black/10 pb-8">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Admin workspace
+                Χώρος διαχείρισης
               </p>
   
               <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
@@ -981,19 +981,19 @@ useEffect(() => {
               )}
   
               {activeAdminTab === "businesses" && (
-                <BusinessesPanel
+                <ΕπιχειρήσειςPanel
                   businesses={businesses}
                   loading={businessesLoading}
                   error={businessesError}
                   onBusinessCreated={(business) => {
-                    setBusinesses((currentBusinesses) => [
+                    setΕπιχειρήσεις((currentΕπιχειρήσεις) => [
                       business,
-                      ...currentBusinesses,
+                      ...currentΕπιχειρήσεις,
                     ]);
                   }}
                   onBusinessUpdated={(updatedBusiness) => {
-                    setBusinesses((currentBusinesses) =>
-                      currentBusinesses.map((business) =>
+                    setΕπιχειρήσεις((currentΕπιχειρήσεις) =>
+                      currentΕπιχειρήσεις.map((business) =>
                         business.id === updatedBusiness.id
                           ? updatedBusiness
                           : business,
@@ -1007,8 +1007,8 @@ useEffect(() => {
                     ]);
                   }}
                   onBusinessDeleted={(businessId) => {
-                    setBusinesses((currentBusinesses) =>
-                      currentBusinesses.filter(
+                    setΕπιχειρήσεις((currentΕπιχειρήσεις) =>
+                      currentΕπιχειρήσεις.filter(
                         (business) =>
                           business.id !== businessId,
                       ),
@@ -1166,7 +1166,7 @@ function AdminSidebar({
 
         <nav className="mt-8 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
           {ADMIN_TABS.map((tab) => {
-            const isActive =
+            const isΕνεργό =
               activeTab === tab.id;
 
             return (
@@ -1180,7 +1180,7 @@ function AdminSidebar({
                 }}
                 
                 className={`flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left text-sm font-bold transition ${
-                  isActive
+                  isΕνεργό
                     ? "bg-white text-[#222]"
                     : "text-white/65 hover:bg-white/10 hover:text-white"
                 }`}
@@ -1189,7 +1189,7 @@ function AdminSidebar({
 
                 <span
                   className={
-                    isActive
+                    isΕνεργό
                       ? "text-[#DC2727]"
                       : "text-white/25"
                   }
@@ -1257,7 +1257,7 @@ function AdminOverview({
 
       <AdminCard
         eyebrow="Accounts"
-        title="Clients"
+        title="Πελάτες"
         description={clientsLoading ? "Φόρτωση…" : `${clients.length} συνολικά`}
         onClick={() =>
           onTabChange("clients")
@@ -1266,7 +1266,7 @@ function AdminOverview({
 
       <AdminCard
         eyebrow="Custom projects"
-        title="Projects"
+        title="Συνδεδεμένα έργα"
         description={projectsLoading ? "Φόρτωση…" : `${projects.length} συνολικά`}
         onClick={() =>
           onTabChange("projects")
@@ -1274,7 +1274,7 @@ function AdminOverview({
       />
 
       <AdminCard
-        eyebrow="Invitations"
+        eyebrow="Προσκλήσεις"
         title="Προσκλήσεις"
         description={invitationsLoading ? "Φόρτωση…" : `${invitations.length} συνολικά`}
         onClick={() =>
@@ -1283,7 +1283,7 @@ function AdminOverview({
       />
 
       <AdminCard
-        eyebrow="Billing"
+        eyebrow="Χρεώσεις"
         title="Συνδρομές"
         description={subscriptionsLoading ? "Φόρτωση…" : `${subscriptions.length} συνολικά`}
         onClick={() =>
@@ -1345,7 +1345,7 @@ function AdminCard({
   );
 }
 
-function BusinessesPanel({
+function ΕπιχειρήσειςPanel({
   businesses,
   loading,
   error,
@@ -1373,22 +1373,22 @@ function BusinessesPanel({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [editingBusinessId, setEditingBusinessId] =
+  const [editingBusinessId, setΕπεξεργασίαingBusinessId] =
     useState<string | null>(null);
   
-  const [editName, setEditName] = useState("");
-  const [editSlug, setEditSlug] = useState("");
-  const [editTimezone, setEditTimezone] =
+  const [editName, setΕπεξεργασίαName] = useState("");
+  const [editSlug, setΕπεξεργασίαSlug] = useState("");
+  const [editTimezone, setΕπεξεργασίαTimezone] =
     useState("Europe/Athens");
   
-  const [editStatus, setEditStatus] =
+  const [editStatus, setΕπεξεργασίαStatus] =
     useState<Business["status"]>("active");
   
-  const [editDashboardModules, setEditDashboardModules] =
+  const [editDashboardModules, setΕπεξεργασίαDashboardModules] =
     useState<DashboardModule[]>([]);
   
-  const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState("");
+  const [editSaving, setΕπεξεργασίαSaving] = useState(false);
+  const [editError, setΕπεξεργασίαError] = useState("");
 
   const [deletingBusiness, setDeletingBusiness] =
     useState<Business | null>(null);
@@ -1641,13 +1641,13 @@ function BusinessesPanel({
     }
   }
 
-  function startEditingBusiness(business: Business) {
-  setEditingBusinessId(business.id);
-  setEditName(business.name);
-  setEditSlug(business.slug);
-  setEditTimezone(business.timezone);
-  setEditStatus(business.status);
-  setEditDashboardModules(
+  function startΕπεξεργασίαingBusiness(business: Business) {
+  setΕπεξεργασίαingBusinessId(business.id);
+  setΕπεξεργασίαName(business.name);
+  setΕπεξεργασίαSlug(business.slug);
+  setΕπεξεργασίαTimezone(business.timezone);
+  setΕπεξεργασίαStatus(business.status);
+  setΕπεξεργασίαDashboardModules(
     business.dashboard_modules ?? [
       "analytics",
       "reviews",
@@ -1655,25 +1655,25 @@ function BusinessesPanel({
       "nfc",
     ],
   );
-  setEditError("");
+  setΕπεξεργασίαError("");
 }
 
-function cancelEditingBusiness() {
-  setEditingBusinessId(null);
-  setEditName("");
-  setEditSlug("");
-  setEditTimezone("Europe/Athens");
-  setEditStatus("active");
-  setEditDashboardModules([]);
-  setEditError("");
+function cancelΕπεξεργασίαingBusiness() {
+  setΕπεξεργασίαingBusinessId(null);
+  setΕπεξεργασίαName("");
+  setΕπεξεργασίαSlug("");
+  setΕπεξεργασίαTimezone("Europe/Athens");
+  setΕπεξεργασίαStatus("active");
+  setΕπεξεργασίαDashboardModules([]);
+  setΕπεξεργασίαError("");
 }
 
 async function updateBusiness(
   businessId: string,
 ) {
   try {
-    setEditSaving(true);
-    setEditError("");
+    setΕπεξεργασίαSaving(true);
+    setΕπεξεργασίαError("");
 
     const {
       data: { session },
@@ -1723,20 +1723,20 @@ async function updateBusiness(
     }
 
     onBusinessUpdated(result.business);
-    cancelEditingBusiness();
+    cancelΕπεξεργασίαingBusiness();
   } catch (updateError) {
     console.error(
       "Business update failed:",
       updateError,
     );
 
-    setEditError(
+    setΕπεξεργασίαError(
       updateError instanceof Error
         ? updateError.message
         : "Δεν ήταν δυνατή η ενημέρωση της επιχείρησης.",
     );
   } finally {
-    setEditSaving(false);
+    setΕπεξεργασίαSaving(false);
   }
 }
 
@@ -1834,7 +1834,7 @@ async function updateBusiness(
         ) ?? null
       : null;
 
-  const activeBusinesses = businesses.filter(
+  const activeΕπιχειρήσεις = businesses.filter(
     (business) =>
       business.status === "active" &&
       business.setup_status === "active",
@@ -1853,7 +1853,7 @@ async function updateBusiness(
     return (
       <div className="mt-8 rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
@@ -1872,12 +1872,12 @@ async function updateBusiness(
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Businesses
+            Επιχειρήσεις
           </p>
 
           <p className="mt-2 text-sm text-[#666]">
             {businesses.length} συνολικά ·{" "}
-            {activeBusinesses} ενεργές
+            {activeΕπιχειρήσεις} ενεργές
           </p>
         </div>
 
@@ -2016,7 +2016,7 @@ async function updateBusiness(
                 }
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
               >
-                <option value="active">Active</option>
+                <option value="active">Ενεργό</option>
                 <option value="inactive">Inactive</option>
               </select>
             </label>
@@ -2080,7 +2080,7 @@ async function updateBusiness(
       ) : (
         <div className="grid gap-5">
           {businesses.map((business) => {
-            const isActive =
+            const isΕνεργό =
               business.status === "active" &&
               business.setup_status === "active";
 
@@ -2098,14 +2098,14 @@ async function updateBusiness(
                     <div className="flex flex-wrap items-center gap-3">
                       <span
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] ${
-                          isActive
+                          isΕνεργό
                             ? "bg-green-50 text-green-700"
                             : "bg-black/5 text-[#777]"
                         }`}
                       >
                         <span
                           className={`h-2 w-2 rounded-full ${
-                            isActive
+                            isΕνεργό
                               ? "bg-green-500"
                               : "bg-[#999]"
                           }`}
@@ -2113,8 +2113,8 @@ async function updateBusiness(
 
                         {setupRequired
                           ? "Setup required"
-                          : isActive
-                            ? "Active"
+                          : isΕνεργό
+                            ? "Ενεργός"
                             : "Inactive"}
                       </span>
 
@@ -2146,7 +2146,7 @@ async function updateBusiness(
                         <p className="mt-2 flex items-center gap-2 font-semibold">
                           <span
                             className={`h-2 w-2 rounded-full ${
-                              isActive
+                              isΕνεργό
                                 ? "animate-pulse bg-[#DC2727]"
                                 : "bg-[#999]"
                             }`}
@@ -2154,7 +2154,7 @@ async function updateBusiness(
 
                           {setupRequired
                             ? "Setup required"
-                            : isActive
+                            : isΕνεργό
                               ? "Live"
                               : "Paused"}
                         </p>
@@ -2166,11 +2166,11 @@ async function updateBusiness(
                     <button
                       type="button"
                       onClick={() =>
-                        startEditingBusiness(business)
+                        startΕπεξεργασίαingBusiness(business)
                       }
                       className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl border border-black/10 bg-white text-[#222] transition hover:border-[#222] hover:bg-[#F7F5F1]"
                       aria-label={`Επεξεργασία ${business.name}`}
-                      title="Edit business"
+                      title="Επεξεργασία επιχείρησης"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -2202,7 +2202,7 @@ async function updateBusiness(
                       }}
                       className="min-h-14 flex-1 rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:flex-none"
                     >
-                      Άνοιγμα Dashboard →
+                      Άνοιγμα πίνακα →
                     </button>
                   </div>
                 </div>
@@ -2226,7 +2226,7 @@ async function updateBusiness(
               event.target === event.currentTarget &&
               !editSaving
             ) {
-              cancelEditingBusiness();
+              cancelΕπεξεργασίαingBusiness();
             }
           }}
         >
@@ -2234,7 +2234,7 @@ async function updateBusiness(
             <div className="sticky top-0 z-10 flex items-start justify-between gap-5 border-b border-black/8 bg-white/95 px-6 py-5 backdrop-blur-xl sm:px-8">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                  Edit business
+                  Επεξεργασία επιχείρησης
                 </p>
 
                 <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
@@ -2244,7 +2244,7 @@ async function updateBusiness(
 
               <button
                 type="button"
-                onClick={cancelEditingBusiness}
+                onClick={cancelΕπεξεργασίαingBusiness}
                 disabled={editSaving}
                 className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full border border-black/10 text-xl transition hover:bg-[#F7F5F1] disabled:opacity-50"
                 aria-label="Κλείσιμο"
@@ -2264,7 +2264,7 @@ async function updateBusiness(
                     type="text"
                     value={editName}
                     onChange={(event) =>
-                      setEditName(event.target.value)
+                      setΕπεξεργασίαName(event.target.value)
                     }
                     maxLength={120}
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
@@ -2285,7 +2285,7 @@ async function updateBusiness(
                       type="text"
                       value={editSlug}
                       onChange={(event) =>
-                        setEditSlug(
+                        setΕπεξεργασίαSlug(
                           generateSlug(
                             event.target.value,
                           ),
@@ -2305,7 +2305,7 @@ async function updateBusiness(
                   <select
                     value={editTimezone}
                     onChange={(event) =>
-                      setEditTimezone(
+                      setΕπεξεργασίαTimezone(
                         event.target.value,
                       )
                     }
@@ -2337,7 +2337,7 @@ async function updateBusiness(
                   <select
                     value={editStatus}
                     onChange={(event) =>
-                      setEditStatus(
+                      setΕπεξεργασίαStatus(
                         event.target
                           .value as Business["status"],
                       )
@@ -2345,7 +2345,7 @@ async function updateBusiness(
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
                   >
                     <option value="active">
-                      Active
+                      Ενεργό
                     </option>
                     <option value="inactive">
                       Inactive
@@ -2358,7 +2358,7 @@ async function updateBusiness(
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                      Dashboard modules
+                      Ενότητες πίνακα
                     </p>
                     <p className="mt-2 max-w-xl text-sm leading-6 text-[#888]">
                       Διάλεξε ακριβώς ποιες ενότητες θα βλέπει ο client στο dashboard του.
@@ -2383,7 +2383,7 @@ async function updateBusiness(
                           key={module.id}
                           type="button"
                           onClick={() => {
-                            setEditDashboardModules(
+                            setΕπεξεργασίαDashboardModules(
                               (current) =>
                                 current.includes(
                                   module.id,
@@ -2523,7 +2523,7 @@ async function updateBusiness(
               <div className="mt-8 flex flex-col-reverse gap-3 border-t border-black/8 pt-6 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={cancelEditingBusiness}
+                  onClick={cancelΕπεξεργασίαingBusiness}
                   disabled={editSaving}
                   className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
                 >
@@ -2781,17 +2781,17 @@ function ProjectsPanel({
   const [successMessage, setSuccessMessage] =
     useState("");
 
-  const [editingProject, setEditingProject] =
+  const [editingProject, setΕπεξεργασίαingProject] =
     useState<ConnectedProject | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editLiveUrl, setEditLiveUrl] = useState("");
-  const [editGithubUrl, setEditGithubUrl] =
+  const [editName, setΕπεξεργασίαName] = useState("");
+  const [editLiveUrl, setΕπεξεργασίαLiveUrl] = useState("");
+  const [editGithubUrl, setΕπεξεργασίαGithubUrl] =
     useState("");
-  const [editStatus, setEditStatus] =
+  const [editStatus, setΕπεξεργασίαStatus] =
     useState<ConnectedProject["status"]>("active");
-  const [editSaving, setEditSaving] =
+  const [editSaving, setΕπεξεργασίαSaving] =
     useState(false);
-  const [editError, setEditError] = useState("");
+  const [editError, setΕπεξεργασίαError] = useState("");
 
   function resetForm() {
     setBusinessId("");
@@ -2908,28 +2908,28 @@ function ProjectsPanel({
     }
   }
 
-  function startEditingProject(
+  function startΕπεξεργασίαingProject(
     project: ConnectedProject,
   ) {
-    setEditingProject(project);
-    setEditName(project.name);
-    setEditLiveUrl(project.live_url);
-    setEditGithubUrl(project.github_url ?? "");
-    setEditStatus(project.status);
-    setEditError("");
+    setΕπεξεργασίαingProject(project);
+    setΕπεξεργασίαName(project.name);
+    setΕπεξεργασίαLiveUrl(project.live_url);
+    setΕπεξεργασίαGithubUrl(project.github_url ?? "");
+    setΕπεξεργασίαStatus(project.status);
+    setΕπεξεργασίαError("");
   }
 
-  function cancelEditingProject() {
+  function cancelΕπεξεργασίαingProject() {
     if (editSaving) {
       return;
     }
 
-    setEditingProject(null);
-    setEditName("");
-    setEditLiveUrl("");
-    setEditGithubUrl("");
-    setEditStatus("active");
-    setEditError("");
+    setΕπεξεργασίαingProject(null);
+    setΕπεξεργασίαName("");
+    setΕπεξεργασίαLiveUrl("");
+    setΕπεξεργασίαGithubUrl("");
+    setΕπεξεργασίαStatus("active");
+    setΕπεξεργασίαError("");
   }
 
   async function updateProject(
@@ -2942,8 +2942,8 @@ function ProjectsPanel({
     }
 
     try {
-      setEditSaving(true);
-      setEditError("");
+      setΕπεξεργασίαSaving(true);
+      setΕπεξεργασίαError("");
 
       const {
         data: { session },
@@ -2994,20 +2994,20 @@ function ProjectsPanel({
       }
 
       onProjectUpdated(result.project);
-      cancelEditingProject();
+      cancelΕπεξεργασίαingProject();
     } catch (updateError) {
       console.error(
         "Project update failed:",
         updateError,
       );
 
-      setEditError(
+      setΕπεξεργασίαError(
         updateError instanceof Error
           ? updateError.message
           : "Δεν ήταν δυνατή η ενημέρωση του project.",
       );
     } finally {
-      setEditSaving(false);
+      setΕπεξεργασίαSaving(false);
     }
   }
 
@@ -3028,7 +3028,7 @@ function ProjectsPanel({
     return (
       <div className="mt-8 rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
@@ -3047,7 +3047,7 @@ function ProjectsPanel({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Connected custom projects
+            Συνδεδεμένα προσαρμοσμένα έργα
           </p>
 
           <p className="mt-2 text-sm text-[#666]">
@@ -3084,7 +3084,7 @@ function ProjectsPanel({
             </p>
 
             <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
-              Νέο Connected Project
+              Νέο συνδεδεμένο έργο
             </h3>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#666]">
@@ -3189,7 +3189,7 @@ function ProjectsPanel({
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
               >
                 <option value="active">
-                  Active
+                  Ενεργό
                 </option>
 
                 <option value="inactive">
@@ -3266,7 +3266,7 @@ function ProjectsPanel({
       ) : (
         <div className="grid gap-5">
           {projects.map((project) => {
-            const isActive =
+            const isΕνεργό =
               project.status === "active";
 
             const business =
@@ -3282,21 +3282,21 @@ function ProjectsPanel({
                     <div className="flex flex-wrap items-center gap-3">
                       <span
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] ${
-                          isActive
+                          isΕνεργό
                             ? "bg-green-50 text-green-700"
                             : "bg-black/5 text-[#777]"
                         }`}
                       >
                         <span
                           className={`h-2 w-2 rounded-full ${
-                            isActive
+                            isΕνεργό
                               ? "bg-green-500"
                               : "bg-[#999]"
                           }`}
                         />
 
-                        {isActive
-                          ? "Active"
+                        {isΕνεργό
+                          ? "Ενεργός"
                           : "Inactive"}
                       </span>
 
@@ -3330,13 +3330,13 @@ function ProjectsPanel({
                         <p className="mt-2 flex items-center gap-2 font-semibold">
                           <span
                             className={`h-2 w-2 rounded-full ${
-                              isActive
+                              isΕνεργό
                                 ? "animate-pulse bg-[#DC2727]"
                                 : "bg-[#999]"
                             }`}
                           />
 
-                          {isActive
+                          {isΕνεργό
                             ? "Ready"
                             : "Paused"}
                         </p>
@@ -3348,11 +3348,11 @@ function ProjectsPanel({
                     <button
                       type="button"
                       onClick={() =>
-                        startEditingProject(project)
+                        startΕπεξεργασίαingProject(project)
                       }
                       className="w-full rounded-2xl border border-black/10 bg-white px-7 py-4 text-center text-sm font-bold transition hover:border-[#222] lg:w-auto"
                     >
-                      Edit
+                      Επεξεργασία
                     </button>
 
                     <a
@@ -3394,7 +3394,7 @@ function ProjectsPanel({
             <div className="flex items-start justify-between gap-5">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
-                  Edit connected project
+                  Επεξεργασία συνδεδεμένου έργου
                 </p>
 
                 <h3 className="mt-3 text-3xl font-black tracking-[-0.04em]">
@@ -3404,7 +3404,7 @@ function ProjectsPanel({
 
               <button
                 type="button"
-                onClick={cancelEditingProject}
+                onClick={cancelΕπεξεργασίαingProject}
                 disabled={editSaving}
                 className="grid h-10 w-10 place-items-center rounded-full bg-[#F4F4F2] text-lg font-bold disabled:opacity-50"
                 aria-label="Κλείσιμο"
@@ -3426,7 +3426,7 @@ function ProjectsPanel({
                   type="text"
                   value={editName}
                   onChange={(event) =>
-                    setEditName(event.target.value)
+                    setΕπεξεργασίαName(event.target.value)
                   }
                   required
                   maxLength={120}
@@ -3444,7 +3444,7 @@ function ProjectsPanel({
                   type="url"
                   value={editLiveUrl}
                   onChange={(event) =>
-                    setEditLiveUrl(event.target.value)
+                    setΕπεξεργασίαLiveUrl(event.target.value)
                   }
                   required
                   disabled={editSaving}
@@ -3462,7 +3462,7 @@ function ProjectsPanel({
                   type="url"
                   value={editGithubUrl}
                   onChange={(event) =>
-                    setEditGithubUrl(event.target.value)
+                    setΕπεξεργασίαGithubUrl(event.target.value)
                   }
                   disabled={editSaving}
                   placeholder="https://github.com/username/project"
@@ -3478,7 +3478,7 @@ function ProjectsPanel({
                 <select
                   value={editStatus}
                   onChange={(event) =>
-                    setEditStatus(
+                    setΕπεξεργασίαStatus(
                       event.target
                         .value as ConnectedProject["status"],
                     )
@@ -3487,7 +3487,7 @@ function ProjectsPanel({
                   className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222] disabled:opacity-60"
                 >
                   <option value="active">
-                    Active
+                    Ενεργό
                   </option>
 
                   <option value="inactive">
@@ -3507,7 +3507,7 @@ function ProjectsPanel({
               <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={cancelEditingProject}
+                  onClick={cancelΕπεξεργασίαingProject}
                   disabled={editSaving}
                   className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
                 >
@@ -3542,7 +3542,7 @@ function ClientsPanel({
   loading,
   error,
   onClientRoleChanged = () => {},
-  onClientRemoved = () => {},
+  onClientΑφαίρεσηd = () => {},
 }: {
   clients: Client[];
   admins: AdminAccount[];
@@ -3553,12 +3553,12 @@ function ClientsPanel({
     businessId: string,
     role: Client["role"],
   ) => void;
-  onClientRemoved?: (
+  onClientΑφαίρεσηd?: (
     userId: string,
     businessId: string,
   ) => void;
 }) {
-  const [editingClientKey, setEditingClientKey] =
+  const [editingClientKey, setΕπεξεργασίαingClientKey] =
     useState<string | null>(null);
 
   const [selectedRole, setSelectedRole] =
@@ -3573,14 +3573,14 @@ function ClientsPanel({
     return `${client.id}-${client.business_id}`;
   }
 
-  function startEditing(client: Client) {
+  function startΕπεξεργασίαing(client: Client) {
     setActionError("");
     setSelectedRole(client.role);
-    setEditingClientKey(getClientKey(client));
+    setΕπεξεργασίαingClientKey(getClientKey(client));
   }
 
-  function cancelEditing() {
-    setEditingClientKey(null);
+  function cancelΕπεξεργασίαing() {
+    setΕπεξεργασίαingClientKey(null);
     setActionError("");
   }
 
@@ -3638,7 +3638,7 @@ function ClientsPanel({
         selectedRole,
       );
 
-      setEditingClientKey(null);
+      setΕπεξεργασίαingClientKey(null);
     } catch (updateError) {
       console.error(
         "Client role update failed:",
@@ -3692,12 +3692,12 @@ function ClientsPanel({
         );
       }
 
-      onClientRemoved(
+      onClientΑφαίρεσηd(
         client.id,
         client.business_id,
       );
 
-      setEditingClientKey(null);
+      setΕπεξεργασίαingClientKey(null);
     } catch (removeError) {
       console.error(
         "Client removal failed:",
@@ -3727,7 +3727,7 @@ function ClientsPanel({
     return (
       <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
@@ -3755,10 +3755,10 @@ function ClientsPanel({
         <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
-              Zisto Team
+              Ομάδα Zisto
             </p>
             <h3 className="mt-2 text-2xl font-black tracking-[-0.035em]">
-              Zisto Admins
+              Διαχειριστές Zisto
             </h3>
             <p className="mt-2 text-sm text-white/55">
               Εσωτερικοί διαχειριστές της πλατφόρμας. Δεν υπολογίζονται ως clients.
@@ -3791,7 +3791,7 @@ function ClientsPanel({
                 )
                 .join("");
 
-              const isActive =
+              const isΕνεργό =
                 Boolean(admin.last_sign_in_at);
 
               return (
@@ -3821,15 +3821,15 @@ function ClientsPanel({
                       <div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em]">
                         <span
                           className={`h-2 w-2 rounded-full ${
-                            isActive
+                            isΕνεργό
                               ? "bg-green-400"
                               : "bg-white/25"
                           }`}
                         />
                         <span className="text-white/45">
-                          {isActive
-                            ? "Active account"
-                            : "No login yet"}
+                          {isΕνεργό
+                            ? "Ενεργός λογαριασμός"
+                            : "Χωρίς σύνδεση ακόμη"}
                         </span>
                       </div>
                     </div>
@@ -3853,7 +3853,7 @@ function ClientsPanel({
         />
 
         <ClientSummaryCard
-          label="Invited"
+          label="Προσκεκλημένοι"
           value={invitedClients}
         />
       </div>
@@ -3887,7 +3887,7 @@ function ClientsPanel({
           {clients.map((client) => {
             const clientKey = getClientKey(client);
 
-            const isEditing =
+            const isΕπεξεργασίαing =
               editingClientKey === clientKey;
 
             const isSaving =
@@ -3950,7 +3950,7 @@ function ClientsPanel({
                     Ρόλος
                   </p>
 
-                  {isEditing ? (
+                  {isΕπεξεργασίαing ? (
                     <select
                       value={selectedRole}
                       disabled={isSaving}
@@ -4002,8 +4002,8 @@ function ClientsPanel({
                     />
 
                     {client.status === "active"
-                      ? "Active"
-                      : "Invited"}
+                      ? "Ενεργός"
+                      : "Προσκεκλημένος"}
                   </span>
                 </div>
 
@@ -4012,7 +4012,7 @@ function ClientsPanel({
                     Ενέργειες
                   </p>
 
-                  {isEditing ? (
+                  {isΕπεξεργασίαing ? (
                     <div className="mt-2 flex flex-wrap gap-2 xl:mt-0">
                       <button
                         type="button"
@@ -4024,16 +4024,16 @@ function ClientsPanel({
                       >
                         {isSaving
                           ? "Αποθήκευση..."
-                          : "Save"}
+                          : "Αποθήκευση"}
                       </button>
 
                       <button
                         type="button"
                         disabled={isSaving}
-                        onClick={cancelEditing}
+                        onClick={cancelΕπεξεργασίαing}
                         className="rounded-xl border border-black/10 px-4 py-2.5 text-xs font-bold transition hover:border-[#222] disabled:opacity-50"
                       >
-                        Cancel
+                        Ακύρωση
                       </button>
 
                       <button
@@ -4044,16 +4044,16 @@ function ClientsPanel({
                         }
                         className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                       >
-                        Remove
+                        Αφαίρεση
                       </button>
                     </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => startEditing(client)}
+                      onClick={() => startΕπεξεργασίαing(client)}
                       className="mt-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-xs font-bold transition hover:border-[#222] hover:bg-[#F7F5F1] xl:mt-0"
                     >
-                      Edit
+                      Επεξεργασία
                     </button>
                   )}
                 </div>
@@ -4198,7 +4198,7 @@ function InvitationsPanel({
     return (
       <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
