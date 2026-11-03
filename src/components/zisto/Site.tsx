@@ -2751,6 +2751,24 @@ const percentFormatter = new Intl.NumberFormat("el-GR", {
   maximumFractionDigits: 1,
 });
 
+function formatMoney(
+  cents: number,
+  currency = "EUR",
+) {
+  return new Intl.NumberFormat("el-GR", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+}
+
+function intervalLabel(months: number) {
+  if (months === 1) return "Κάθε μήνα";
+  if (months === 3) return "Κάθε 3 μήνες";
+  if (months === 6) return "Κάθε 6 μήνες";
+  if (months === 12) return "Κάθε χρόνο";
+  return `Κάθε ${months} μήνες`;
+}
+
 function formatEventName(eventName: string) {
   const names: Record<string, string> = {
     page_view: "Επίσκεψη στη σελίδα",
