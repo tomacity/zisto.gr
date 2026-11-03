@@ -10290,15 +10290,35 @@ function DashboardPage({
                       <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
                         Πόλη *
                       </span>
-                      <input
+                      <SearchableSelect
                         value={initialBillingProfile.city}
-                        onChange={(event) =>
+                        onChange={(city) =>
                           setInitialBillingProfile((current) => ({
                             ...current,
-                            city: event.target.value,
+                            city,
                           }))
                         }
-                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                        loadOptions={loadGreekSettlements}
+                        placeholder="Αναζήτησε πόλη ή οικισμό"
+                        emptyMessage="Δεν βρέθηκε πόλη ή οικισμός."
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Περιφέρεια
+                      </span>
+                      <SearchableSelect
+                        value={initialBillingProfile.region}
+                        onChange={(region) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            region,
+                          }))
+                        }
+                        options={GREEK_REGIONS}
+                        placeholder="Αναζήτησε περιφέρεια"
+                        emptyMessage="Δεν βρέθηκε περιφέρεια."
                       />
                     </label>
 
