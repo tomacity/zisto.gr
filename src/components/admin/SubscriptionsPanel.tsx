@@ -100,7 +100,7 @@ function billingStatusLabel(
   value: AdminSubscription["billing_status"],
 ) {
   const labels = {
-    draft: "Draft",
+    draft: "Πρόχειρη",
     active: "Ενεργή",
     past_due: "Σε καθυστέρηση",
     cancelled: "Ακυρωμένη",
@@ -114,8 +114,8 @@ function accessStatusLabel(
 ) {
   const labels = {
     active: "Ενεργή",
-    grace_period: "Grace period",
-    suspended: "Suspended",
+    grace_period: "Περίοδος χάριτος",
+    suspended: "Σε αναστολή",
   };
 
   return labels[value];
@@ -722,8 +722,8 @@ export function SubscriptionsPanel({
               className="rounded-2xl border border-black/10 bg-white px-5 py-4 text-sm font-bold text-[#222] transition hover:border-[#222] disabled:opacity-50"
             >
               {runningBillingCheck
-                ? "Έλεγχος billing..."
-                : "Run billing check"}
+                ? "Έλεγχος χρεώσεων..."
+                : "Έλεγχος χρεώσεων"}
             </button>
 
             <button
@@ -1108,7 +1108,7 @@ export function SubscriptionsPanel({
                           </p>
                           {subscription.payment_due_at && (
                             <p className="mt-1 text-[10px] leading-4 text-[#999]">
-                              Due{" "}
+                              Λήξη{" "}
                               {formatDate(
                                 subscription.payment_due_at,
                               )}
@@ -1266,7 +1266,7 @@ export function SubscriptionsPanel({
                           </p>
                           {subscription.payment_due_at && (
                             <p className="mt-1 text-[10px] leading-4 text-[#999]">
-                              Due{" "}
+                              Λήξη{" "}
                               {formatDate(
                                 subscription.payment_due_at,
                               )}
@@ -1456,7 +1456,7 @@ export function SubscriptionsPanel({
 
       <section className="rounded-[28px] border border-black/10 bg-white p-6 sm:p-8">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Audit trail
+          Ιστορικό ελέγχου
         </p>
         <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
           Δραστηριότητα χρεώσεων
@@ -1467,7 +1467,7 @@ export function SubscriptionsPanel({
 
         {billingEvents.length === 0 ? (
           <p className="mt-6 text-sm text-[#777]">
-            Δεν υπάρχουν καταγεγραμμένα billing events ακόμη.
+            Δεν υπάρχουν καταγεγραμμένα συμβάντα χρεώσεων ακόμη.
           </p>
         ) : (
           <div className="mt-6 space-y-2">
