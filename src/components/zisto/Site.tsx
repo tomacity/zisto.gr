@@ -2288,6 +2288,10 @@ function InvitationSetupPage() {
   const [saving, setSaving] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const invitationSessionRef = useRef<{
+    access_token: string;
+    refresh_token: string;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -2308,6 +2312,11 @@ function InvitationSetupPage() {
             "Η πρόσκληση δεν είναι έγκυρη ή έχει λήξει. Ζήτησε νέα πρόσκληση από το Zisto.",
           );
         }
+
+        invitationSessionRef.current = {
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        };
 
         if (active) {
           setFullName(
@@ -2357,6 +2366,36 @@ function InvitationSetupPage() {
       if (password !== confirmPassword) {
         throw new Error("Οι δύο κωδικοί δεν ταιριάζουν.");
       }
+
+      let {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session && invitationSessionRef.current) {
+        const {
+          data,
+          error: restoreSessionError,
+        } = await supabase.auth.setSession(
+          invitationSessionRef.current,
+        );
+
+        if (restoreSessionError) {
+          throw restoreSessionError;
+        }
+
+        session = data.session;
+      }
+
+      if (!session) {
+        throw new Error(
+          "Η συνεδρία της πρόσκλησης χάθηκε. Άνοιξε ξανά τον σύνδεσμο πρόσκλησης και προσπάθησε πάλι.",
+        );
+      }
+
+      invitationSessionRef.current = {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      };
 
       const { error } = await supabase.auth.updateUser({
         password,
