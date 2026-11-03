@@ -747,20 +747,48 @@ export default async function handler(
           object?.subscription,
         );
 
+      const checkoutPaymentSucceeded =
+        eventType ===
+          "checkout.session.async_payment_succeeded" ||
+        object?.payment_status === "paid" ||
+        object?.payment_status ===
+          "no_payment_required";
+
+      const checkoutUpdate = {
+        stripe_customer_id:
+          stripeCustomerId,
+        stripe_subscription_id:
+          stripeSubscriptionId,
+        ...(checkoutPaymentSucceeded
+          ? {
+              billing_status:
+                "active",
+              access_status:
+                "active",
+              last_paid_at:
+                new Date()
+                  .toISOString(),
+              payment_due_at:
+                null,
+              grace_until: null,
+              overdue_email_sent_at:
+                null,
+              suspended_at: null,
+              suspension_email_sent_at:
+                null,
+            }
+          : {}),
+        updated_at:
+          new Date()
+            .toISOString(),
+      };
+
       let query =
         supabaseAdmin
           .from(
             "subscriptions",
           )
-          .update({
-            stripe_customer_id:
-              stripeCustomerId,
-            stripe_subscription_id:
-              stripeSubscriptionId,
-            updated_at:
-              new Date()
-                .toISOString(),
-          });
+          .update(checkoutUpdate);
 
       if (
         typeof zistoSubscriptionId ===
