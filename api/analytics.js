@@ -1065,7 +1065,7 @@ export default async function handler(
       const rows =
         await upsertResponse.json();
 
-      if (invoiceEmail) {
+      if (user.email) {
         const subscriptionEmailUpdate =
           await supabaseRequest({
             supabaseUrl,
@@ -1081,7 +1081,7 @@ export default async function handler(
             },
             body: {
               billing_email:
-                invoiceEmail,
+                user.email,
               updated_at:
                 new Date().toISOString(),
             },
