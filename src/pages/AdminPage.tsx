@@ -186,6 +186,15 @@ type Client = {
   status: "active" | "invited";
 };
 
+type AdminAccount = {
+  id: string;
+  email: string;
+  full_name: string;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+};
+
 type Invitation = {
   id: string;
   email: string;
@@ -229,6 +238,7 @@ export function AdminPage() {
   const [projectsError, setProjectsError] =
     useState("");
   const [clients, setClients] = useState<Client[]>([]);
+  const [admins, setAdmins] = useState<AdminAccount[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState("");
   const [invitations, setInvitations] =
@@ -639,6 +649,7 @@ useEffect(() => {
 
       if (active) {
         setClients(result.clients ?? []);
+        setAdmins(result.admins ?? []);
       }
     } catch (error) {
       console.error("Clients loading failed:", error);
@@ -1033,6 +1044,7 @@ useEffect(() => {
               {activeAdminTab === "clients" && (
                 <ClientsPanel
                   clients={clients}
+                  admins={admins}
                   loading={clientsLoading}
                   error={clientsError}
                 />
@@ -3526,20 +3538,22 @@ function ProjectsPanel({
 
 function ClientsPanel({
   clients,
+  admins,
   loading,
   error,
-  onClientRoleChanged,
-  onClientRemoved,
+  onClientRoleChanged = () => {},
+  onClientRemoved = () => {},
 }: {
   clients: Client[];
+  admins: AdminAccount[];
   loading: boolean;
   error: string;
-  onClientRoleChanged: (
+  onClientRoleChanged?: (
     userId: string,
     businessId: string,
     role: Client["role"],
   ) => void;
-  onClientRemoved: (
+  onClientRemoved?: (
     userId: string,
     businessId: string,
   ) => void;
@@ -3727,20 +3741,6 @@ function ClientsPanel({
     );
   }
 
-  if (clients.length === 0) {
-    return (
-      <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
-        <h3 className="text-2xl font-black tracking-[-0.03em]">
-          Δεν υπάρχουν clients
-        </h3>
-
-        <p className="mt-3 text-sm text-[#666]">
-          Οι clients που προσκαλείς θα εμφανίζονται εδώ.
-        </p>
-      </div>
-    );
-  }
-
   const activeClients = clients.filter(
     (client) => client.status === "active",
   ).length;
@@ -3751,6 +3751,96 @@ function ClientsPanel({
 
   return (
     <div className="space-y-6">
+      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[#222] text-white">
+        <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
+              Zisto Team
+            </p>
+            <h3 className="mt-2 text-2xl font-black tracking-[-0.035em]">
+              Zisto Admins
+            </h3>
+            <p className="mt-2 text-sm text-white/55">
+              Εσωτερικοί διαχειριστές της πλατφόρμας. Δεν υπολογίζονται ως clients.
+            </p>
+          </div>
+
+          <span className="inline-flex w-fit rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/65">
+            {admins.length} admins
+          </span>
+        </div>
+
+        {admins.length === 0 ? (
+          <div className="px-6 py-8 text-sm text-white/50">
+            Δεν υπάρχουν καταχωρημένοι Zisto admins.
+          </div>
+        ) : (
+          <div className="grid gap-px bg-white/10 sm:grid-cols-2">
+            {admins.map((admin) => {
+              const displayName =
+                admin.full_name.trim() ||
+                admin.email.split("@")[0] ||
+                "Admin";
+
+              const initials = displayName
+                .split(" ")
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) =>
+                  part.charAt(0).toUpperCase(),
+                )
+                .join("");
+
+              const isActive =
+                Boolean(admin.last_sign_in_at);
+
+              return (
+                <article
+                  key={admin.id}
+                  className="bg-[#222] p-6"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-full bg-[#DC2727] text-sm font-black text-white">
+                      {initials || "A"}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-black">
+                          {displayName}
+                        </p>
+                        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-white/60">
+                          Admin
+                        </span>
+                      </div>
+
+                      <p className="mt-1 truncate text-sm text-white/50">
+                        {admin.email}
+                      </p>
+
+                      <div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em]">
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            isActive
+                              ? "bg-green-400"
+                              : "bg-white/25"
+                          }`}
+                        />
+                        <span className="text-white/45">
+                          {isActive
+                            ? "Active account"
+                            : "No login yet"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <ClientSummaryCard
           label="Σύνολο clients"
@@ -3774,6 +3864,16 @@ function ClientsPanel({
         </div>
       )}
 
+      {clients.length === 0 ? (
+        <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
+          <h3 className="text-2xl font-black tracking-[-0.03em]">
+            Δεν υπάρχουν clients
+          </h3>
+          <p className="mt-3 text-sm text-[#666]">
+            Οι clients που προσκαλείς θα εμφανίζονται εδώ.
+          </p>
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
         <div className="hidden grid-cols-[1.4fr_1.1fr_0.65fr_0.7fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
           <span>Client</span>
@@ -3962,6 +4062,7 @@ function ClientsPanel({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }
