@@ -1347,7 +1347,7 @@ function DashboardHeroPreview() {
       <section className="mt-28">
         <div className="mb-14 text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
-            Dashboard
+            Πίνακας
           </p>
 
           <h2 className="mt-5 text-[10vw] font-black leading-[0.9] tracking-[-0.04em] text-[#222] md:text-[5vw]">
@@ -6417,7 +6417,7 @@ function SettingsTab({
           .dashboard_modules
           .map((module) => {
             const labels: Record<
-              DashboardModule,
+              ΠίνακαςModule,
               string
             > = {
               analytics: "Στατιστικά",
@@ -11019,7 +11019,7 @@ function PaymentPolicyPage() {
 
       <div className="mx-auto w-full max-w-[900px] px-5 py-20 md:px-10 md:py-28">
         <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
-          Billing
+          Χρεώσεις
         </p>
 
         <h1 className="mt-5 text-[13vw] font-black leading-[0.9] tracking-[-0.045em] md:text-[64px]">
