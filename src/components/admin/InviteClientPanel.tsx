@@ -228,15 +228,15 @@ export function InviteClientPanel({
               className="mt-3 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm font-bold outline-none transition focus:border-[#222] focus:bg-white"
             >
               <option value="owner">
-                Owner
+                Ιδιοκτήτης
               </option>
 
               <option value="manager">
-                Manager
+                Διαχειριστής
               </option>
 
               <option value="staff">
-                Staff
+                Προσωπικό
               </option>
             </select>
           </label>
