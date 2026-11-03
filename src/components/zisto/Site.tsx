@@ -2409,8 +2409,15 @@ function InvitationSetupPage() {
         throw error;
       }
 
+      const businessId =
+        typeof session.user.user_metadata?.business_id === "string"
+          ? session.user.user_metadata.business_id
+          : "";
+
       window.history.replaceState({}, "", window.location.origin);
-      window.location.hash = "/dashboard";
+      window.location.hash = businessId
+        ? `/dashboard?business=${encodeURIComponent(businessId)}`
+        : "/dashboard";
     } catch (error) {
       console.error("Invitation setup failed:", error);
       setErrorMessage(
