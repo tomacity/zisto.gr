@@ -2603,6 +2603,14 @@ type AnalyticsResponse = {
   };
   daily_activity: DailyActivity[];
   recent_activity: AnalyticsEvent[];
+  appointments: {
+    today: number;
+    week: number;
+    month: number;
+    cancelled_month: number;
+    upcoming_7_days: number;
+    busiest_hour: number | null;
+  } | null;
 };
 
 type BillingSetupPayload = {
@@ -3159,6 +3167,18 @@ function AnalyticsTab({
 }: {
   analytics: AnalyticsResponse;
 }) {
+  const enabledModules =
+    analytics.business.dashboard_modules ?? [];
+
+  const menuEnabled =
+    enabledModules.includes("menu");
+  const reviewsEnabled =
+    enabledModules.includes("reviews");
+  const nfcEnabled =
+    enabledModules.includes("nfc");
+  const appointmentsEnabled =
+    enabledModules.includes("appointments");
+
   const totalSources =
     analytics.sources.nfc +
     analytics.sources.qr +
@@ -3171,11 +3191,11 @@ function AnalyticsTab({
       value: analytics.sources.nfc,
     },
     {
-      label: "QR code",
+      label: "QR",
       value: analytics.sources.qr,
     },
     {
-      label: "Direct",
+      label: "Άμεση επίσκεψη",
       value: analytics.sources.direct,
     },
     {
@@ -3191,9 +3211,48 @@ function AnalyticsTab({
     1,
   );
 
+  const contextualMetric = (() => {
+    if (
+      appointmentsEnabled &&
+      analytics.appointments
+    ) {
+      return {
+        label: "Ραντεβού εβδομάδας",
+        value: analytics.appointments.week,
+        note: `${analytics.appointments.upcoming_7_days} επόμενες 7 ημέρες`,
+      };
+    }
+
+    if (menuEnabled) {
+      return {
+        label: "Conversion μενού",
+        value: `${percentFormatter.format(
+          analytics.totals.menu_conversion_rate,
+        )}%`,
+        note: `${analytics.totals.menu_opens_today} ανοίγματα σήμερα`,
+      };
+    }
+
+    if (reviewsEnabled) {
+      return {
+        label: "Conversion κριτικών",
+        value: `${percentFormatter.format(
+          analytics.totals.review_conversion_rate,
+        )}%`,
+        note: `${analytics.totals.review_clicks_today} κλικ σήμερα`,
+      };
+    }
+
+    return {
+      label: "Μοναδικοί επισκέπτες",
+      value:
+        analytics.totals.unique_visitors_month,
+      note: "Τρέχων μήνας",
+    };
+  })();
+
   return (
     <div className="space-y-6">
-      {/* Κεντρικές μετρήσεις */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           {
@@ -3214,18 +3273,7 @@ function AnalyticsTab({
               analytics.totals.page_views_month,
             note: `${analytics.totals.unique_visitors_month} μοναδικοί`,
           },
-          {
-            label: "Συνολικό conversion",
-            value: `${percentFormatter.format(
-              Math.max(
-                analytics.totals
-                  .menu_conversion_rate,
-                analytics.totals
-                  .review_conversion_rate,
-              ),
-            )}%`,
-            note: "Καλύτερη σημερινή ενέργεια",
-          },
+          contextualMetric,
         ].map((item, index) => (
           <article
             key={item.label}
@@ -3266,13 +3314,20 @@ function AnalyticsTab({
         ))}
       </section>
 
-      {/* Γράφημα + πηγές */}
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-8">
+      <section className={`grid grid-cols-1 gap-6 ${
+        nfcEnabled
+          ? "xl:grid-cols-12"
+          : ""
+      }`}>
+        <article className={`rounded-[22px] border border-black/10 bg-white p-6 md:p-8 ${
+          nfcEnabled
+            ? "xl:col-span-8"
+            : ""
+        }`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Activity
+                Δραστηριότητα
               </p>
 
               <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
@@ -3281,7 +3336,7 @@ function AnalyticsTab({
             </div>
 
             <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/40">
-              Live data
+              Live δεδομένα
             </span>
           </div>
 
@@ -3337,134 +3392,214 @@ function AnalyticsTab({
           </div>
         </article>
 
-        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-4">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Traffic sources
-          </p>
+        {nfcEnabled && (
+          <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-4">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Πηγές επισκεψιμότητας
+            </p>
 
-          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-            Από πού έρχονται
-          </h2>
+            <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+              Από πού έρχονται
+            </h2>
 
-          <div className="mt-8 space-y-6">
-            {sourceItems.map((source) => {
-              const percentage =
-                totalSources > 0
-                  ? (source.value /
-                      totalSources) *
-                    100
-                  : 0;
+            <div className="mt-8 space-y-6">
+              {sourceItems.map((source) => {
+                const percentage =
+                  totalSources > 0
+                    ? (source.value /
+                        totalSources) *
+                      100
+                    : 0;
 
-              return (
-                <div key={source.label}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-bold">
-                      {source.label}
-                    </span>
+                return (
+                  <div key={source.label}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] font-bold">
+                        {source.label}
+                      </span>
 
-                    <span className="text-[11px] font-bold text-[#222]/40">
-                      {numberFormatter.format(
-                        source.value,
-                      )}{" "}
-                      ·{" "}
-                      {percentFormatter.format(
-                        percentage,
-                      )}
-                      %
-                    </span>
+                      <span className="text-[11px] font-bold text-[#222]/40">
+                        {numberFormatter.format(
+                          source.value,
+                        )}{" "}
+                        ·{" "}
+                        {percentFormatter.format(
+                          percentage,
+                        )}
+                        %
+                      </span>
+                    </div>
+
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#EEEEEC]">
+                      <div
+                        className="h-full rounded-full bg-[#DC2727] transition-all duration-500"
+                        style={{
+                          width: `${percentage}%`,
+                        }}
+                      />
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </article>
+        )}
+      </section>
 
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#EEEEEC]">
-                    <div
-                      className="h-full rounded-full bg-[#DC2727] transition-all duration-500"
-                      style={{
-                        width: `${percentage}%`,
-                      }}
-                    />
-                  </div>
+      {(menuEnabled || reviewsEnabled) && (
+        <section className={`grid grid-cols-1 gap-6 ${
+          menuEnabled && reviewsEnabled
+            ? "md:grid-cols-2"
+            : ""
+        }`}>
+          {menuEnabled && (
+            <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Conversion μενού
+              </p>
+
+              <div className="mt-6 flex items-end justify-between gap-4">
+                <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
+                  {percentFormatter.format(
+                    analytics.totals
+                      .menu_conversion_rate,
+                  )}
+                  %
+                </p>
+
+                <p className="text-right text-[11px] leading-relaxed text-[#222]/40">
+                  {
+                    analytics.totals
+                      .menu_opens_today
+                  }{" "}
+                  ανοίγματα σήμερα
+                </p>
+              </div>
+
+              <div className="mt-8 h-3 overflow-hidden rounded-full bg-[#EEEEEC]">
+                <div
+                  className="h-full rounded-full bg-[#222]"
+                  style={{
+                    width: `${Math.min(
+                      analytics.totals
+                        .menu_conversion_rate,
+                      100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </article>
+          )}
+
+          {reviewsEnabled && (
+            <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
+                Conversion κριτικών
+              </p>
+
+              <div className="mt-6 flex items-end justify-between gap-4">
+                <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
+                  {percentFormatter.format(
+                    analytics.totals
+                      .review_conversion_rate,
+                  )}
+                  %
+                </p>
+
+                <p className="text-right text-[11px] leading-relaxed text-white/55">
+                  {
+                    analytics.totals
+                      .review_clicks_today
+                  }{" "}
+                  κλικ σήμερα
+                </p>
+              </div>
+
+              <div className="mt-8 h-3 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-white"
+                  style={{
+                    width: `${Math.min(
+                      analytics.totals
+                        .review_conversion_rate,
+                      100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </article>
+          )}
+        </section>
+      )}
+
+      {appointmentsEnabled &&
+        analytics.appointments && (
+          <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                  Ραντεβού
+                </p>
+                <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+                  Απόδοση προγράμματος
+                </h2>
+              </div>
+
+              <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/45">
+                Πραγματικά δεδομένα
+              </span>
+            </div>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                {
+                  label: "Σήμερα",
+                  value:
+                    analytics.appointments.today,
+                },
+                {
+                  label: "Αυτή την εβδομάδα",
+                  value:
+                    analytics.appointments.week,
+                },
+                {
+                  label: "Αυτόν τον μήνα",
+                  value:
+                    analytics.appointments.month,
+                },
+                {
+                  label: "Ακυρώσεις μήνα",
+                  value:
+                    analytics.appointments
+                      .cancelled_month,
+                },
+                {
+                  label: "Δημοφιλέστερη ώρα",
+                  value:
+                    analytics.appointments
+                      .busiest_hour === null
+                      ? "—"
+                      : `${String(
+                          analytics.appointments
+                            .busiest_hour,
+                        ).padStart(2, "0")}:00`,
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[18px] bg-[#F6F6F4] p-5"
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/35">
+                    {item.label}
+                  </p>
+                  <p className="mt-4 text-[30px] font-black tracking-[-0.04em]">
+                    {item.value}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        </article>
-      </section>
-
-      {/* Conversions */}
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Menu conversion
-          </p>
-
-          <div className="mt-6 flex items-end justify-between gap-4">
-            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-              {percentFormatter.format(
-                analytics.totals
-                  .menu_conversion_rate,
-              )}
-              %
-            </p>
-
-            <p className="text-right text-[11px] leading-relaxed text-[#222]/40">
-              {
-                analytics.totals
-                  .menu_opens_today
-              }{" "}
-              ανοίγματα σήμερα
-            </p>
-          </div>
-
-          <div className="mt-8 h-3 overflow-hidden rounded-full bg-[#EEEEEC]">
-            <div
-              className="h-full rounded-full bg-[#222]"
-              style={{
-                width: `${Math.min(
-                  analytics.totals
-                    .menu_conversion_rate,
-                  100,
-                )}%`,
-              }}
-            />
-          </div>
-        </article>
-
-        <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
-            Review conversion
-          </p>
-
-          <div className="mt-6 flex items-end justify-between gap-4">
-            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-              {percentFormatter.format(
-                analytics.totals
-                  .review_conversion_rate,
-              )}
-              %
-            </p>
-
-            <p className="text-right text-[11px] leading-relaxed text-white/55">
-              {
-                analytics.totals
-                  .review_clicks_today
-              }{" "}
-              clicks σήμερα
-            </p>
-          </div>
-
-          <div className="mt-8 h-3 overflow-hidden rounded-full bg-white/20">
-            <div
-              className="h-full rounded-full bg-white"
-              style={{
-                width: `${Math.min(
-                  analytics.totals
-                    .review_conversion_rate,
-                  100,
-                )}%`,
-              }}
-            />
-          </div>
-        </article>
-      </section>
+              ))}
+            </div>
+          </section>
+        )}
 
       <RecentActivity
         events={analytics.recent_activity}
