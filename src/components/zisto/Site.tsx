@@ -2610,6 +2610,10 @@ type AnalyticsResponse = {
     cancelled_month: number;
     upcoming_7_days: number;
     busiest_hour: number | null;
+    daily_activity: {
+      date: string;
+      count: number;
+    }[];
   } | null;
 };
 
@@ -3204,9 +3208,34 @@ function AnalyticsTab({
     },
   ];
 
+  const useAppointmentChart =
+    appointmentsEnabled &&
+    !menuEnabled &&
+    !nfcEnabled &&
+    Boolean(
+      analytics.appointments
+        ?.daily_activity,
+    );
+
+  const chartData =
+    useAppointmentChart &&
+    analytics.appointments
+      ? analytics.appointments.daily_activity.map(
+          (item) => ({
+            date: item.date,
+            value: item.count,
+          }),
+        )
+      : analytics.daily_activity.map(
+          (item) => ({
+            date: item.date,
+            value: item.page_views,
+          }),
+        );
+
   const maxDailyViews = Math.max(
-    ...analytics.daily_activity.map(
-      (item) => item.page_views,
+    ...chartData.map(
+      (item) => item.value,
     ),
     1,
   );
@@ -3331,7 +3360,9 @@ function AnalyticsTab({
               </p>
 
               <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-                Επισκέψεις τελευταίων 7 ημερών
+                {useAppointmentChart
+                  ? "Ραντεβού τελευταίων 7 ημερών"
+                  : "Επισκέψεις τελευταίων 7 ημερών"}
               </h2>
             </div>
 
@@ -3341,14 +3372,14 @@ function AnalyticsTab({
           </div>
 
           <div className="mt-10 flex h-[280px] items-end gap-3 md:gap-5">
-            {analytics.daily_activity.map(
+            {chartData.map(
               (item) => {
                 const height =
-                  item.page_views === 0
+                  item.value === 0
                     ? 4
                     : Math.max(
                         12,
-                        (item.page_views /
+                        (item.value /
                           maxDailyViews) *
                           100,
                       );
@@ -3359,7 +3390,7 @@ function AnalyticsTab({
                     className="flex min-w-0 flex-1 flex-col items-center justify-end"
                   >
                     <span className="mb-3 text-[10px] font-bold text-[#222]/40">
-                      {item.page_views}
+                      {item.value}
                     </span>
 
                     <div className="flex h-[210px] w-full items-end rounded-[8px] bg-[#F1F1EF]">
