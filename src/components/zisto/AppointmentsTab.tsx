@@ -70,7 +70,7 @@ const DAY_LABELS = [
   "Κυρ",
 ];
 
-export function AppointmentsTab({
+export function ΡαντεβούTab({
   businessId,
 }: {
   businessId?: string | null;
