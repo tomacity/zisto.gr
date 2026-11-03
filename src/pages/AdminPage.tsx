@@ -100,13 +100,13 @@ const DASHBOARD_MODULE_OPTIONS: {
 }[] = [
   {
     id: "analytics",
-    label: "Analytics",
+    label: "Στατιστικά",
     description: "Επισκέψεις, conversions και δραστηριότητα.",
   },
   {
     id: "reviews",
     label: "Αξιολογήσεις",
-    description: "Review clicks και review performance.",
+    description: "Κλικ για κριτική και απόδοση κριτικών.",
   },
   {
     id: "menu",
@@ -1384,7 +1384,7 @@ function ΕπιχειρήσειςPanel({
   const [editStatus, setΕπεξεργασίαStatus] =
     useState<Business["status"]>("active");
   
-  const [editDashboardModules, setΕπεξεργασίαDashboardModules] =
+  const [editDashboardModules, setEditDashboardModules] =
     useState<DashboardModule[]>([]);
   
   const [editSaving, setΕπεξεργασίαSaving] = useState(false);
@@ -1647,7 +1647,7 @@ function ΕπιχειρήσειςPanel({
   setΕπεξεργασίαSlug(business.slug);
   setΕπεξεργασίαTimezone(business.timezone);
   setΕπεξεργασίαStatus(business.status);
-  setΕπεξεργασίαDashboardModules(
+  setEditDashboardModules(
     business.dashboard_modules ?? [
       "analytics",
       "reviews",
@@ -1664,7 +1664,7 @@ function cancelΕπεξεργασίαingBusiness() {
   setΕπεξεργασίαSlug("");
   setΕπεξεργασίαTimezone("Europe/Athens");
   setΕπεξεργασίαStatus("active");
-  setΕπεξεργασίαDashboardModules([]);
+  setEditDashboardModules([]);
   setΕπεξεργασίαError("");
 }
 
@@ -2383,7 +2383,7 @@ async function updateBusiness(
                           key={module.id}
                           type="button"
                           onClick={() => {
-                            setΕπεξεργασίαDashboardModules(
+                            setEditDashboardModules(
                               (current) =>
                                 current.includes(
                                   module.id,
