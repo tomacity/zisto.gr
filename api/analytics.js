@@ -379,6 +379,33 @@ export default async function handler(
         membership.business_id;
     }
 
+    if (!isAdmin && membership) {
+      try {
+        await supabaseRequest({
+          supabaseUrl,
+          supabaseSecretKey,
+          path:
+            `/rest/v1/invitations?invited_user_id=eq.${encodeURIComponent(
+              user.id,
+            )}&status=eq.pending`,
+          method: "PATCH",
+          headers: {
+            Prefer: "return=minimal",
+          },
+          body: {
+            status: "accepted",
+            accepted_at:
+              new Date().toISOString(),
+          },
+        });
+      } catch (invitationAcceptError) {
+        console.error(
+          "Invitation acceptance update failed:",
+          invitationAcceptError,
+        );
+      }
+    }
+
     if (
       requestedView === "billing-history" &&
       req.method === "GET"
@@ -1469,7 +1496,7 @@ export default async function handler(
         );
         form.set(
           "custom_text[terms_of_service_acceptance][message]",
-          "Με την εγγραφή αποδέχεσαι την Πολιτική Πληρωμών & Συνδρομών του Zisto: https://zisto.app/#/payments",
+          `Με την εγγραφή αποδέχεσαι την Πολιτική Πληρωμών & Συνδρομών του Zisto: ${appUrl}/#/payments`,
         );
         form.set(
           "custom_text[submit][message]",
@@ -2489,6 +2516,34 @@ export default async function handler(
 
       subscriptionState =
         subscriptionRows[0] ?? null;
+    }
+
+    if (
+      subscriptionState?.billing_status ===
+        "draft" &&
+      !subscriptionState
+        ?.stripe_subscription_id
+    ) {
+      return res.status(402).json({
+        error:
+          membership?.role === "owner"
+            ? "subscription_setup_required"
+            : "subscription_pending_owner_activation",
+        message:
+          membership?.role === "owner"
+            ? "Η συνδρομή χρειάζεται ενεργοποίηση πριν ανοίξει το dashboard."
+            : "Η συνδρομή της επιχείρησης δεν έχει ενεργοποιηθεί ακόμη από τον ιδιοκτήτη.",
+        membership_role:
+          membership?.role ?? null,
+        subscription:
+          subscriptionState,
+        business: {
+          id: business.id,
+          name: business.name,
+          dashboard_modules:
+            business.dashboard_modules ?? [],
+        },
+      });
     }
 
     if (
