@@ -9561,6 +9561,29 @@ function DashboardPage({
     openingInitialCheckout,
     setOpeningInitialCheckout,
   ] = useState(false);
+  const [
+    initialBillingProfile,
+    setInitialBillingProfile,
+  ] = useState({
+    customer_type: "business",
+    legal_name: "",
+    trade_name: "",
+    tax_id: "",
+    tax_country: "GR",
+    tax_office: "",
+    activity: "",
+    invoice_email: "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    region: "",
+    postal_code: "",
+    country_code: "GR",
+  });
+  const [
+    loadingInitialBillingProfile,
+    setLoadingInitialBillingProfile,
+  ] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -9743,6 +9766,116 @@ function DashboardPage({
     };
   }, [businessId]);
 
+  useEffect(() => {
+    if (
+      !billingSetup ||
+      billingSetup.membership_role !== "owner"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadInitialBillingProfile() {
+      try {
+        setLoadingInitialBillingProfile(true);
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          window.location.hash = "/login";
+          return;
+        }
+
+        const response = await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            billingSetup.business.id,
+          )}&view=billing-profile`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Δεν ήταν δυνατή η φόρτωση των στοιχείων τιμολόγησης.",
+          );
+        }
+
+        if (!cancelled) {
+          const profile =
+            result.billing_profile ?? {};
+
+          setInitialBillingProfile({
+            customer_type:
+              profile.customer_type ??
+              "business",
+            legal_name:
+              profile.legal_name ?? "",
+            trade_name:
+              profile.trade_name ??
+              billingSetup.business.name ??
+              "",
+            tax_id:
+              profile.tax_id ?? "",
+            tax_country:
+              profile.tax_country ?? "GR",
+            tax_office:
+              profile.tax_office ?? "",
+            activity:
+              profile.activity ?? "",
+            invoice_email:
+              profile.invoice_email ||
+              session.user.email ||
+              "",
+            address_line1:
+              profile.address_line1 ?? "",
+            address_line2:
+              profile.address_line2 ?? "",
+            city:
+              profile.city ?? "",
+            region:
+              profile.region ?? "",
+            postal_code:
+              profile.postal_code ?? "",
+            country_code:
+              profile.country_code ?? "GR",
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAnalyticsError(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η φόρτωση των στοιχείων τιμολόγησης.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingInitialBillingProfile(false);
+        }
+      }
+    }
+
+    void loadInitialBillingProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    billingSetup?.business.id,
+    billingSetup?.membership_role,
+  ]);
+
   const dashboardMetrics = analytics
     ? [
         {
@@ -9870,6 +10003,53 @@ function DashboardPage({
       if (!session) {
         window.location.hash = "/login";
         return;
+      }
+
+      const requiredBillingFields = [
+        initialBillingProfile.legal_name,
+        initialBillingProfile.tax_id,
+        initialBillingProfile.invoice_email,
+        initialBillingProfile.address_line1,
+        initialBillingProfile.city,
+        initialBillingProfile.postal_code,
+      ];
+
+      if (
+        requiredBillingFields.some(
+          (value) => !value.trim(),
+        )
+      ) {
+        throw new Error(
+          "Συμπλήρωσε τα υποχρεωτικά στοιχεία τιμολόγησης πριν συνεχίσεις.",
+        );
+      }
+
+      const billingResponse = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          billingSetup.business.id,
+        )}&view=billing-profile`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(
+            initialBillingProfile,
+          ),
+        },
+      );
+
+      const billingResult =
+        await billingResponse.json();
+
+      if (!billingResponse.ok) {
+        throw new Error(
+          billingResult.error ||
+            "Δεν ήταν δυνατή η αποθήκευση των στοιχείων τιμολόγησης.",
+        );
       }
 
       const response = await fetch(
@@ -10001,7 +10181,7 @@ function DashboardPage({
                     Email χρέωσης
                   </p>
                   <p className="mt-2 break-all text-[13px] font-black">
-                    {subscription.billing_email ?? "—"}
+                    {userEmail || "—"}
                   </p>
                   <p className="mt-1 text-[11px] text-[#222]/45">
                     Η απόδειξη της πληρωμής θα συνδεθεί με αυτό το email.
@@ -10009,6 +10189,154 @@ function DashboardPage({
                 </div>
               </div>
             </div>
+
+            {isOwner && (
+              <div className="mt-5 rounded-[20px] border border-black/[0.08] p-5 sm:p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#DC2727]">
+                  Στοιχεία τιμολόγησης
+                </p>
+                <p className="mt-2 text-[12px] leading-6 text-[#222]/50">
+                  Συμπλήρωσέ τα πριν την πρώτη πληρωμή. Το email πληρωμής παραμένει το email του owner.
+                </p>
+
+                {loadingInitialBillingProfile ? (
+                  <div className="mt-5 rounded-[14px] bg-[#F6F6F4] p-5 text-[12px] font-semibold text-[#222]/45">
+                    Φόρτωση στοιχείων...
+                  </div>
+                ) : (
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Επωνυμία *
+                      </span>
+                      <input
+                        value={initialBillingProfile.legal_name}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            legal_name: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Email παραστατικών *
+                      </span>
+                      <input
+                        type="email"
+                        value={initialBillingProfile.invoice_email}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            invoice_email: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        ΑΦΜ *
+                      </span>
+                      <input
+                        value={initialBillingProfile.tax_id}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            tax_id: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        ΔΟΥ
+                      </span>
+                      <input
+                        value={initialBillingProfile.tax_office}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            tax_office: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Διεύθυνση *
+                      </span>
+                      <input
+                        value={initialBillingProfile.address_line1}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            address_line1: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Πόλη *
+                      </span>
+                      <input
+                        value={initialBillingProfile.city}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            city: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Τ.Κ. *
+                      </span>
+                      <input
+                        value={initialBillingProfile.postal_code}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            postal_code: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Δραστηριότητα
+                      </span>
+                      <input
+                        value={initialBillingProfile.activity}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            activity: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
 
             {billingSetup.business.dashboard_modules.length > 0 && (
               <div className="mt-5 rounded-[20px] border border-black/[0.08] p-5 sm:p-6">
