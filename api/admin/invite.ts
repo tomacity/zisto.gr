@@ -222,33 +222,7 @@ export default async function handler(
       });
     }
 
-    const requestOrigin =
-      typeof request.headers.origin === "string" &&
-      /^https?:\/\//.test(request.headers.origin)
-        ? request.headers.origin
-        : null;
-
-    const forwardedHost =
-      typeof request.headers["x-forwarded-host"] === "string"
-        ? request.headers["x-forwarded-host"]
-        : null;
-
-    const forwardedProto =
-      typeof request.headers["x-forwarded-proto"] === "string"
-        ? request.headers["x-forwarded-proto"]
-        : "https";
-
-    const requestBaseUrl =
-      requestOrigin ??
-      (forwardedHost
-        ? `${forwardedProto}://${forwardedHost}`
-        : null);
-
-    const baseUrl = (
-      requestBaseUrl ??
-      APP_URL ??
-      "https://zisto.app"
-    ).replace(/\/$/, "");
+    const baseUrl = "https://zisto.app";
 
     const redirectTo = `${baseUrl}/?invite=1`;
 

@@ -59,10 +59,7 @@ export default async function handler(
   const resendApiKey =
     process.env.RESEND_API_KEY;
 
-  const appUrl = (
-    process.env.APP_URL ||
-    "https://zisto.app"
-  ).replace(/\/$/, "");
+  const appUrl = "https://zisto.app";
 
   if (
     !supabaseUrl ||
