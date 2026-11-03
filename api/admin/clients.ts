@@ -245,8 +245,54 @@ export default async function handler(
         };
       });
 
+      const {
+        data: adminRows,
+        error: adminsError,
+      } = await supabaseAdmin
+        .from("zisto_admins")
+        .select("user_id, created_at")
+        .order("created_at", {
+          ascending: true,
+        });
+
+      if (adminsError) {
+        console.error(
+          "Admin accounts loading failed:",
+          adminsError,
+        );
+
+        return response.status(500).json({
+          error: "Could not load Zisto admins",
+        });
+      }
+
+      const admins = (adminRows ?? []).map(
+        (admin) => {
+          const user = usersById.get(
+            admin.user_id,
+          );
+
+          return {
+            id: admin.user_id,
+            email: user?.email ?? "",
+            full_name:
+              typeof user?.user_metadata
+                ?.full_name === "string"
+                ? user.user_metadata.full_name
+                : "",
+            created_at:
+              admin.created_at ?? null,
+            last_sign_in_at:
+              user?.last_sign_in_at ?? null,
+            email_confirmed_at:
+              user?.email_confirmed_at ?? null,
+          };
+        },
+      );
+
       return response.status(200).json({
         clients,
+        admins,
       });
     }
 
