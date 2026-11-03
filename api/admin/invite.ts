@@ -222,8 +222,32 @@ export default async function handler(
       });
     }
 
+    const requestOrigin =
+      typeof request.headers.origin === "string" &&
+      /^https?:\/\//.test(request.headers.origin)
+        ? request.headers.origin
+        : null;
+
+    const forwardedHost =
+      typeof request.headers["x-forwarded-host"] === "string"
+        ? request.headers["x-forwarded-host"]
+        : null;
+
+    const forwardedProto =
+      typeof request.headers["x-forwarded-proto"] === "string"
+        ? request.headers["x-forwarded-proto"]
+        : "https";
+
+    const requestBaseUrl =
+      requestOrigin ??
+      (forwardedHost
+        ? `${forwardedProto}://${forwardedHost}`
+        : null);
+
     const baseUrl = (
-      APP_URL ?? "https://zisto.app"
+      requestBaseUrl ??
+      APP_URL ??
+      "https://zisto.app"
     ).replace(/\/$/, "");
 
     const redirectTo = `${baseUrl}/?invite=1`;
