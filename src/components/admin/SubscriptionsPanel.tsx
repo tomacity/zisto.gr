@@ -113,7 +113,7 @@ function accessStatusLabel(
   value: AdminSubscription["access_status"],
 ) {
   const labels = {
-    active: "Active",
+    active: "Ενεργή",
     grace_period: "Grace period",
     suspended: "Suspended",
   };
@@ -890,7 +890,7 @@ export function SubscriptionsPanel({
 
             <label>
               <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                Billing email
+                Email χρέωσης
               </span>
               <input
                 type="email"
@@ -934,7 +934,7 @@ export function SubscriptionsPanel({
                   )
                 }
                 rows={3}
-                placeholder="π.χ. Review + Appointments, custom onboarding..."
+                placeholder="π.χ. Κριτικές + Ραντεβού, προσαρμοσμένο onboarding..."
                 className="mt-2 w-full resize-none rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none focus:border-[#222]"
               />
             </label>
@@ -1277,7 +1277,7 @@ export function SubscriptionsPanel({
 
                       <div className="min-w-0 border-t border-black/[0.06] pt-4">
                         <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#999]">
-                          Billing email
+                          Email χρέωσης
                         </p>
                         <p className="mt-1.5 break-words text-[13px] leading-5 text-[#666] [overflow-wrap:anywhere]">
                           {subscription.billing_email ??
@@ -1332,7 +1332,7 @@ export function SubscriptionsPanel({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-              Billing history
+              Ιστορικό χρεώσεων
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
               Παραστατικά
@@ -1459,7 +1459,7 @@ export function SubscriptionsPanel({
           Audit trail
         </p>
         <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
-          Billing activity
+          Δραστηριότητα χρεώσεων
         </h2>
         <p className="mt-2 text-sm text-[#666]">
           Stripe webhook events και κατάσταση επεξεργασίας.
