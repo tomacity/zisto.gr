@@ -199,6 +199,34 @@ function getStartOfMonth(now) {
   );
 }
 
+
+function dateKeyInTimeZone(
+  value,
+  timeZone = "Europe/Athens",
+) {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-GB",
+      {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      },
+    ).formatToParts(
+      new Date(value),
+    );
+
+  const values = Object.fromEntries(
+    parts.map((part) => [
+      part.type,
+      part.value,
+    ]),
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export default async function handler(
   req,
   res,
@@ -2520,6 +2548,7 @@ export default async function handler(
 
 
     let appointmentAnalytics = null;
+    let appointmentRowsForAnalytics = [];
 
     const enabledDashboardModules =
       Array.isArray(business.dashboard_modules)
@@ -2557,6 +2586,9 @@ export default async function handler(
       } else {
         const appointmentRows =
           await appointmentAnalyticsResponse.json();
+
+        appointmentRowsForAnalytics =
+          appointmentRows;
 
         const analyticsNow = new Date();
         const analyticsTodayStart =
@@ -2926,6 +2958,33 @@ export default async function handler(
             "review_click",
           ),
       });
+    }
+
+    if (
+      appointmentAnalytics &&
+      appointmentRowsForAnalytics.length > 0
+    ) {
+      appointmentAnalytics.daily_activity =
+        dailyActivity.map((item) => ({
+          date: item.date,
+          count:
+            appointmentRowsForAnalytics.filter(
+              (appointment) =>
+                appointment.status !==
+                  "cancelled" &&
+                dateKeyInTimeZone(
+                  appointment.starts_at,
+                  business.timezone ||
+                    "Europe/Athens",
+                ) === item.date,
+            ).length,
+        }));
+    } else if (appointmentAnalytics) {
+      appointmentAnalytics.daily_activity =
+        dailyActivity.map((item) => ({
+          date: item.date,
+          count: 0,
+        }));
     }
 
     return res.status(200).json({
