@@ -7364,32 +7364,30 @@ function SettingsTab({
                     </p>
                   )}
 
-                  <button
-                    type={
-                      editingBillingProfile
-                        ? "submit"
-                        : "button"
-                    }
-                    disabled={
-                      savingBillingProfile
-                    }
-                    onClick={
-                      editingBillingProfile
-                        ? undefined
-                        : () => {
-                            setBillingProfileError("");
-                            setBillingProfileSuccess("");
-                            setEditingBillingProfile(true);
-                          }
-                    }
-                    className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
-                  >
-                    {savingBillingProfile
-                      ? "Αποθήκευση..."
-                      : editingBillingProfile
-                        ? "Αποθήκευση αλλαγών"
-                        : "Επεξεργασία"}
-                  </button>
+                  {editingBillingProfile ? (
+                    <button
+                      type="submit"
+                      disabled={savingBillingProfile}
+                      className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+                    >
+                      {savingBillingProfile
+                        ? "Αποθήκευση..."
+                        : "Αποθήκευση αλλαγών"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setBillingProfileError("");
+                        setBillingProfileSuccess("");
+                        setEditingBillingProfile(true);
+                      }}
+                      className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727]"
+                    >
+                      Επεξεργασία
+                    </button>
+                  )}
                 </form>
               )}
             </section>
