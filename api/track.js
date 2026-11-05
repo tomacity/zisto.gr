@@ -2158,6 +2158,57 @@ export default async function handler(request, response) {
       });
     }
 
+    /*
+     * Rate-limit public analytics ingestion per project + client identity.
+     * Prefer the request IP (hashed before storage); fall back to session_id
+     * when an IP is unavailable. This reuses the server-only rate-limit RPC.
+     */
+    const trackingClientIp =
+      getClientIp(request);
+
+    const trackingRateIdentity =
+      trackingClientIp
+        ? hashRateLimitValue(
+            trackingClientIp,
+          )
+        : hashRateLimitValue(
+            sessionId,
+          );
+
+    const trackingRateKey =
+      `analytics:${project.id}:${trackingRateIdentity}`;
+
+    const {
+      data: trackingRateAllowed,
+      error: trackingRateError,
+    } = await supabaseAdmin.rpc(
+      "check_appointment_rate_limit",
+      {
+        p_key: trackingRateKey,
+        p_limit: 120,
+        p_window_seconds: 60,
+      },
+    );
+
+    if (trackingRateError) {
+      console.error(
+        "Analytics rate limit check failed:",
+        trackingRateError,
+      );
+
+      return response.status(500).json({
+        error: "Could not validate analytics request",
+      });
+    }
+
+    if (trackingRateAllowed === false) {
+      response.setHeader("Retry-After", "60");
+
+      return response.status(429).json({
+        error: "Too many analytics requests",
+      });
+    }
+
     const country =
       cleanText(
         request.headers["x-vercel-ip-country"],
