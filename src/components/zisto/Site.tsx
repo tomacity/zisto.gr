@@ -4622,6 +4622,10 @@ function SettingsTab({
     setSavingBillingProfile,
   ] = useState(false);
   const [
+    editingBillingProfile,
+    setEditingBillingProfile,
+  ] = useState(false);
+  const [
     billingProfileError,
     setBillingProfileError,
   ] = useState("");
@@ -5080,6 +5084,7 @@ function SettingsTab({
       setBillingProfileSuccess(
         "Τα στοιχεία τιμολόγησης αποθηκεύτηκαν.",
       );
+      setEditingBillingProfile(false);
     } catch (error) {
       setBillingProfileError(
         error instanceof Error
@@ -7058,7 +7063,14 @@ function SettingsTab({
                   }
                   className="mt-8"
                 >
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <fieldset
+                    disabled={!editingBillingProfile}
+                    className={`grid grid-cols-1 gap-4 transition md:grid-cols-2 ${
+                      editingBillingProfile
+                        ? "opacity-100"
+                        : "opacity-55"
+                    }`}
+                  >
                     <label className="space-y-2">
                       <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
                         Τύπος πελάτη
@@ -7338,7 +7350,7 @@ function SettingsTab({
                         className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold uppercase outline-none focus:border-[#222]"
                       />
                     </label>
-                  </div>
+                  </fieldset>
 
                   {billingProfileError && (
                     <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
@@ -7353,15 +7365,30 @@ function SettingsTab({
                   )}
 
                   <button
-                    type="submit"
+                    type={
+                      editingBillingProfile
+                        ? "submit"
+                        : "button"
+                    }
                     disabled={
                       savingBillingProfile
+                    }
+                    onClick={
+                      editingBillingProfile
+                        ? undefined
+                        : () => {
+                            setBillingProfileError("");
+                            setBillingProfileSuccess("");
+                            setEditingBillingProfile(true);
+                          }
                     }
                     className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
                   >
                     {savingBillingProfile
                       ? "Αποθήκευση..."
-                      : "Αποθήκευση στοιχείων"}
+                      : editingBillingProfile
+                        ? "Αποθήκευση αλλαγών"
+                        : "Επεξεργασία"}
                   </button>
                 </form>
               )}
