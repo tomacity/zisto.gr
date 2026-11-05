@@ -6629,27 +6629,22 @@ function SettingsTab({
   }
 
   const includedServices =
-    subscription?.notes
-      ? subscription.notes
-          .split(/[,\n+]/)
-          .map((item) => item.trim())
-          .filter(Boolean)
-      : analytics.business
-          .dashboard_modules
-          .map((module) => {
-            const labels: Record<
-              ΠίνακαςModule,
-              string
-            > = {
-              analytics: "Στατιστικά",
-              reviews: "Αξιολογήσεις",
-              menu: "Ψηφιακό μενού",
-              nfc: "NFC κάρτες",
-              appointments: "Ραντεβού",
-            };
+    analytics.business
+      .dashboard_modules
+      .map((module) => {
+        const labels: Record<
+          ΠίνακαςModule,
+          string
+        > = {
+          analytics: "Στατιστικά",
+          reviews: "Αξιολογήσεις",
+          menu: "Ψηφιακό μενού",
+          nfc: "NFC κάρτες",
+          appointments: "Ραντεβού",
+        };
 
-            return labels[module];
-          });
+        return labels[module];
+      });
 
   return (
     <div className="space-y-6">
