@@ -9661,6 +9661,69 @@ function DashboardPage({
         }
       }
 
+      async function confirmStripeCheckoutIfNeeded() {
+        if (!businessId) {
+          return;
+        }
+
+        const rawHash =
+          window.location.hash.replace(/^#/, "");
+        const [, search = ""] =
+          rawHash.split("?");
+        const params =
+          new URLSearchParams(search);
+
+        if (
+          params.get("billing") !==
+            "success"
+        ) {
+          return;
+        }
+
+        const checkoutSessionId =
+          params.get("session_id");
+
+        if (!checkoutSessionId) {
+          return;
+        }
+
+        const response = await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            businessId,
+          )}&view=subscription`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              action:
+                "confirm_checkout",
+              session_id:
+                checkoutSessionId,
+            }),
+          },
+        );
+
+        const result =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Δεν ήταν δυνατή η επιβεβαίωση της πληρωμής.",
+          );
+        }
+
+        window.location.hash =
+          `/dashboard?business=${encodeURIComponent(
+            businessId,
+          )}`;
+      }
+
       async function loadAnalytics() {
         try {
           setAnalyticsLoading(true);
@@ -9737,6 +9800,23 @@ function DashboardPage({
           if (active) {
             setAnalyticsLoading(false);
           }
+        }
+      }
+
+      try {
+        await confirmStripeCheckoutIfNeeded();
+      } catch (error) {
+        console.error(
+          "Stripe checkout confirmation failed:",
+          error,
+        );
+
+        if (active) {
+          setAnalyticsError(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η επιβεβαίωση της πληρωμής.",
+          );
         }
       }
 
