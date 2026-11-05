@@ -1393,7 +1393,8 @@ export default async function handler(
 
       if (
         action !== "cancel_subscription" &&
-        action !== "resume_renewal"
+        action !== "resume_renewal" &&
+        action !== "confirm_checkout"
       ) {
         return res.status(400).json({
           error:
@@ -1435,6 +1436,250 @@ export default async function handler(
         return res.status(404).json({
           error:
             "Subscription not found",
+        });
+      }
+
+      if (action === "confirm_checkout") {
+        const checkoutSessionId =
+          typeof body.session_id === "string"
+            ? body.session_id.trim()
+            : "";
+
+        if (!checkoutSessionId) {
+          return res.status(400).json({
+            error:
+              "Checkout session ID is required",
+          });
+        }
+
+        const stripeSecretKey =
+          process.env.STRIPE_SECRET_KEY;
+
+        if (!stripeSecretKey) {
+          return res.status(500).json({
+            error:
+              "Stripe is not configured",
+          });
+        }
+
+        const stripeResponse =
+          await fetch(
+            `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(
+              checkoutSessionId,
+            )}?expand[]=subscription`,
+            {
+              method: "GET",
+              headers: {
+                Authorization:
+                  `Bearer ${stripeSecretKey}`,
+              },
+            },
+          );
+
+        const stripeSession =
+          await stripeResponse.json();
+
+        if (!stripeResponse.ok) {
+          console.error(
+            "Stripe checkout verification failed:",
+            stripeSession,
+          );
+
+          return res.status(502).json({
+            error:
+              stripeSession?.error?.message ??
+              "Could not verify Stripe checkout",
+          });
+        }
+
+        const sessionBusinessId =
+          stripeSession?.metadata
+            ?.business_id ??
+          stripeSession
+            ?.client_reference_id;
+
+        const sessionSubscriptionId =
+          stripeSession?.metadata
+            ?.zisto_subscription_id;
+
+        if (
+          stripeSession?.mode !==
+            "subscription" ||
+          sessionBusinessId !==
+            businessId ||
+          sessionSubscriptionId !==
+            subscription.id
+        ) {
+          return res.status(409).json({
+            error:
+              "Checkout session does not match this subscription",
+          });
+        }
+
+        const paymentSucceeded =
+          stripeSession?.status ===
+            "complete" &&
+          (
+            stripeSession?.payment_status ===
+              "paid" ||
+            stripeSession?.payment_status ===
+              "no_payment_required"
+          );
+
+        if (!paymentSucceeded) {
+          return res.status(409).json({
+            error:
+              "Stripe checkout is not paid",
+          });
+        }
+
+        const stripeSubscription =
+          stripeSession?.subscription;
+
+        const stripeSubscriptionId =
+          typeof stripeSubscription ===
+            "string"
+            ? stripeSubscription
+            : stripeSubscription?.id;
+
+        const stripeCustomerId =
+          typeof stripeSession?.customer ===
+            "string"
+            ? stripeSession.customer
+            : stripeSession?.customer?.id;
+
+        if (
+          typeof stripeSubscriptionId !==
+            "string" ||
+          !stripeSubscriptionId
+        ) {
+          return res.status(409).json({
+            error:
+              "Stripe subscription is missing from checkout",
+          });
+        }
+
+        const stripeSubscriptionStatus =
+          typeof stripeSubscription ===
+            "object" &&
+          stripeSubscription
+            ? stripeSubscription.status
+            : null;
+
+        if (
+          stripeSubscriptionStatus &&
+          ![
+            "active",
+            "trialing",
+          ].includes(
+            stripeSubscriptionStatus,
+          )
+        ) {
+          return res.status(409).json({
+            error:
+              "Stripe subscription is not active",
+          });
+        }
+
+        const stripePriceId =
+          typeof stripeSubscription ===
+            "object" &&
+          stripeSubscription
+            ?.items?.data?.[0]?.price?.id
+            ? stripeSubscription
+                .items.data[0].price.id
+            : null;
+
+        const currentPeriodEnd =
+          typeof stripeSubscription ===
+            "object" &&
+          Number.isFinite(
+            stripeSubscription
+              ?.current_period_end,
+          )
+            ? new Date(
+                stripeSubscription
+                  .current_period_end *
+                  1000,
+              ).toISOString()
+            : null;
+
+        const confirmedAt =
+          new Date().toISOString();
+
+        const confirmationPayload = {
+          stripe_customer_id:
+            typeof stripeCustomerId ===
+              "string"
+              ? stripeCustomerId
+              : null,
+          stripe_subscription_id:
+            stripeSubscriptionId,
+          ...(stripePriceId
+            ? {
+                stripe_price_id:
+                  stripePriceId,
+              }
+            : {}),
+          billing_status:
+            "active",
+          access_status:
+            "active",
+          last_paid_at:
+            confirmedAt,
+          ...(currentPeriodEnd
+            ? {
+                next_billing_at:
+                  currentPeriodEnd,
+              }
+            : {}),
+          payment_due_at: null,
+          grace_until: null,
+          overdue_email_sent_at: null,
+          suspended_at: null,
+          suspension_email_sent_at:
+            null,
+          updated_at:
+            confirmedAt,
+        };
+
+        const confirmationResponse =
+          await supabaseRequest({
+            supabaseUrl,
+            supabaseSecretKey,
+            path:
+              `/rest/v1/subscriptions?id=eq.${subscription.id}`,
+            method: "PATCH",
+            headers: {
+              Prefer:
+                "return=representation",
+            },
+            body:
+              confirmationPayload,
+          });
+
+        if (
+          !confirmationResponse.ok
+        ) {
+          console.error(
+            "Checkout confirmation sync failed:",
+            await confirmationResponse.text(),
+          );
+
+          return res.status(500).json({
+            error:
+              "Stripe payment was verified but Zisto could not activate the subscription",
+          });
+        }
+
+        const confirmationRows =
+          await confirmationResponse.json();
+
+        return res.status(200).json({
+          verified: true,
+          subscription:
+            confirmationRows[0] ??
+            null,
         });
       }
 
