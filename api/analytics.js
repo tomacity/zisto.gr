@@ -267,16 +267,19 @@ export default async function handler(
       ? authorization.slice(7)
       : null;
 
+  const requestUrl =
+    new URL(
+      req.url ?? "/api/analytics",
+      `https://${req.headers.host ?? "localhost"}`,
+    );
+
   const requestedBusinessId =
-    typeof req.query.business_id ===
-    "string"
-      ? req.query.business_id
-      : null;
+    requestUrl.searchParams.get(
+      "business_id",
+    );
 
   const requestedView =
-    typeof req.query.view === "string"
-      ? req.query.view
-      : null;
+    requestUrl.searchParams.get("view");
 
   if (!accessToken) {
     return res.status(401).json({
@@ -2222,14 +2225,10 @@ export default async function handler(
 
     if (requestedView === "appointments") {
       const start =
-        typeof req.query.start === "string"
-          ? req.query.start
-          : null;
+        requestUrl.searchParams.get("start");
 
       const end =
-        typeof req.query.end === "string"
-          ? req.query.end
-          : null;
+        requestUrl.searchParams.get("end");
 
       if (req.method === "GET") {
         const appointmentParams =
