@@ -5188,19 +5188,6 @@ function SettingsTab({
         | null;
     },
   ) {
-    const previewWindow =
-      window.open(
-        "about:blank",
-        "_blank",
-      );
-
-    if (!previewWindow) {
-      setSubscriptionError(
-        "Ο browser μπλόκαρε το παράθυρο του παραστατικού. Επίτρεψε pop-ups για το Zisto.",
-      );
-      return;
-    }
-
     const providerQrUrl =
       (document.metadata
         ?.provider_qr_image_url as
@@ -5875,15 +5862,23 @@ function SettingsTab({
 </body>
 </html>`;
 
-    previewWindow.document.open();
-    previewWindow.document.write(html);
-    previewWindow.document.close();
+    const invoiceBlob =
+      new Blob(
+        [html],
+        {
+          type:
+            "text/html;charset=utf-8",
+        },
+      );
 
-    // Detach only after writing the document.
-    // Using noopener/noreferrer in window.open can make Chrome return
-    // an unusable window reference and leave the new tab at about:blank.
-    previewWindow.opener = null;
-    previewWindow.focus();
+    const invoiceUrl =
+      URL.createObjectURL(
+        invoiceBlob,
+      );
+
+    window.location.assign(
+      invoiceUrl,
+    );
   }
 
   function intervalLabel(months: number) {
