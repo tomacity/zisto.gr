@@ -58,10 +58,14 @@ export default async function handler(
     });
   }
 
+  const requestUrl =
+    new URL(
+      request.url ?? "/api/admin/clients",
+      `https://${request.headers.host ?? "localhost"}`,
+    );
+
   const requestedView =
-    typeof request.query.view === "string"
-      ? request.query.view
-      : null;
+    requestUrl.searchParams.get("view");
 
   const supabaseUrl = process.env.SUPABASE_URL;
 
