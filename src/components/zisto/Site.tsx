@@ -6854,8 +6854,8 @@ function SettingsTab({
 
       <section className="overflow-hidden rounded-[26px] border border-black/10 bg-white">
         <div className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between md:p-8">
-          <div className="flex items-center gap-5">
-            <div className="relative h-20 w-20 overflow-hidden rounded-full bg-[#DC2727] text-white shadow-sm">
+          <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:gap-5 md:text-left">
+            <div className="relative h-20 w-20 shrink-0 aspect-square overflow-hidden rounded-full bg-[#DC2727] text-white shadow-sm">
               {analytics.business.profile_image_url ? (
                 <img
                   src={
@@ -6878,14 +6878,14 @@ function SettingsTab({
               )}
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
                 Business Center
               </p>
-              <h1 className="mt-2 text-[30px] font-black tracking-[-0.045em] md:text-[38px]">
+              <h1 className="mt-2 text-[30px] font-black leading-[0.98] tracking-[-0.045em] md:text-[38px]">
                 {analytics.business.name}
               </h1>
-              <p className="mt-1 text-[12px] text-[#222]/45">
+              <p className="mt-2 text-[12px] text-[#222]/45 md:mt-1">
                 {
                   analytics.business
                     .location_name ??
@@ -6895,7 +6895,7 @@ function SettingsTab({
             </div>
           </div>
 
-          <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-black/10 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition hover:border-[#222] hover:bg-[#222] hover:text-white">
+          <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-full border border-black/10 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition hover:border-[#222] hover:bg-[#222] hover:text-white md:w-auto">
             {uploadingAvatar
               ? "Ανέβασμα..."
               : "Αλλαγή φωτογραφίας"}
