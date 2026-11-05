@@ -744,9 +744,16 @@ export default async function handler(
       });
     }
 
+    const requestUrl =
+      new URL(
+        request.url ?? "/api/admin/subscriptions",
+        `https://${request.headers.host ?? "localhost"}`,
+      );
+
     if (
       request.method === "GET" &&
-      request.query.view === "billing-history"
+      requestUrl.searchParams.get("view") ===
+        "billing-history"
     ) {
       const [documentsResult, eventsResult] =
         await Promise.all([
