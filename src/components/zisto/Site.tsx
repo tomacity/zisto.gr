@@ -4504,6 +4504,10 @@ function SettingsTab({
     subscriptionError,
     setSubscriptionError,
   ] = useState("");
+  const [
+    invoicePreviewHtml,
+    setInvoicePreviewHtml,
+  ] = useState<string | null>(null);
 
   const [
     billingDocuments,
@@ -5862,22 +5866,8 @@ function SettingsTab({
 </body>
 </html>`;
 
-    const invoiceBlob =
-      new Blob(
-        [html],
-        {
-          type:
-            "text/html;charset=utf-8",
-        },
-      );
-
-    const invoiceUrl =
-      URL.createObjectURL(
-        invoiceBlob,
-      );
-
-    window.location.assign(
-      invoiceUrl,
+    setInvoicePreviewHtml(
+      html,
     );
   }
 
@@ -6663,6 +6653,42 @@ function SettingsTab({
 
   return (
     <div className="space-y-6">
+      {invoicePreviewHtml && (
+        <div className="fixed inset-0 z-[12000] flex flex-col bg-[#EFEFED]">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-black/10 bg-white px-4 sm:px-6">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#DC2727]">
+                Παραστατικό
+              </p>
+              <p className="mt-0.5 text-[14px] font-black">
+                Τιμολόγιο Zisto
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setInvoicePreviewHtml(
+                  null,
+                )
+              }
+              className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-white text-[18px] font-bold text-[#222] transition hover:bg-[#222] hover:text-white"
+              aria-label="Κλείσιμο τιμολογίου"
+            >
+              ×
+            </button>
+          </div>
+
+          <iframe
+            title="Τιμολόγιο Zisto"
+            srcDoc={
+              invoicePreviewHtml
+            }
+            className="min-h-0 flex-1 border-0 bg-[#EFEFED]"
+          />
+        </div>
+      )}
+
       {avatarCrop && (
         <div
           className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm"
@@ -7811,7 +7837,7 @@ function SettingsTab({
                                     }
                                     className="inline-flex justify-center rounded-full bg-[#222] px-4 py-3 text-[9px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#DC2727]"
                                   >
-                                    Zisto Invoice
+                                    Τιμολόγιο Zisto
                                   </button>
 
                                   {documentUrl && (
