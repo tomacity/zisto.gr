@@ -4,7 +4,7 @@ import type {
 } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-type ClientRole = "owner" | "member" | "staff";
+type ClientRole = "owner" | "manager" | "member" | "staff";
 
 type MembershipRow = {
   user_id: string;
@@ -26,6 +26,7 @@ type MembershipRow = {
 
 const ALLOWED_ROLES = new Set<ClientRole>([
   "owner",
+  "manager",
   "member",
   "staff",
 ]);
