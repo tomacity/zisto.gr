@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { scheduleAppointmentReminder, cancelAppointmentReminder } from "../lib/appointment-reminders.js";
 import { createClient } from "@supabase/supabase-js";
 
 const ALLOWED_EVENT_TYPES = new Set([
@@ -1164,10 +1165,18 @@ async function handleAppointmentBooking(
         `,
       });
 
+    const reminder = await scheduleAppointmentReminder(
+      supabaseAdmin,
+      { ...appointment, customer_email: customerEmail, customer_name: customerName, status: "confirmed" },
+      business,
+      service.name,
+    );
+
     return response.status(201).json({
       success: true,
       email_sent:
         confirmationEmail.sent,
+      reminder_scheduled: reminder.scheduled,
       appointment,
       service: {
         id: service.id,
@@ -1211,6 +1220,8 @@ async function resolveAppointmentByToken(
       staff_id,
       customer_name,
       customer_email,
+      reminder_email_id,
+      reminder_scheduled_for,
       starts_at,
       ends_at,
       status,
