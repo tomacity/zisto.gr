@@ -2409,6 +2409,11 @@ function InvitationSetupPage() {
         throw error;
       }
 
+      const businessId =
+        typeof session.user.user_metadata?.business_id === "string"
+          ? session.user.user_metadata.business_id
+          : "";
+
       const acceptanceResponse =
         await fetch(
           "/api/admin/invitations",
@@ -2422,6 +2427,7 @@ function InvitationSetupPage() {
             },
             body: JSON.stringify({
               action: "accept",
+              business_id: businessId,
             }),
           },
         );
@@ -2437,11 +2443,6 @@ function InvitationSetupPage() {
             "Ο λογαριασμός δημιουργήθηκε, αλλά δεν ολοκληρώθηκε η πρόσκληση. Προσπάθησε ξανά.",
         );
       }
-
-      const businessId =
-        typeof session.user.user_metadata?.business_id === "string"
-          ? session.user.user_metadata.business_id
-          : "";
 
       const dashboardUrl = businessId
         ? `https://www.zisto.app/#/dashboard?business=${encodeURIComponent(businessId)}`
