@@ -1456,6 +1456,13 @@ async function handleAppointmentPublicCancel(
       });
     }
 
+    const reminderCancellation = await cancelAppointmentReminder(appointment);
+    if (!reminderCancellation.ok) {
+      return response.status(502).json({
+        error: "Could not cancel the scheduled appointment reminder. Try again.",
+      });
+    }
+
     const {
       data: updated,
       error,
@@ -1463,6 +1470,8 @@ async function handleAppointmentPublicCancel(
       .from("appointments")
       .update({
         status: "cancelled",
+        reminder_email_id: null,
+        reminder_scheduled_for: null,
         updated_at:
           new Date().toISOString(),
       })
@@ -1767,12 +1776,21 @@ async function handleAppointmentPublicReschedule(
       });
     }
 
+    const reminderCancellation = await cancelAppointmentReminder(appointment);
+    if (!reminderCancellation.ok) {
+      return response.status(502).json({
+        error: "Could not cancel the previous appointment reminder. Try again.",
+      });
+    }
+
     const {
       data: updated,
       error: updateError,
     } = await supabaseAdmin
       .from("appointments")
       .update({
+        reminder_email_id: null,
+        reminder_scheduled_for: null,
         starts_at:
           startsAt.toISOString(),
         ends_at:
@@ -1908,6 +1926,18 @@ async function handleAppointmentPublicReschedule(
             error:
               "Missing recipient email",
           };
+
+    const reminder = await scheduleAppointmentReminder(
+      supabaseAdmin,
+      { ...appointment, ...updated, reminder_email_id: null },
+      appointment.businesses,
+      service.name,
+    );
+
+    console.info("Appointment reminder reschedule result:", {
+      scheduled: reminder.scheduled,
+      reason: reminder.reason || null,
+    });
 
     console.info(
       "Appointment reschedule email result:",
