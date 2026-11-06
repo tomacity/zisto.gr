@@ -1,3 +1,5 @@
+import { cancelAppointmentReminder } from "../lib/appointment-reminders.js";
+
 const ALLOWED_ORIGINS = new Set([
   "https://zistogr.vercel.app",
   "https://zisto.app",
@@ -2372,6 +2374,8 @@ export default async function handler(
               "customer_name",
               "customer_email",
               "starts_at",
+              "reminder_email_id",
+              "reminder_scheduled_for",
               "service_id",
               "status",
             ].join(","),
@@ -2486,6 +2490,11 @@ export default async function handler(
           }
         }
 
+        const reminderCancellation = await cancelAppointmentReminder(appointment);
+        if (!reminderCancellation.ok) {
+          return res.status(502).json({ error: "Could not cancel the scheduled appointment reminder. Try again." });
+        }
+
         const updateParams =
           new URLSearchParams({
             id: `eq.${appointmentId}`,
@@ -2506,6 +2515,8 @@ export default async function handler(
             },
             body: {
               status: "cancelled",
+              reminder_email_id: null,
+              reminder_scheduled_for: null,
               updated_at:
                 new Date().toISOString(),
             },
