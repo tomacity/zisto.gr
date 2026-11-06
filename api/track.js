@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { sendAppointmentSms } from "../lib/appointment-sms.js";
 import { createClient } from "@supabase/supabase-js";
 
 const ALLOWED_EVENT_TYPES = new Set([
@@ -1165,21 +1164,10 @@ async function handleAppointmentBooking(
         `,
       });
 
-    const bookingSms = await sendAppointmentSms({
-      businessId: business.id,
-      appointmentId: appointment.id,
-      phone: customerPhone,
-      businessName: business.name,
-      startsAt: appointment.starts_at,
-      timeZone,
-      event: "booked",
-    });
-
     return response.status(201).json({
       success: true,
       email_sent:
         confirmationEmail.sent,
-      sms_queued: bookingSms.queued,
       appointment,
       service: {
         id: service.id,
@@ -1223,7 +1211,6 @@ async function resolveAppointmentByToken(
       staff_id,
       customer_name,
       customer_email,
-      customer_phone,
       starts_at,
       ends_at,
       status,
@@ -1490,19 +1477,8 @@ async function handleAppointmentPublicCancel(
       });
     }
 
-    const cancellationSms = await sendAppointmentSms({
-      businessId: appointment.business_id,
-      appointmentId: appointment.id,
-      phone: appointment.customer_phone,
-      businessName: appointment.businesses?.name,
-      startsAt: appointment.starts_at,
-      timeZone: appointment.businesses?.timezone,
-      event: "cancelled",
-    });
-
     return response.status(200).json({
       success: true,
-      sms_queued: cancellationSms.queued,
       appointment: updated,
     });
   } catch (error) {
@@ -1931,21 +1907,10 @@ async function handleAppointmentPublicReschedule(
       },
     );
 
-    const rescheduleSms = await sendAppointmentSms({
-      businessId: appointment.business_id,
-      appointmentId: appointment.id,
-      phone: appointment.customer_phone,
-      businessName,
-      startsAt: updated.starts_at,
-      timeZone,
-      event: "rescheduled",
-    });
-
     return response.status(200).json({
       success: true,
       email_sent:
         rescheduleEmail.sent,
-      sms_queued: rescheduleSms.queued,
       appointment: updated,
     });
   } catch (error) {
