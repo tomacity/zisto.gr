@@ -75,7 +75,15 @@ export default async function handler(
           ? body.action.trim()
           : "";
 
-      if (action !== "accept") {
+      const businessId =
+        typeof body.business_id === "string"
+          ? body.business_id.trim()
+          : "";
+
+      if (
+        action !== "accept" ||
+        !businessId
+      ) {
         return response.status(400).json({
           error: "Invalid invitation action",
         });
@@ -95,6 +103,7 @@ export default async function handler(
           error_message: null,
         })
         .eq("invited_user_id", user.id)
+        .eq("business_id", businessId)
         .in("status", [
           "pending",
           "accepted",
