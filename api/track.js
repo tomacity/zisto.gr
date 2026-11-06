@@ -1179,7 +1179,7 @@ async function handleAppointmentBooking(
       success: true,
       email_sent:
         confirmationEmail.sent,
-      sms_sent: bookingSms.queued,
+      sms_queued: bookingSms.queued,
       appointment,
       service: {
         id: service.id,
@@ -1502,7 +1502,7 @@ async function handleAppointmentPublicCancel(
 
     return response.status(200).json({
       success: true,
-      sms_sent: cancellationSms.queued,
+      sms_queued: cancellationSms.queued,
       appointment: updated,
     });
   } catch (error) {
@@ -1945,7 +1945,7 @@ async function handleAppointmentPublicReschedule(
       success: true,
       email_sent:
         rescheduleEmail.sent,
-      sms_sent: rescheduleSms.queued,
+      sms_queued: rescheduleSms.queued,
       appointment: updated,
     });
   } catch (error) {
