@@ -10,7 +10,10 @@ export default async function handler(
 ) {
   response.setHeader("Cache-Control", "no-store");
 
-  if (request.method !== "GET") {
+  if (
+    request.method !== "GET" &&
+    request.method !== "PATCH"
+  ) {
     return response.status(405).json({
       error: "Method not allowed",
     });
@@ -62,6 +65,69 @@ export default async function handler(
     if (userError || !user) {
       return response.status(401).json({
         error: "Invalid or expired session",
+      });
+    }
+
+    if (request.method === "PATCH") {
+      const body = request.body ?? {};
+      const action =
+        typeof body.action === "string"
+          ? body.action.trim()
+          : "";
+
+      if (action !== "accept") {
+        return response.status(400).json({
+          error: "Invalid invitation action",
+        });
+      }
+
+      const now =
+        new Date().toISOString();
+
+      const {
+        data: acceptedInvitations,
+        error: acceptError,
+      } = await supabaseAdmin
+        .from("invitations")
+        .update({
+          status: "accepted",
+          accepted_at: now,
+          error_message: null,
+        })
+        .eq("invited_user_id", user.id)
+        .in("status", [
+          "pending",
+          "accepted",
+        ])
+        .select(
+          "id, business_id, role, status, accepted_at",
+        );
+
+      if (acceptError) {
+        console.error(
+          "Invitation acceptance failed:",
+          acceptError,
+        );
+
+        return response.status(500).json({
+          error:
+            "Could not mark invitation as accepted",
+        });
+      }
+
+      if (
+        !acceptedInvitations ||
+        acceptedInvitations.length === 0
+      ) {
+        return response.status(404).json({
+          error:
+            "No pending invitation found for this account",
+        });
+      }
+
+      return response.status(200).json({
+        success: true,
+        invitations: acceptedInvitations,
       });
     }
 
