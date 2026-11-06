@@ -1167,7 +1167,7 @@ async function handleAppointmentBooking(
 
     const reminder = await scheduleAppointmentReminder(
       supabaseAdmin,
-      { ...appointment, customer_email: customerEmail, customer_name: customerName, status: "confirmed" },
+      { ...appointment, business_id: business.id, customer_email: customerEmail, customer_name: customerName, status: "confirmed" },
       business,
       service.name,
     );
