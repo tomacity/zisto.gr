@@ -7,6 +7,7 @@ import {
   type SupabaseClient,
 } from "@supabase/supabase-js";
 import { issuePendingFiscalDocuments } from "../../src/server/einvoicing-provider.js";
+import { queuePendingAppointmentReminders } from "../../lib/appointment-reminders.js";
 
 const BILLING_STATUSES = new Set([
   "draft",
@@ -669,6 +670,7 @@ export default async function handler(
         const [
           billingResult,
           fiscalResult,
+          appointmentReminders,
         ] = await Promise.all([
           runBillingAutomation({
             supabaseAdmin,
@@ -678,6 +680,7 @@ export default async function handler(
             supabaseAdmin,
             limit: 10,
           }),
+          queuePendingAppointmentReminders(supabaseAdmin),
         ]);
 
         return response
@@ -685,6 +688,7 @@ export default async function handler(
           .json({
             ...billingResult,
             fiscal: fiscalResult,
+            appointment_reminders: appointmentReminders,
           });
       } catch (error) {
         console.error(
