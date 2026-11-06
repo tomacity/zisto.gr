@@ -2409,6 +2409,35 @@ function InvitationSetupPage() {
         throw error;
       }
 
+      const acceptanceResponse =
+        await fetch(
+          "/api/admin/invitations",
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              action: "accept",
+            }),
+          },
+        );
+
+      if (!acceptanceResponse.ok) {
+        const acceptanceResult =
+          await acceptanceResponse
+            .json()
+            .catch(() => null);
+
+        throw new Error(
+          acceptanceResult?.error ??
+            "Ο λογαριασμός δημιουργήθηκε, αλλά δεν ολοκληρώθηκε η πρόσκληση. Προσπάθησε ξανά.",
+        );
+      }
+
       const businessId =
         typeof session.user.user_metadata?.business_id === "string"
           ? session.user.user_metadata.business_id
