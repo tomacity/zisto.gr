@@ -1121,6 +1121,7 @@ function BusinessesPanel({
   onBusinessCreated,
   onBusinessUpdated,
   onProjectCreated,
+  onBusinessDeleted,
 }: {
   businesses: Business[];
   loading: boolean;
@@ -1130,6 +1131,7 @@ function BusinessesPanel({
   onProjectCreated: (
     project: ConnectedProject,
   ) => void;
+  onBusinessDeleted: (businessId: string) => void;
 }) {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -1578,7 +1580,11 @@ async function updateBusiness(
       }
   
       onBusinessDeleted(deletingBusiness.id);
-      cancelDeletingBusiness();
+      // The modal must close even while deleteSaving is true.
+      // cancelDeletingBusiness intentionally blocks manual closing during a request.
+      setDeletingBusiness(null);
+      setDeleteConfirmation("");
+      setDeleteError("");
     } catch (deleteBusinessError) {
       console.error(
         "Business deletion failed:",
