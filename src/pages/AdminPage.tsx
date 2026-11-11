@@ -1496,6 +1496,7 @@ function ΕπιχειρήσειςPanel({
   onBusinessCreated,
   onBusinessUpdated,
   onProjectCreated,
+  onBusinessDeleted,
 }: {
   businesses: Business[];
   loading: boolean;
@@ -1505,6 +1506,7 @@ function ΕπιχειρήσειςPanel({
   onProjectCreated: (
     project: ConnectedProject,
   ) => void;
+  onBusinessDeleted: (businessId: string) => void;
 }) {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -1953,7 +1955,9 @@ async function updateBusiness(
       }
   
       onBusinessDeleted(deletingBusiness.id);
-      cancelDeletingBusiness();
+      setDeletingBusiness(null);
+      setDeleteConfirmation("");
+      setDeleteError("");
     } catch (deleteBusinessError) {
       console.error(
         "Business deletion failed:",
