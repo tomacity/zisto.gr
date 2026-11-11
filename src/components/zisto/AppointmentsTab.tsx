@@ -353,7 +353,7 @@ export function AppointmentsTab({
     <section>
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#DC2727]">
-          Appointments
+          Ραντεβού
         </p>
         <h1 className="mt-4 text-[11vw] font-black leading-[0.9] tracking-[-0.05em] sm:text-[7vw] lg:text-[4.6vw]">
           Το πρόγραμμά σου.

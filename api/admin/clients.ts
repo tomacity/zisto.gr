@@ -4,7 +4,7 @@ import type {
 } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-type ClientRole = "owner" | "member" | "staff";
+type ClientRole = "owner" | "manager" | "member" | "staff";
 
 type MembershipRow = {
   user_id: string;
@@ -26,6 +26,7 @@ type MembershipRow = {
 
 const ALLOWED_ROLES = new Set<ClientRole>([
   "owner",
+  "manager",
   "member",
   "staff",
 ]);
@@ -57,6 +58,15 @@ export default async function handler(
       error: "Method not allowed",
     });
   }
+
+  const requestUrl =
+    new URL(
+      request.url ?? "/api/admin/clients",
+      `https://${request.headers.host ?? "localhost"}`,
+    );
+
+  const requestedView =
+    requestUrl.searchParams.get("view");
 
   const supabaseUrl = process.env.SUPABASE_URL;
 
@@ -130,6 +140,21 @@ export default async function handler(
     if (!adminRecord) {
       return response.status(403).json({
         error: "Zisto admin access required",
+        isAdmin: false,
+      });
+    }
+
+    if (
+      request.method === "GET" &&
+      requestedView === "me"
+    ) {
+      return response.status(200).json({
+        isAdmin: true,
+        user: {
+          id: requestingUser.id,
+          email:
+            requestingUser.email ?? null,
+        },
       });
     }
 
@@ -225,8 +250,54 @@ export default async function handler(
         };
       });
 
+      const {
+        data: adminRows,
+        error: adminsError,
+      } = await supabaseAdmin
+        .from("zisto_admins")
+        .select("user_id, created_at")
+        .order("created_at", {
+          ascending: true,
+        });
+
+      if (adminsError) {
+        console.error(
+          "Admin accounts loading failed:",
+          adminsError,
+        );
+
+        return response.status(500).json({
+          error: "Could not load Zisto admins",
+        });
+      }
+
+      const admins = (adminRows ?? []).map(
+        (admin) => {
+          const user = usersById.get(
+            admin.user_id,
+          );
+
+          return {
+            id: admin.user_id,
+            email: user?.email ?? "",
+            full_name:
+              typeof user?.user_metadata
+                ?.full_name === "string"
+                ? user.user_metadata.full_name
+                : "",
+            created_at:
+              admin.created_at ?? null,
+            last_sign_in_at:
+              user?.last_sign_in_at ?? null,
+            email_confirmed_at:
+              user?.email_confirmed_at ?? null,
+          };
+        },
+      );
+
       return response.status(200).json({
         clients,
+        admins,
       });
     }
 

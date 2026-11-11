@@ -59,10 +59,7 @@ export default async function handler(
   const resendApiKey =
     process.env.RESEND_API_KEY;
 
-  const appUrl = (
-    process.env.APP_URL ||
-    "https://zisto.app"
-  ).replace(/\/$/, "");
+  const appUrl = "https://www.zisto.app";
 
   if (
     !supabaseUrl ||
@@ -176,6 +173,7 @@ export default async function handler(
         role,
         status,
         business_id,
+        invited_user_id,
         businesses (
           id,
           name,
@@ -237,27 +235,39 @@ export default async function handler(
     /*
      * Generate a fresh Supabase invitation link.
      */
+    const linkType =
+      invitation.invited_user_id
+        ? "recovery"
+        : "invite";
+
     const {
       data: linkData,
       error: linkError,
-    } =
-      await supabaseAdmin.auth.admin.generateLink(
-        {
-          type: "invite",
-          email: invitation.email,
-          options: {
-            redirectTo: `${appUrl}/?invite=1`,
-            data: {
-              full_name:
-                invitation.full_name ?? "",
-              business_name: business.name,
-              business_id:
-                invitation.business_id,
-              role: invitation.role,
+    } = await supabaseAdmin.auth.admin.generateLink(
+      linkType === "recovery"
+        ? {
+            type: "recovery",
+            email: invitation.email,
+            options: {
+              redirectTo: `${appUrl}/?invite=1`,
+            },
+          }
+        : {
+            type: "invite",
+            email: invitation.email,
+            options: {
+              redirectTo: `${appUrl}/?invite=1`,
+              data: {
+                full_name:
+                  invitation.full_name ?? "",
+                business_name: business.name,
+                business_id:
+                  invitation.business_id,
+                role: invitation.role,
+              },
             },
           },
-        },
-      );
+    );
 
     if (
       linkError ||

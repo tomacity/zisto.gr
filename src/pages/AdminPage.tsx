@@ -2,6 +2,7 @@ import { GlobalLoader } from "../components/ui/GlobalLoader";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { InviteClientPanel } from "../components/admin/InviteClientPanel";
+import { SubscriptionsPanel, type AdminSubscription } from "../components/admin/SubscriptionsPanel";
 
 type AdminTab =
   | "home"
@@ -9,6 +10,7 @@ type AdminTab =
   | "projects"
   | "clients"
   | "invitations"
+  | "subscriptions"
   | "invite";
 
 const ADMIN_TABS: {
@@ -18,7 +20,7 @@ const ADMIN_TABS: {
 }[] = [
   {
     id: "home",
-    label: "Overview",
+    label: "Επισκόπηση",
     description:
       "Κεντρική εικόνα και γρήγορη πρόσβαση σε όλες τις λειτουργίες του Zisto Admin.",
   },
@@ -30,13 +32,13 @@ const ADMIN_TABS: {
   },
   {
     id: "projects",
-    label: "Projects",
+    label: "Smart Links",
     description:
-      "Σύνδεση και διαχείριση των public Smart Links και των GitHub repositories τους.",
+      "Διαχείριση των Smart Links κάθε επιχείρησης, των live URLs και των συνδεδεμένων repositories.",
   },
   {
     id: "clients",
-    label: "Clients",
+    label: "Πελάτες",
     description:
       "Διαχείριση των clients και της πρόσβασής τους στις επιχειρήσεις.",
   },
@@ -47,12 +49,42 @@ const ADMIN_TABS: {
       "Έλεγχος ενεργών, ολοκληρωμένων και εκκρεμών προσκλήσεων.",
   },
   {
+    id: "subscriptions",
+    label: "Συνδρομές",
+    description:
+      "Custom χρεώσεις, billing status, επόμενες πληρωμές και πρόσβαση ανά επιχείρηση.",
+  },
+  {
     id: "invite",
-    label: "Invite Client",
+    label: "Πρόσκληση πελάτη",
     description:
       "Αποστολή νέας πρόσκλησης και σύνδεση client με επιχείρηση.",
   },
 ];
+
+function adminTabFromHash(): AdminTab {
+  if (typeof window === "undefined") {
+    return "home";
+  }
+
+  const rawHash =
+    window.location.hash.replace(/^#/, "");
+
+  const [, search = ""] =
+    rawHash.split("?");
+
+  const tab =
+    new URLSearchParams(
+      search,
+    ).get("tab");
+
+  return ADMIN_TABS.some(
+    (item) => item.id === tab,
+  )
+    ? (tab as AdminTab)
+    : "home";
+}
+
 
 type DashboardModule =
   | "analytics"
@@ -68,13 +100,13 @@ const DASHBOARD_MODULE_OPTIONS: {
 }[] = [
   {
     id: "analytics",
-    label: "Analytics",
+    label: "Στατιστικά",
     description: "Επισκέψεις, conversions και δραστηριότητα.",
   },
   {
     id: "reviews",
     label: "Αξιολογήσεις",
-    description: "Review clicks και review performance.",
+    description: "Κλικ για κριτική και απόδοση κριτικών.",
   },
   {
     id: "menu",
@@ -154,6 +186,15 @@ type Client = {
   status: "active" | "invited";
 };
 
+type AdminAccount = {
+  id: string;
+  email: string;
+  full_name: string;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+};
+
 type Invitation = {
   id: string;
   email: string;
@@ -197,6 +238,7 @@ export function AdminPage() {
   const [projectsError, setProjectsError] =
     useState("");
   const [clients, setClients] = useState<Client[]>([]);
+  const [admins, setAdmins] = useState<AdminAccount[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientsError, setClientsError] = useState("");
   const [invitations, setInvitations] =
@@ -211,12 +253,61 @@ const [invitationsError, setInvitationsError] =
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [error, setError] = useState("");
-  const [activeAdminTab, setActiveAdminTab] =
-  useState<AdminTab>("home");
+  const [activeAdminTab, setΕνεργόAdminTab] =
+    useState<AdminTab>(
+      adminTabFromHash,
+    );
   
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [businessesLoading, setBusinessesLoading] = useState(false);
-  const [businessesError, setBusinessesError] = useState("");
+  const [businesses, setΕπιχειρήσεις] = useState<Business[]>([]);
+  const [businessesLoading, setΕπιχειρήσειςLoading] = useState(false);
+  const [businessesError, setΕπιχειρήσειςError] = useState("");
+
+  const [subscriptions, setSubscriptions] =
+    useState<AdminSubscription[]>([]);
+  const [subscriptionsLoading, setSubscriptionsLoading] =
+    useState(false);
+  const [subscriptionsError, setSubscriptionsError] =
+    useState("");
+
+  useEffect(() => {
+    const syncAdminTabFromHash =
+      () => {
+        setΕνεργόAdminTab(
+          adminTabFromHash(),
+        );
+      };
+
+    window.addEventListener(
+      "hashchange",
+      syncAdminTabFromHash,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "hashchange",
+        syncAdminTabFromHash,
+      );
+    };
+  }, []);
+
+  function handleAdminTabChange(
+    tab: AdminTab,
+  ) {
+    setΕνεργόAdminTab(tab);
+
+    const nextHash =
+      tab === "home"
+        ? "/admin"
+        : `/admin?tab=${tab}`;
+
+    if (
+      window.location.hash !==
+      `#${nextHash}`
+    ) {
+      window.location.hash =
+        nextHash;
+    }
+  }
 
   useEffect(() => {
     if (!isAdmin || (activeAdminTab !== "home" && activeAdminTab !== "projects")) {
@@ -338,7 +429,7 @@ const [invitationsError, setInvitationsError] =
           return;
         }
 
-        const response = await fetch("/api/admin/me", {
+        const response = await fetch("/api/admin/clients?view=me", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${session.access_token}`,
@@ -441,10 +532,10 @@ const [invitationsError, setInvitationsError] =
 
   let active = true;
 
-  async function loadBusinesses() {
+  async function loadΕπιχειρήσεις() {
     try {
-      setBusinessesLoading(true);
-      setBusinessesError("");
+      setΕπιχειρήσειςLoading(true);
+      setΕπιχειρήσειςError("");
 
       const {
         data: { session },
@@ -482,13 +573,13 @@ const [invitationsError, setInvitationsError] =
       }
 
       if (active) {
-        setBusinesses(result.businesses ?? []);
+        setΕπιχειρήσεις(result.businesses ?? []);
       }
     } catch (loadError) {
-      console.error("Businesses loading failed:", loadError);
+      console.error("Επιχειρήσεις loading failed:", loadError);
 
       if (active) {
-        setBusinessesError(
+        setΕπιχειρήσειςError(
           loadError instanceof Error
             ? loadError.message
             : "Δεν ήταν δυνατή η φόρτωση των επιχειρήσεων.",
@@ -496,12 +587,12 @@ const [invitationsError, setInvitationsError] =
       }
     } finally {
       if (active) {
-        setBusinessesLoading(false);
+        setΕπιχειρήσειςLoading(false);
       }
     }
   }
 
-  loadBusinesses();
+  loadΕπιχειρήσεις();
 
   return () => {
     active = false;
@@ -558,6 +649,7 @@ useEffect(() => {
 
       if (active) {
         setClients(result.clients ?? []);
+        setAdmins(result.admins ?? []);
       }
     } catch (error) {
       console.error("Clients loading failed:", error);
@@ -664,6 +756,97 @@ useEffect(() => {
     active = false;
   };
 }, [isAdmin, activeAdminTab]);
+
+useEffect(() => {
+  if (
+    !isAdmin ||
+    (
+      activeAdminTab !== "home" &&
+      activeAdminTab !== "subscriptions"
+    )
+  ) {
+    return;
+  }
+
+  let active = true;
+
+  async function loadSubscriptions() {
+    try {
+      setSubscriptionsLoading(true);
+      setSubscriptionsError("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        "/api/admin/subscriptions",
+        {
+          method: "GET",
+          headers: {
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          cache: "no-store",
+        },
+      );
+
+      const result = await response.json();
+
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Could not load subscriptions",
+        );
+      }
+
+      if (active) {
+        setSubscriptions(
+          result.subscriptions ?? [],
+        );
+      }
+    } catch (loadError) {
+      console.error(
+        "Subscriptions loading failed:",
+        loadError,
+      );
+
+      if (active) {
+        setSubscriptionsError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Δεν ήταν δυνατή η φόρτωση των συνδρομών.",
+        );
+      }
+    } finally {
+      if (active) {
+        setSubscriptionsLoading(false);
+      }
+    }
+  }
+
+  loadSubscriptions();
+
+  return () => {
+    active = false;
+  };
+}, [isAdmin, activeAdminTab]);
   
   if (loading) {
     return (
@@ -729,7 +912,7 @@ useEffect(() => {
           adminEmail={adminEmail}
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
-          onTabChange={setActiveAdminTab}
+          onTabChange={handleAdminTabChange}
           onLogout={handleLogout}
         />
 
@@ -755,7 +938,7 @@ useEffect(() => {
               </button>
           
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#222]/35">
-                Admin Dashboard
+                Πίνακας διαχείρισης
               </p>
           
               <div className="grid h-10 w-10 place-items-center rounded-full bg-[#222] text-xs font-black uppercase text-white">
@@ -768,7 +951,7 @@ useEffect(() => {
         
             <header className="border-b border-black/10 pb-8">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Admin workspace
+                Χώρος διαχείρισης
               </p>
   
               <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
@@ -787,28 +970,30 @@ useEffect(() => {
                   clients={clients}
                   invitations={invitations}
                   projects={projects}
+                  subscriptions={subscriptions}
                   businessesLoading={businessesLoading}
                   clientsLoading={clientsLoading}
                   invitationsLoading={invitationsLoading}
                   projectsLoading={projectsLoading}
-                  onTabChange={setActiveAdminTab}
+                  subscriptionsLoading={subscriptionsLoading}
+                  onTabChange={handleAdminTabChange}
                 />
               )}
   
               {activeAdminTab === "businesses" && (
-                <BusinessesPanel
+                <ΕπιχειρήσειςPanel
                   businesses={businesses}
                   loading={businessesLoading}
                   error={businessesError}
                   onBusinessCreated={(business) => {
-                    setBusinesses((currentBusinesses) => [
+                    setΕπιχειρήσεις((currentΕπιχειρήσεις) => [
                       business,
-                      ...currentBusinesses,
+                      ...currentΕπιχειρήσεις,
                     ]);
                   }}
                   onBusinessUpdated={(updatedBusiness) => {
-                    setBusinesses((currentBusinesses) =>
-                      currentBusinesses.map((business) =>
+                    setΕπιχειρήσεις((currentΕπιχειρήσεις) =>
+                      currentΕπιχειρήσεις.map((business) =>
                         business.id === updatedBusiness.id
                           ? updatedBusiness
                           : business,
@@ -822,8 +1007,8 @@ useEffect(() => {
                     ]);
                   }}
                   onBusinessDeleted={(businessId) => {
-                    setBusinesses((currentBusinesses) =>
-                      currentBusinesses.filter(
+                    setΕπιχειρήσεις((currentΕπιχειρήσεις) =>
+                      currentΕπιχειρήσεις.filter(
                         (business) =>
                           business.id !== businessId,
                       ),
@@ -859,6 +1044,7 @@ useEffect(() => {
               {activeAdminTab === "clients" && (
                 <ClientsPanel
                   clients={clients}
+                  admins={admins}
                   loading={clientsLoading}
                   error={clientsError}
                 />
@@ -878,6 +1064,37 @@ useEffect(() => {
                           : invitation,
                       ),
                     );
+                  }}
+                />
+              )}
+
+              {activeAdminTab === "subscriptions" && (
+                <SubscriptionsPanel
+                  subscriptions={subscriptions}
+                  businesses={businesses}
+                  loading={subscriptionsLoading}
+                  error={subscriptionsError}
+                  onSubscriptionSaved={(savedSubscription) => {
+                    setSubscriptions((currentSubscriptions) => {
+                      const exists = currentSubscriptions.some(
+                        (subscription) =>
+                          subscription.id === savedSubscription.id,
+                      );
+
+                      if (exists) {
+                        return currentSubscriptions.map(
+                          (subscription) =>
+                            subscription.id === savedSubscription.id
+                              ? savedSubscription
+                              : subscription,
+                        );
+                      }
+
+                      return [
+                        savedSubscription,
+                        ...currentSubscriptions,
+                      ];
+                    });
                   }}
                 />
               )}
@@ -1007,114 +1224,272 @@ function AdminOverview({
   clients,
   invitations,
   projects,
+  subscriptions,
   businessesLoading,
   clientsLoading,
   invitationsLoading,
   projectsLoading,
+  subscriptionsLoading,
   onTabChange,
 }: {
   businesses: Business[];
   clients: Client[];
   invitations: Invitation[];
   projects: ConnectedProject[];
+  subscriptions: AdminSubscription[];
   businessesLoading: boolean;
   clientsLoading: boolean;
   invitationsLoading: boolean;
   projectsLoading: boolean;
+  subscriptionsLoading: boolean;
   onTabChange: (tab: AdminTab) => void;
 }) {
+  const activeBusinesses = businesses.filter(
+    (business) => business.status === "active",
+  ).length;
+
+  const setupRequired = businesses.filter(
+    (business) => business.setup_status === "setup_required",
+  ).length;
+
+  const activeClients = clients.filter(
+    (client) => client.status === "active",
+  ).length;
+
+  const activeSmartLinks = projects.filter(
+    (project) => project.status === "active",
+  ).length;
+
+  const activeSubscriptions = subscriptions.filter(
+    (subscription) =>
+      subscription.billing_status === "active",
+  ).length;
+
+  const pendingInvitations = invitations.filter(
+    (invitation) => invitation.status === "pending",
+  ).length;
+
+  const draftSubscriptions = subscriptions.filter(
+    (subscription) => subscription.billing_status === "draft",
+  ).length;
+
+  const attentionItems = [
+    {
+      label: "Επιχειρήσεις που θέλουν setup",
+      value: setupRequired,
+      tab: "businesses" as AdminTab,
+    },
+    {
+      label: "Εκκρεμείς προσκλήσεις",
+      value: pendingInvitations,
+      tab: "invitations" as AdminTab,
+    },
+    {
+      label: "Συνδρομές που περιμένουν ενεργοποίηση",
+      value: draftSubscriptions,
+      tab: "subscriptions" as AdminTab,
+    },
+  ];
+
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      <AdminCard
-        eyebrow="Management"
-        title="Επιχειρήσεις"
-        description={businessesLoading ? "Φόρτωση…" : `${businesses.length} συνολικά`}
-        onClick={() =>
-          onTabChange("businesses")
-        }
-      />
+    <div className="space-y-6">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard
+          label="Ενεργές επιχειρήσεις"
+          value={
+            businessesLoading
+              ? "—"
+              : String(activeBusinesses)
+          }
+          helper={
+            businessesLoading
+              ? "Φόρτωση..."
+              : `${businesses.length} συνολικά`
+          }
+        />
 
-      <AdminCard
-        eyebrow="Accounts"
-        title="Clients"
-        description={clientsLoading ? "Φόρτωση…" : `${clients.length} συνολικά`}
-        onClick={() =>
-          onTabChange("clients")
-        }
-      />
+        <AdminMetricCard
+          label="Ενεργοί πελάτες"
+          value={
+            clientsLoading
+              ? "—"
+              : String(activeClients)
+          }
+          helper={
+            clientsLoading
+              ? "Φόρτωση..."
+              : `${clients.length} συνολικά`
+          }
+        />
 
-      <AdminCard
-        eyebrow="Custom projects"
-        title="Projects"
-        description={projectsLoading ? "Φόρτωση…" : `${projects.length} συνολικά`}
-        onClick={() =>
-          onTabChange("projects")
-        }
-      />
+        <AdminMetricCard
+          label="Ενεργά Smart Links"
+          value={
+            projectsLoading
+              ? "—"
+              : String(activeSmartLinks)
+          }
+          helper={
+            projectsLoading
+              ? "Φόρτωση..."
+              : `${projects.length} συνολικά`
+          }
+        />
 
-      <AdminCard
-        eyebrow="Invitations"
-        title="Προσκλήσεις"
-        description={invitationsLoading ? "Φόρτωση…" : `${invitations.length} συνολικά`}
-        onClick={() =>
-          onTabChange("invitations")
-        }
-      />
+        <AdminMetricCard
+          label="Ενεργές συνδρομές"
+          value={
+            subscriptionsLoading
+              ? "—"
+              : String(activeSubscriptions)
+          }
+          helper={
+            subscriptionsLoading
+              ? "Φόρτωση..."
+              : `${subscriptions.length} συνολικά`
+          }
+          dark
+        />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-[28px] border border-black/10 bg-white p-6 sm:p-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Χρειάζεται προσοχή
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
+                Τι μένει να κλείσει.
+              </h2>
+            </div>
+
+            <span className="rounded-full bg-[#F7F5F1] px-3 py-1.5 text-[10px] font-bold text-[#666]">
+              {invitationsLoading ||
+              businessesLoading ||
+              subscriptionsLoading
+                ? "..."
+                : `${setupRequired + pendingInvitations + draftSubscriptions} θέματα`}
+            </span>
+          </div>
+
+          <div className="mt-6 divide-y divide-black/[0.06]">
+            {attentionItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() =>
+                  onTabChange(item.tab)
+                }
+                className="flex w-full items-center justify-between gap-4 py-4 text-left transition hover:translate-x-1"
+              >
+                <span className="text-sm font-bold text-[#222]">
+                  {item.label}
+                </span>
+
+                <span
+                  className={`grid min-w-9 place-items-center rounded-full px-3 py-1.5 text-xs font-black ${
+                    item.value > 0
+                      ? "bg-[#FFF0F0] text-[#DC2727]"
+                      : "bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  {item.value}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[28px] bg-[#222] p-6 text-white sm:p-8">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/45">
+            Γρήγορες ενέργειες
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
+            Από εδώ ξεκινάς.
+          </h2>
+
+          <div className="mt-6 grid gap-3">
+            {[
+              {
+                label: "Νέα επιχείρηση",
+                tab: "businesses" as AdminTab,
+              },
+              {
+                label: "Νέο Smart Link",
+                tab: "projects" as AdminTab,
+              },
+              {
+                label: "Πρόσκληση πελάτη",
+                tab: "invite" as AdminTab,
+              },
+              {
+                label: "Διαχείριση συνδρομών",
+                tab: "subscriptions" as AdminTab,
+              },
+            ].map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={() =>
+                  onTabChange(action.tab)
+                }
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-left text-sm font-bold transition hover:bg-white hover:text-[#222]"
+              >
+                <span>{action.label}</span>
+                <span>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 
-function AdminCard({
-  eyebrow,
-  title,
-  description,
-  onClick,
+function AdminMetricCard({
+  label,
+  value,
+  helper,
   dark = false,
 }: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  onClick: () => void;
+  label: string;
+  value: string;
+  helper: string;
   dark?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group min-h-[210px] rounded-[28px] p-7 text-left transition hover:-translate-y-1 hover:shadow-lg ${
+    <article
+      className={`rounded-[24px] border p-5 sm:p-6 ${
         dark
-          ? "bg-[#222] text-white hover:bg-[#DC2727]"
-          : "border border-black/10 bg-white text-[#222] hover:border-[#222]"
+          ? "border-[#222] bg-[#222] text-white"
+          : "border-black/10 bg-white text-[#222]"
       }`}
     >
       <p
-        className={`text-xs font-bold uppercase tracking-[0.22em] ${
-          dark ? "text-white/50" : "text-[#999]"
+        className={`text-[10px] font-bold uppercase tracking-[0.18em] ${
+          dark ? "text-white/45" : "text-[#999]"
         }`}
       >
-        {eyebrow}
+        {label}
       </p>
 
-      <h2 className="mt-6 text-2xl font-black tracking-[-0.03em]">
-        {title}
-      </h2>
+      <p className="mt-5 text-4xl font-black tracking-[-0.05em]">
+        {value}
+      </p>
 
       <p
-        className={`mt-3 text-sm leading-6 ${
-          dark ? "text-white/70" : "text-[#666]"
+        className={`mt-2 text-xs ${
+          dark ? "text-white/55" : "text-[#777]"
         }`}
       >
-        {description}
+        {helper}
       </p>
-
-      <p className="mt-7 text-sm font-bold transition group-hover:translate-x-1">
-        Προβολή →
-      </p>
-    </button>
+    </article>
   );
 }
 
-function BusinessesPanel({
+function ΕπιχειρήσειςPanel({
   businesses,
   loading,
   error,
@@ -1580,8 +1955,6 @@ async function updateBusiness(
       }
   
       onBusinessDeleted(deletingBusiness.id);
-      // The modal must close even while deleteSaving is true.
-      // cancelDeletingBusiness intentionally blocks manual closing during a request.
       setDeletingBusiness(null);
       setDeleteConfirmation("");
       setDeleteError("");
@@ -1609,7 +1982,7 @@ async function updateBusiness(
         ) ?? null
       : null;
 
-  const activeBusinesses = businesses.filter(
+  const activeΕπιχειρήσεις = businesses.filter(
     (business) =>
       business.status === "active" &&
       business.setup_status === "active",
@@ -1628,7 +2001,7 @@ async function updateBusiness(
     return (
       <div className="mt-8 rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
@@ -1647,12 +2020,12 @@ async function updateBusiness(
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Businesses
+            Επιχειρήσεις
           </p>
 
           <p className="mt-2 text-sm text-[#666]">
             {businesses.length} συνολικά ·{" "}
-            {activeBusinesses} ενεργές
+            {activeΕπιχειρήσεις} ενεργές
           </p>
         </div>
 
@@ -1791,7 +2164,7 @@ async function updateBusiness(
                 }
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
               >
-                <option value="active">Active</option>
+                <option value="active">Ενεργό</option>
                 <option value="inactive">Inactive</option>
               </select>
             </label>
@@ -1887,9 +2260,9 @@ async function updateBusiness(
                         />
 
                         {setupRequired
-                          ? "Setup required"
+                          ? "Απαιτείται ρύθμιση"
                           : isActive
-                            ? "Active"
+                            ? "Ενεργός"
                             : "Inactive"}
                       </span>
 
@@ -1928,10 +2301,10 @@ async function updateBusiness(
                           />
 
                           {setupRequired
-                            ? "Setup required"
+                            ? "Απαιτείται ρύθμιση"
                             : isActive
-                              ? "Live"
-                              : "Paused"}
+                              ? "Ενεργό"
+                              : "Σε παύση"}
                         </p>
                       </div>
                     </div>
@@ -1945,7 +2318,7 @@ async function updateBusiness(
                       }
                       className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl border border-black/10 bg-white text-[#222] transition hover:border-[#222] hover:bg-[#F7F5F1]"
                       aria-label={`Επεξεργασία ${business.name}`}
-                      title="Edit business"
+                      title="Επεξεργασία επιχείρησης"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -1977,7 +2350,7 @@ async function updateBusiness(
                       }}
                       className="min-h-14 flex-1 rounded-2xl bg-[#222] px-7 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] lg:flex-none"
                     >
-                      Άνοιγμα Dashboard →
+                      Άνοιγμα πίνακα →
                     </button>
                   </div>
                 </div>
@@ -2009,7 +2382,7 @@ async function updateBusiness(
             <div className="sticky top-0 z-10 flex items-start justify-between gap-5 border-b border-black/8 bg-white/95 px-6 py-5 backdrop-blur-xl sm:px-8">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                  Edit business
+                  Επεξεργασία επιχείρησης
                 </p>
 
                 <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
@@ -2120,7 +2493,7 @@ async function updateBusiness(
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222]"
                   >
                     <option value="active">
-                      Active
+                      Ενεργό
                     </option>
                     <option value="inactive">
                       Inactive
@@ -2133,7 +2506,7 @@ async function updateBusiness(
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#666]">
-                      Dashboard modules
+                      Ενότητες πίνακα
                     </p>
                     <p className="mt-2 max-w-xl text-sm leading-6 text-[#888]">
                       Διάλεξε ακριβώς ποιες ενότητες θα βλέπει ο client στο dashboard του.
@@ -2803,11 +3176,11 @@ function ProjectsPanel({
     return (
       <div className="mt-8 rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
-          Δεν φορτώθηκαν τα projects
+          Δεν φορτώθηκαν τα Smart Links
         </h3>
 
         <p className="mt-3 text-sm text-red-700">
@@ -2822,7 +3195,7 @@ function ProjectsPanel({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Connected custom projects
+            Smart Links
           </p>
 
           <p className="mt-2 text-sm text-[#666]">
@@ -2844,7 +3217,7 @@ function ProjectsPanel({
         >
           {showCreateForm
             ? "Κλείσιμο φόρμας"
-            : "+ Connect Project"}
+            : "+ Νέο Smart Link"}
         </button>
       </div>
 
@@ -2855,11 +3228,11 @@ function ProjectsPanel({
         >
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-              Connect custom page
+              Σύνδεση Smart Link
             </p>
 
             <h3 className="mt-3 text-2xl font-black tracking-[-0.04em]">
-              Νέο Connected Project
+              Νέο Smart Link
             </h3>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#666]">
@@ -2964,7 +3337,7 @@ function ProjectsPanel({
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm outline-none transition focus:border-[#222]"
               >
                 <option value="active">
-                  Active
+                  Ενεργό
                 </option>
 
                 <option value="inactive">
@@ -3034,7 +3407,7 @@ function ProjectsPanel({
           </h3>
 
           <p className="mt-3 text-sm text-[#666]">
-            Πάτησε «+ Connect Project» για να
+            Πάτησε «+ Νέο Smart Link» για να
             συνδέσεις το πρώτο custom project.
           </p>
         </div>
@@ -3071,7 +3444,7 @@ function ProjectsPanel({
                         />
 
                         {isActive
-                          ? "Active"
+                          ? "Ενεργός"
                           : "Inactive"}
                       </span>
 
@@ -3113,7 +3486,7 @@ function ProjectsPanel({
 
                           {isActive
                             ? "Ready"
-                            : "Paused"}
+                            : "Σε παύση"}
                         </p>
                       </div>
                     </div>
@@ -3127,7 +3500,7 @@ function ProjectsPanel({
                       }
                       className="w-full rounded-2xl border border-black/10 bg-white px-7 py-4 text-center text-sm font-bold transition hover:border-[#222] lg:w-auto"
                     >
-                      Edit
+                      Επεξεργασία
                     </button>
 
                     <a
@@ -3169,7 +3542,7 @@ function ProjectsPanel({
             <div className="flex items-start justify-between gap-5">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
-                  Edit connected project
+                  Επεξεργασία Smart Link
                 </p>
 
                 <h3 className="mt-3 text-3xl font-black tracking-[-0.04em]">
@@ -3262,7 +3635,7 @@ function ProjectsPanel({
                   className="mt-2 w-full rounded-2xl border border-black/10 bg-[#F7F5F1] px-4 py-4 text-sm outline-none transition focus:border-[#222] disabled:opacity-60"
                 >
                   <option value="active">
-                    Active
+                    Ενεργό
                   </option>
 
                   <option value="inactive">
@@ -3313,20 +3686,22 @@ function ProjectsPanel({
 
 function ClientsPanel({
   clients,
+  admins,
   loading,
   error,
-  onClientRoleChanged,
-  onClientRemoved,
+  onClientRoleChanged = () => {},
+  onClientΑφαίρεσηd = () => {},
 }: {
   clients: Client[];
+  admins: AdminAccount[];
   loading: boolean;
   error: string;
-  onClientRoleChanged: (
+  onClientRoleChanged?: (
     userId: string,
     businessId: string,
     role: Client["role"],
   ) => void;
-  onClientRemoved: (
+  onClientΑφαίρεσηd?: (
     userId: string,
     businessId: string,
   ) => void;
@@ -3465,7 +3840,7 @@ function ClientsPanel({
         );
       }
 
-      onClientRemoved(
+      onClientΑφαίρεσηd(
         client.id,
         client.business_id,
       );
@@ -3500,7 +3875,7 @@ function ClientsPanel({
     return (
       <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">
@@ -3509,20 +3884,6 @@ function ClientsPanel({
 
         <p className="mt-3 text-sm text-red-700">
           {error}
-        </p>
-      </div>
-    );
-  }
-
-  if (clients.length === 0) {
-    return (
-      <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
-        <h3 className="text-2xl font-black tracking-[-0.03em]">
-          Δεν υπάρχουν clients
-        </h3>
-
-        <p className="mt-3 text-sm text-[#666]">
-          Οι clients που προσκαλείς θα εμφανίζονται εδώ.
         </p>
       </div>
     );
@@ -3538,6 +3899,96 @@ function ClientsPanel({
 
   return (
     <div className="space-y-6">
+      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[#222] text-white">
+        <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#DC2727]">
+              Ομάδα Zisto
+            </p>
+            <h3 className="mt-2 text-2xl font-black tracking-[-0.035em]">
+              Διαχειριστές Zisto
+            </h3>
+            <p className="mt-2 text-sm text-white/55">
+              Εσωτερικοί διαχειριστές της πλατφόρμας. Δεν υπολογίζονται ως clients.
+            </p>
+          </div>
+
+          <span className="inline-flex w-fit rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/65">
+            {admins.length} admins
+          </span>
+        </div>
+
+        {admins.length === 0 ? (
+          <div className="px-6 py-8 text-sm text-white/50">
+            Δεν υπάρχουν καταχωρημένοι Zisto admins.
+          </div>
+        ) : (
+          <div className="grid gap-px bg-white/10 sm:grid-cols-2">
+            {admins.map((admin) => {
+              const displayName =
+                admin.full_name.trim() ||
+                admin.email.split("@")[0] ||
+                "Admin";
+
+              const initials = displayName
+                .split(" ")
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) =>
+                  part.charAt(0).toUpperCase(),
+                )
+                .join("");
+
+              const isActive =
+                Boolean(admin.last_sign_in_at);
+
+              return (
+                <article
+                  key={admin.id}
+                  className="bg-[#222] p-6"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-full bg-[#DC2727] text-sm font-black text-white">
+                      {initials || "A"}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-black">
+                          {displayName}
+                        </p>
+                        <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-white/60">
+                          Admin
+                        </span>
+                      </div>
+
+                      <p className="mt-1 truncate text-sm text-white/50">
+                        {admin.email}
+                      </p>
+
+                      <div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em]">
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            isActive
+                              ? "bg-green-400"
+                              : "bg-white/25"
+                          }`}
+                        />
+                        <span className="text-white/45">
+                          {isActive
+                            ? "Ενεργός λογαριασμός"
+                            : "Χωρίς σύνδεση ακόμη"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <ClientSummaryCard
           label="Σύνολο clients"
@@ -3550,7 +4001,7 @@ function ClientsPanel({
         />
 
         <ClientSummaryCard
-          label="Invited"
+          label="Προσκεκλημένοι"
           value={invitedClients}
         />
       </div>
@@ -3561,6 +4012,16 @@ function ClientsPanel({
         </div>
       )}
 
+      {clients.length === 0 ? (
+        <div className="rounded-[24px] border border-dashed border-black/15 bg-[#F7F5F1] p-8 text-center">
+          <h3 className="text-2xl font-black tracking-[-0.03em]">
+            Δεν υπάρχουν clients
+          </h3>
+          <p className="mt-3 text-sm text-[#666]">
+            Οι clients που προσκαλείς θα εμφανίζονται εδώ.
+          </p>
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white">
         <div className="hidden grid-cols-[1.4fr_1.1fr_0.65fr_0.7fr_0.9fr] gap-4 border-b border-black/8 bg-[#F7F5F1] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#777] xl:grid">
           <span>Client</span>
@@ -3689,8 +4150,8 @@ function ClientsPanel({
                     />
 
                     {client.status === "active"
-                      ? "Active"
-                      : "Invited"}
+                      ? "Ενεργός"
+                      : "Προσκεκλημένος"}
                   </span>
                 </div>
 
@@ -3711,7 +4172,7 @@ function ClientsPanel({
                       >
                         {isSaving
                           ? "Αποθήκευση..."
-                          : "Save"}
+                          : "Αποθήκευση"}
                       </button>
 
                       <button
@@ -3720,7 +4181,7 @@ function ClientsPanel({
                         onClick={cancelEditing}
                         className="rounded-xl border border-black/10 px-4 py-2.5 text-xs font-bold transition hover:border-[#222] disabled:opacity-50"
                       >
-                        Cancel
+                        Ακύρωση
                       </button>
 
                       <button
@@ -3731,7 +4192,7 @@ function ClientsPanel({
                         }
                         className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                       >
-                        Remove
+                        Αφαίρεση
                       </button>
                     </div>
                   ) : (
@@ -3740,7 +4201,7 @@ function ClientsPanel({
                       onClick={() => startEditing(client)}
                       className="mt-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-xs font-bold transition hover:border-[#222] hover:bg-[#F7F5F1] xl:mt-0"
                     >
-                      Edit
+                      Επεξεργασία
                     </button>
                   )}
                 </div>
@@ -3749,6 +4210,7 @@ function ClientsPanel({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -3884,7 +4346,7 @@ function InvitationsPanel({
     return (
       <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Loading error
+          Σφάλμα φόρτωσης
         </p>
 
         <h3 className="mt-4 text-2xl font-black tracking-[-0.03em]">

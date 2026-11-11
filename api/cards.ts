@@ -242,11 +242,16 @@ export default async function handler(
       ? authorization.slice(7)
       : null;
 
+  const requestUrl =
+    new URL(
+      req.url ?? "/api/cards",
+      `https://${req.headers.host ?? "localhost"}`,
+    );
+
   const requestedBusinessId =
-    typeof req.query.business_id ===
-    "string"
-      ? req.query.business_id
-      : null;
+    requestUrl.searchParams.get(
+      "business_id",
+    );
 
   if (!accessToken) {
     return res.status(401).json({
@@ -507,17 +512,20 @@ const smartLinkLiveUrl =
 
     if (
   req.method === "GET" &&
-  req.query.analytics === "card"
+  requestUrl.searchParams.get("analytics") === "card"
 ) {
   const cardId =
-    typeof req.query.card_id === "string"
-      ? req.query.card_id
-      : null;
+    requestUrl.searchParams.get("card_id");
+
+  const requestedDateValue =
+    requestUrl.searchParams.get("date");
 
   const requestedDate =
-    typeof req.query.date === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
-      ? req.query.date
+    requestedDateValue &&
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      requestedDateValue,
+    )
+      ? requestedDateValue
       : null;
 
   if (!cardId) {
@@ -566,10 +574,13 @@ const smartLinkLiveUrl =
       new Date(),
     );
 
+      const requestedMonthValue =
+  requestUrl.searchParams.get("month");
+
       const requestedMonth =
-  typeof req.query.month === "string" &&
-  /^\d{4}-\d{2}$/.test(req.query.month)
-    ? req.query.month
+  requestedMonthValue &&
+  /^\d{4}-\d{2}$/.test(requestedMonthValue)
+    ? requestedMonthValue
     : todayKey.slice(0, 7);
 
 const [calendarYear, calendarMonth] =
@@ -805,9 +816,7 @@ const calendarEndKey = [
 
     if (req.method === "PATCH") {
       const cardId =
-        typeof req.query.card_id === "string"
-          ? req.query.card_id
-          : null;
+        requestUrl.searchParams.get("card_id");
     
         const name =
           typeof req.body?.name === "string"
@@ -930,9 +939,7 @@ const calendarEndKey = [
 
     if (req.method === "DELETE") {
       const cardId =
-        typeof req.query.card_id === "string"
-          ? req.query.card_id
-          : null;
+        requestUrl.searchParams.get("card_id");
     
       if (!cardId) {
         return res.status(400).json({

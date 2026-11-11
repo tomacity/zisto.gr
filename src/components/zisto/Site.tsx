@@ -39,6 +39,633 @@ const MONOGRAM = "/images/zisto-monogram.png";
 const RED = "#DC2727";
 const INK = "#222222";
 
+const GREEK_REGIONS = [
+  "Ανατολική Μακεδονία και Θράκη",
+  "Αττική",
+  "Βόρειο Αιγαίο",
+  "Δυτική Ελλάδα",
+  "Δυτική Μακεδονία",
+  "Ήπειρος",
+  "Θεσσαλία",
+  "Ιόνια Νησιά",
+  "Κεντρική Μακεδονία",
+  "Κρήτη",
+  "Νότιο Αιγαίο",
+  "Πελοπόννησος",
+  "Στερεά Ελλάδα",
+].sort((a, b) =>
+  a.localeCompare(b, "el-GR"),
+);
+
+const ELSTAT_SETTLEMENTS_URL =
+  "https://sdigmap.tee.gov.gr/mapping/rest/services/UDM/UDM_SERVICE_ELSTAT/MapServer/18/query";
+
+const ELSTAT_REGIONAL_UNITS_URL =
+  "https://sdigmap.tee.gov.gr/mapping/rest/services/UDM/UDM_SERVICE_ELSTAT/MapServer/3/query";
+
+let greekSettlementsCache:
+  | string[]
+  | null = null;
+
+let greekSettlementsPromise:
+  | Promise<string[]>
+  | null = null;
+
+function normalizeGreekSearch(
+  value: string,
+) {
+  return value
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      "",
+    )
+    .toLocaleLowerCase(
+      "el-GR",
+    )
+    .trim();
+}
+
+function cleanSettlementName(
+  value: string,
+) {
+  return value
+    .trim()
+    .replace(
+      /,\s*(ο|η|το|οι|τα)\s*$/iu,
+      "",
+    )
+    .trim();
+}
+
+function pointInRing(
+  point: [number, number],
+  ring: number[][],
+) {
+  const [x, y] = point;
+  let inside = false;
+
+  for (
+    let i = 0,
+      j = ring.length - 1;
+    i < ring.length;
+    j = i++
+  ) {
+    const xi = ring[i]?.[0];
+    const yi = ring[i]?.[1];
+    const xj = ring[j]?.[0];
+    const yj = ring[j]?.[1];
+
+    if (
+      typeof xi !== "number" ||
+      typeof yi !== "number" ||
+      typeof xj !== "number" ||
+      typeof yj !== "number"
+    ) {
+      continue;
+    }
+
+    const intersects =
+      yi > y !== yj > y &&
+      x <
+        ((xj - xi) *
+          (y - yi)) /
+          (yj - yi || 1e-12) +
+          xi;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function pointInPolygon(
+  point: [number, number],
+  rings: number[][][],
+) {
+  let inside = false;
+
+  for (const ring of rings) {
+    if (
+      ring.length >= 3 &&
+      pointInRing(
+        point,
+        ring,
+      )
+    ) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function formatRegionalUnitName(
+  value: string,
+) {
+  const cleaned = value
+    .trim()
+    .replace(
+      /^ΠΕΡΙΦΕΡΕΙΑΚΗ\s+ΕΝΟΤΗΤΑ\s+/iu,
+      "",
+    )
+    .replace(
+      /^Π\.\s*Ε\.\s*/iu,
+      "",
+    )
+    .toLocaleLowerCase(
+      "el-GR",
+    );
+
+  return cleaned.replace(
+    /(^|[\s-])([\p{L}])/gu,
+    (
+      match,
+      prefix: string,
+      letter: string,
+    ) =>
+      `${prefix}${letter.toLocaleUpperCase(
+        "el-GR",
+      )}`,
+  );
+}
+
+async function loadRegionalUnits() {
+  const params =
+    new URLSearchParams({
+      where: "1=1",
+      outFields: "NAME_GR",
+      returnGeometry: "true",
+      outSR: "2100",
+      f: "json",
+    });
+
+  const response =
+    await fetch(
+      `${ELSTAT_REGIONAL_UNITS_URL}?${params.toString()}`,
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      "Δεν ήταν δυνατή η φόρτωση των Περιφερειακών Ενοτήτων.",
+    );
+  }
+
+  const result =
+    await response.json();
+
+  return Array.isArray(
+    result.features,
+  )
+    ? result.features
+        .map(
+          (
+            feature: any,
+          ) => ({
+            name:
+              typeof feature
+                ?.attributes
+                ?.NAME_GR ===
+              "string"
+                ? formatRegionalUnitName(
+                    feature.attributes.NAME_GR,
+                  )
+                : "",
+            rings:
+              Array.isArray(
+                feature
+                  ?.geometry
+                  ?.rings,
+              )
+                ? feature.geometry.rings
+                : [],
+          }),
+        )
+        .filter(
+          (
+            unit: {
+              name: string;
+              rings: number[][][];
+            },
+          ) =>
+            unit.name.length >
+              0 &&
+            unit.rings.length >
+              0,
+        )
+    : [];
+}
+
+async function loadGreekSettlements() {
+  if (greekSettlementsCache) {
+    return greekSettlementsCache;
+  }
+
+  if (greekSettlementsPromise) {
+    return greekSettlementsPromise;
+  }
+
+  greekSettlementsPromise =
+    (async () => {
+      const regionalUnits =
+        await loadRegionalUnits();
+
+      const collected:
+        string[] = [];
+
+      const pageSize = 2000;
+
+      for (
+        let offset = 0;
+        offset < 30000;
+        offset += pageSize
+      ) {
+        const params =
+          new URLSearchParams({
+            where:
+              "OIKISMOS IS NOT NULL",
+            outFields:
+              "OIKISMOS",
+            returnGeometry:
+              "true",
+            outSR: "2100",
+            orderByFields:
+              "OIKISMOS",
+            resultOffset:
+              String(offset),
+            resultRecordCount:
+              String(pageSize),
+            f: "json",
+          });
+
+        const response =
+          await fetch(
+            `${ELSTAT_SETTLEMENTS_URL}?${params.toString()}`,
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            "Δεν ήταν δυνατή η φόρτωση των πόλεων.",
+          );
+        }
+
+        const result =
+          await response.json();
+
+        const features =
+          Array.isArray(
+            result.features,
+          )
+            ? result.features
+            : [];
+
+        for (
+          const feature of features
+        ) {
+          const rawName =
+            feature
+              ?.attributes
+              ?.OIKISMOS;
+
+          const x =
+            feature
+              ?.geometry
+              ?.x;
+
+          const y =
+            feature
+              ?.geometry
+              ?.y;
+
+          if (
+            typeof rawName !==
+              "string" ||
+            typeof x !==
+              "number" ||
+            typeof y !==
+              "number"
+          ) {
+            continue;
+          }
+
+          const settlementName =
+            cleanSettlementName(
+              rawName,
+            );
+
+          const regionalUnit =
+            regionalUnits.find(
+              (unit) =>
+                pointInPolygon(
+                  [x, y],
+                  unit.rings,
+                ),
+            );
+
+          collected.push(
+            regionalUnit
+              ? `${settlementName}, ${regionalUnit.name}`
+              : settlementName,
+          );
+        }
+
+        if (
+          features.length <
+            pageSize &&
+          !result.exceededTransferLimit
+        ) {
+          break;
+        }
+      }
+
+      greekSettlementsCache =
+        Array.from(
+          new Set(
+            collected,
+          ),
+        ).sort((a, b) =>
+          a.localeCompare(
+            b,
+            "el-GR",
+          ),
+        );
+
+      return greekSettlementsCache;
+    })().catch((error) => {
+      greekSettlementsPromise =
+        null;
+      throw error;
+    });
+
+  return greekSettlementsPromise;
+}
+
+function SearchableSelect({
+  value,
+  onChange,
+  options,
+  loadOptions,
+  placeholder,
+  emptyMessage =
+    "Δεν βρέθηκε επιλογή.",
+}: {
+  value: string;
+  onChange: (
+    value: string,
+  ) => void;
+  options?: string[];
+  loadOptions?: () =>
+    Promise<string[]>;
+  placeholder: string;
+  emptyMessage?: string;
+}) {
+  const rootRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+  const [
+    availableOptions,
+    setAvailableOptions,
+  ] = useState<string[]>(
+    options ?? [],
+  );
+  const [open, setOpen] =
+    useState(false);
+  const [loading, setLoading] =
+    useState(false);
+  const [loadError, setLoadError] =
+    useState("");
+
+  useEffect(() => {
+    if (options) {
+      setAvailableOptions(
+        options,
+      );
+    }
+  }, [options]);
+
+  useEffect(() => {
+    function handlePointerDown(
+      event: MouseEvent,
+    ) {
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(
+          event.target as Node,
+        )
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handlePointerDown,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handlePointerDown,
+      );
+    };
+  }, []);
+
+  async function ensureOptions() {
+    if (
+      !loadOptions ||
+      availableOptions.length >
+        0 ||
+      loading
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setLoadError("");
+
+      const loaded =
+        await loadOptions();
+
+      setAvailableOptions(
+        loaded,
+      );
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η φόρτωση.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const normalizedQuery =
+    normalizeGreekSearch(value);
+
+  const filteredOptions =
+    availableOptions
+      .filter((option) => {
+        if (!normalizedQuery) {
+          return true;
+        }
+
+        return normalizeGreekSearch(
+          option,
+        ).includes(
+          normalizedQuery,
+        );
+      })
+      .slice(0, 250);
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative"
+    >
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(event) => {
+            onChange(
+              event.target.value,
+            );
+            setOpen(true);
+            void ensureOptions();
+          }}
+          onFocus={() => {
+            setOpen(true);
+            void ensureOptions();
+          }}
+          placeholder={
+            placeholder
+          }
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 pr-11 text-[13px] font-semibold outline-none focus:border-[#222]"
+        />
+
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(
+              (current) =>
+                !current,
+            );
+            void ensureOptions();
+          }}
+          className="absolute inset-y-0 right-0 grid w-11 place-items-center text-[#222]/40 transition hover:text-[#222]"
+          aria-label="Άνοιγμα επιλογών"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            className={`h-4 w-4 transition-transform ${
+              open
+                ? "rotate-180"
+                : ""
+            }`}
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="m4 6 4 4 4-4"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute z-[80] mt-2 max-h-72 w-full overflow-y-auto rounded-[14px] border border-black/10 bg-white p-1.5 shadow-[0_18px_45px_-20px_rgba(0,0,0,0.28)]">
+          {loading ? (
+            <p className="px-3 py-4 text-[11px] font-semibold text-[#222]/40">
+              Φόρτωση επιλογών...
+            </p>
+          ) : loadError ? (
+            <button
+              type="button"
+              onClick={() => {
+                setAvailableOptions(
+                  [],
+                );
+                void ensureOptions();
+              }}
+              className="w-full rounded-[10px] px-3 py-4 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
+            >
+              {loadError} Πάτησε για
+              νέα προσπάθεια.
+            </button>
+          ) : filteredOptions.length >
+            0 ? (
+            filteredOptions.map(
+              (option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onMouseDown={(
+                    event,
+                  ) =>
+                    event.preventDefault()
+                  }
+                  onClick={() => {
+                    onChange(
+                      option,
+                    );
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-[10px] px-3 py-2.5 text-left text-[12px] font-semibold transition hover:bg-[#F6F6F4] ${
+                    option === value
+                      ? "bg-[#222] text-white hover:bg-[#222]"
+                      : "text-[#222]"
+                  }`}
+                >
+                  <span>
+                    {option}
+                  </span>
+
+                  {option ===
+                    value && (
+                    <span className="text-[10px]">
+                      ✓
+                    </span>
+                  )}
+                </button>
+              ),
+            )
+          ) : (
+            <p className="px-3 py-4 text-[11px] font-semibold text-[#222]/40">
+              {emptyMessage}
+            </p>
+          )}
+
+          {!loading &&
+            !loadError &&
+            availableOptions.length >
+              250 &&
+            filteredOptions.length ===
+              250 && (
+              <p className="border-t border-black/5 px-3 py-3 text-[10px] text-[#222]/35">
+                Γράψε περισσότερα
+                γράμματα για να
+                περιορίσεις τα
+                αποτελέσματα.
+              </p>
+            )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Shared: reveal on scroll                                          */
 /* ------------------------------------------------------------------ */
@@ -666,7 +1293,7 @@ const SERVICES = [
   },
   {
     n: "05",
-    title: "Το δικό σου Dashboard",
+    title: "Ο δικός σου πίνακας",
     body: "Κάθε επιχείρηση αποκτά προσωπικό dashboard με live analytics, στατιστικά ανά τραπέζι και πλήρη διαχείριση των NFC καρτών της.",
     span: "md:col-span-12",
     big: true,
@@ -720,7 +1347,7 @@ function DashboardHeroPreview() {
       <section className="mt-28">
         <div className="mb-14 text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
-            Dashboard
+            Πίνακας
           </p>
 
           <h2 className="mt-5 text-[10vw] font-black leading-[0.9] tracking-[-0.04em] text-[#222] md:text-[5vw]">
@@ -728,7 +1355,7 @@ function DashboardHeroPreview() {
           </h2>
 
           <p className="mx-auto mt-5 max-w-3xl text-[16px] leading-relaxed text-[#222]/60">
-            Παρακολούθησε επισκέψεις, conversions, reviews, μενού και
+            Παρακολούθησε επισκέψεις, μετατροπές, κριτικές, μενού και
             την απόδοση κάθε NFC κάρτας σε πραγματικό χρόνο.
           </p>
         </div>
@@ -1305,6 +1932,13 @@ function Footer() {
           >
             Πολιτική Cookies
           </a>
+
+          <a
+            href="/#/payments"
+            className="transition-colors duration-300 hover:text-white"
+          >
+            Πολιτική Πληρωμών
+          </a>
         
           <button
             type="button"
@@ -1360,7 +1994,7 @@ function LoginPage() {
 
     async function redirectLoggedInUser(accessToken: string) {
     try {
-      const response = await fetch("/api/admin/me", {
+      const response = await fetch("/api/admin/clients?view=me", {
         method: "GET",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -1654,6 +2288,10 @@ function InvitationSetupPage() {
   const [saving, setSaving] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const invitationSessionRef = useRef<{
+    access_token: string;
+    refresh_token: string;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -1674,6 +2312,11 @@ function InvitationSetupPage() {
             "Η πρόσκληση δεν είναι έγκυρη ή έχει λήξει. Ζήτησε νέα πρόσκληση από το Zisto.",
           );
         }
+
+        invitationSessionRef.current = {
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        };
 
         if (active) {
           setFullName(
@@ -1724,6 +2367,36 @@ function InvitationSetupPage() {
         throw new Error("Οι δύο κωδικοί δεν ταιριάζουν.");
       }
 
+      let {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session && invitationSessionRef.current) {
+        const {
+          data,
+          error: restoreSessionError,
+        } = await supabase.auth.setSession(
+          invitationSessionRef.current,
+        );
+
+        if (restoreSessionError) {
+          throw restoreSessionError;
+        }
+
+        session = data.session;
+      }
+
+      if (!session) {
+        throw new Error(
+          "Η συνεδρία της πρόσκλησης χάθηκε. Άνοιξε ξανά τον σύνδεσμο πρόσκλησης και προσπάθησε πάλι.",
+        );
+      }
+
+      invitationSessionRef.current = {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      };
+
       const { error } = await supabase.auth.updateUser({
         password,
         data: {
@@ -1736,8 +2409,46 @@ function InvitationSetupPage() {
         throw error;
       }
 
-      window.history.replaceState({}, "", window.location.origin);
-      window.location.hash = "/dashboard";
+      const businessId =
+        typeof session.user.user_metadata?.business_id === "string"
+          ? session.user.user_metadata.business_id
+          : "";
+
+      const acceptanceResponse =
+        await fetch(
+          "/api/admin/invitations",
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              action: "accept",
+              business_id: businessId,
+            }),
+          },
+        );
+
+      if (!acceptanceResponse.ok) {
+        const acceptanceResult =
+          await acceptanceResponse
+            .json()
+            .catch(() => null);
+
+        throw new Error(
+          acceptanceResult?.error ??
+            "Ο λογαριασμός δημιουργήθηκε, αλλά δεν ολοκληρώθηκε η πρόσκληση. Προσπάθησε ξανά.",
+        );
+      }
+
+      const dashboardUrl = businessId
+        ? `https://www.zisto.app/#/dashboard?business=${encodeURIComponent(businessId)}`
+        : "https://www.zisto.app/#/dashboard";
+
+      window.location.replace(dashboardUrl);
     } catch (error) {
       console.error("Invitation setup failed:", error);
       setErrorMessage(
@@ -1920,7 +2631,35 @@ type AnalyticsResponse = {
     name: string;
     location_name: string | null;
     dashboard_modules: DashboardModule[];
+    profile_image_url: string | null;
   };
+  subscription: {
+    id: string;
+    billing_email: string | null;
+    amount_cents: number;
+    currency: string;
+    vat_rate: number;
+    billing_interval_months: number;
+    billing_status:
+      | "draft"
+      | "active"
+      | "past_due"
+      | "cancelled";
+    access_status:
+      | "active"
+      | "grace_period"
+      | "suspended";
+    starts_at: string;
+    next_billing_at: string | null;
+    payment_due_at: string | null;
+    grace_until: string | null;
+    last_paid_at: string | null;
+    notes: string | null;
+    stripe_customer_id: string | null;
+    stripe_subscription_id: string | null;
+    cancel_at_period_end: boolean;
+    cancellation_requested_at: string | null;
+  } | null;
   totals: {
     page_views_today: number;
     page_views_week: number;
@@ -1941,14 +2680,52 @@ type AnalyticsResponse = {
   };
   daily_activity: DailyActivity[];
   recent_activity: AnalyticsEvent[];
+  appointments: {
+    today: number;
+    week: number;
+    month: number;
+    cancelled_month: number;
+    upcoming_7_days: number;
+    busiest_hour: number | null;
+    daily_activity: {
+      date: string;
+      count: number;
+    }[];
+  } | null;
+};
+
+type BillingSetupPayload = {
+  error:
+    | "subscription_setup_required"
+    | "subscription_pending_owner_activation";
+  message: string;
+  membership_role:
+    | "owner"
+    | "manager"
+    | "staff"
+    | null;
+  subscription: NonNullable<
+    AnalyticsResponse["subscription"]
+  >;
+  business: {
+    id: string;
+    name: string;
+    dashboard_modules: DashboardModule[];
+  };
 };
 
 class AnalyticsRequestError extends Error {
   status: number;
+  payload: Record<string, unknown> | null;
 
-  constructor(status: number, message: string) {
+  constructor(
+    status: number,
+    message: string,
+    payload: Record<string, unknown> | null = null,
+  ) {
     super(message);
     this.status = status;
+    this.payload = payload;
   }
 }
 
@@ -1977,15 +2754,23 @@ async function fetchAnalytics(
 
   if (!response.ok) {
     let message = `Analytics request failed: ${response.status}`;
+    let payload: Record<string, unknown> | null = null;
 
     try {
-      const payload = await response.json();
-      message = payload.error ?? message;
+      payload = await response.json();
+      message =
+        typeof payload?.error === "string"
+          ? payload.error
+          : message;
     } catch {
       // Keep the fallback message.
     }
 
-    throw new AnalyticsRequestError(response.status, message);
+    throw new AnalyticsRequestError(
+      response.status,
+      message,
+      payload,
+    );
   }
 
   return response.json();
@@ -1995,6 +2780,24 @@ const numberFormatter = new Intl.NumberFormat("el-GR");
 const percentFormatter = new Intl.NumberFormat("el-GR", {
   maximumFractionDigits: 1,
 });
+
+function formatMoney(
+  cents: number,
+  currency = "EUR",
+) {
+  return new Intl.NumberFormat("el-GR", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+}
+
+function intervalLabel(months: number) {
+  if (months === 1) return "Κάθε μήνα";
+  if (months === 3) return "Κάθε 3 μήνες";
+  if (months === 6) return "Κάθε 6 μήνες";
+  if (months === 12) return "Κάθε χρόνο";
+  return `Κάθε ${months} μήνες`;
+}
 
 function formatEventName(eventName: string) {
   const names: Record<string, string> = {
@@ -2197,12 +3000,12 @@ function DashboardChart({ data }: { data: DailyActivity[] }) {
 
             <div className="mt-3 space-y-1 text-[10px] text-white/65">
               <p className="flex justify-between gap-4">
-                <span>Menu opens</span>
+                <span>Ανοίγματα μενού</span>
                 <strong className="text-white">{activeItem.menu}</strong>
               </p>
 
               <p className="flex justify-between gap-4">
-                <span>Review clicks</span>
+                <span>Κλικ για κριτική</span>
                 <strong className="text-white">{activeItem.reviews}</strong>
               </p>
             </div>
@@ -2339,7 +3142,7 @@ function BusinessHealth({
       active: menuActive,
     },
     {
-      label: "Analytics tracking",
+      label: "Παρακολούθηση στατιστικών",
       active: trackingActive,
     },
     {
@@ -2347,7 +3150,7 @@ function BusinessHealth({
       active: nfcOrQrActive,
     },
     {
-      label: `${sevenDayReviewClicks} review clicks / 7 ημέρες`,
+      label: `${sevenDayReviewClicks} κλικ για κριτική / 7 ημέρες`,
       active: sevenDayReviewClicks > 0,
     },
   ];
@@ -2463,6 +3266,18 @@ function AnalyticsTab({
 }: {
   analytics: AnalyticsResponse;
 }) {
+  const enabledModules =
+    analytics.business.dashboard_modules ?? [];
+
+  const menuEnabled =
+    enabledModules.includes("menu");
+  const reviewsEnabled =
+    enabledModules.includes("reviews");
+  const nfcEnabled =
+    enabledModules.includes("nfc");
+  const appointmentsEnabled =
+    enabledModules.includes("appointments");
+
   const totalSources =
     analytics.sources.nfc +
     analytics.sources.qr +
@@ -2475,11 +3290,11 @@ function AnalyticsTab({
       value: analytics.sources.nfc,
     },
     {
-      label: "QR code",
+      label: "QR",
       value: analytics.sources.qr,
     },
     {
-      label: "Direct",
+      label: "Άμεση επίσκεψη",
       value: analytics.sources.direct,
     },
     {
@@ -2488,16 +3303,80 @@ function AnalyticsTab({
     },
   ];
 
+  const useAppointmentChart =
+    appointmentsEnabled &&
+    !menuEnabled &&
+    !nfcEnabled &&
+    Boolean(
+      analytics.appointments
+        ?.daily_activity,
+    );
+
+  const chartData =
+    useAppointmentChart &&
+    analytics.appointments
+      ? analytics.appointments.daily_activity.map(
+          (item) => ({
+            date: item.date,
+            value: item.count,
+          }),
+        )
+      : analytics.daily_activity.map(
+          (item) => ({
+            date: item.date,
+            value: item.page_views,
+          }),
+        );
+
   const maxDailyViews = Math.max(
-    ...analytics.daily_activity.map(
-      (item) => item.page_views,
+    ...chartData.map(
+      (item) => item.value,
     ),
     1,
   );
 
+  const contextualMetric = (() => {
+    if (
+      appointmentsEnabled &&
+      analytics.appointments
+    ) {
+      return {
+        label: "Ραντεβού εβδομάδας",
+        value: analytics.appointments.week,
+        note: `${analytics.appointments.upcoming_7_days} επόμενες 7 ημέρες`,
+      };
+    }
+
+    if (menuEnabled) {
+      return {
+        label: "Conversion μενού",
+        value: `${percentFormatter.format(
+          analytics.totals.menu_conversion_rate,
+        )}%`,
+        note: `${analytics.totals.menu_opens_today} ανοίγματα σήμερα`,
+      };
+    }
+
+    if (reviewsEnabled) {
+      return {
+        label: "Conversion κριτικών",
+        value: `${percentFormatter.format(
+          analytics.totals.review_conversion_rate,
+        )}%`,
+        note: `${analytics.totals.review_clicks_today} κλικ σήμερα`,
+      };
+    }
+
+    return {
+      label: "Μοναδικοί επισκέπτες",
+      value:
+        analytics.totals.unique_visitors_month,
+      note: "Τρέχων μήνας",
+    };
+  })();
+
   return (
     <div className="space-y-6">
-      {/* Κεντρικές μετρήσεις */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           {
@@ -2518,18 +3397,7 @@ function AnalyticsTab({
               analytics.totals.page_views_month,
             note: `${analytics.totals.unique_visitors_month} μοναδικοί`,
           },
-          {
-            label: "Συνολικό conversion",
-            value: `${percentFormatter.format(
-              Math.max(
-                analytics.totals
-                  .menu_conversion_rate,
-                analytics.totals
-                  .review_conversion_rate,
-              ),
-            )}%`,
-            note: "Καλύτερη σημερινή ενέργεια",
-          },
+          contextualMetric,
         ].map((item, index) => (
           <article
             key={item.label}
@@ -2570,34 +3438,43 @@ function AnalyticsTab({
         ))}
       </section>
 
-      {/* Γράφημα + πηγές */}
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-8">
+      <section className={`grid grid-cols-1 gap-6 ${
+        nfcEnabled
+          ? "xl:grid-cols-12"
+          : ""
+      }`}>
+        <article className={`rounded-[22px] border border-black/10 bg-white p-6 md:p-8 ${
+          nfcEnabled
+            ? "xl:col-span-8"
+            : ""
+        }`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Activity
+                Δραστηριότητα
               </p>
 
               <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-                Επισκέψεις τελευταίων 7 ημερών
+                {useAppointmentChart
+                  ? "Ραντεβού τελευταίων 7 ημερών"
+                  : "Επισκέψεις τελευταίων 7 ημερών"}
               </h2>
             </div>
 
             <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/40">
-              Live data
+              Live δεδομένα
             </span>
           </div>
 
           <div className="mt-10 flex h-[280px] items-end gap-3 md:gap-5">
-            {analytics.daily_activity.map(
+            {chartData.map(
               (item) => {
                 const height =
-                  item.page_views === 0
+                  item.value === 0
                     ? 4
                     : Math.max(
                         12,
-                        (item.page_views /
+                        (item.value /
                           maxDailyViews) *
                           100,
                       );
@@ -2608,7 +3485,7 @@ function AnalyticsTab({
                     className="flex min-w-0 flex-1 flex-col items-center justify-end"
                   >
                     <span className="mb-3 text-[10px] font-bold text-[#222]/40">
-                      {item.page_views}
+                      {item.value}
                     </span>
 
                     <div className="flex h-[210px] w-full items-end rounded-[8px] bg-[#F1F1EF]">
@@ -2641,134 +3518,214 @@ function AnalyticsTab({
           </div>
         </article>
 
-        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-4">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Traffic sources
-          </p>
+        {nfcEnabled && (
+          <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8 xl:col-span-4">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Πηγές επισκεψιμότητας
+            </p>
 
-          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-            Από πού έρχονται
-          </h2>
+            <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+              Από πού έρχονται
+            </h2>
 
-          <div className="mt-8 space-y-6">
-            {sourceItems.map((source) => {
-              const percentage =
-                totalSources > 0
-                  ? (source.value /
-                      totalSources) *
-                    100
-                  : 0;
+            <div className="mt-8 space-y-6">
+              {sourceItems.map((source) => {
+                const percentage =
+                  totalSources > 0
+                    ? (source.value /
+                        totalSources) *
+                      100
+                    : 0;
 
-              return (
-                <div key={source.label}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-bold">
-                      {source.label}
-                    </span>
+                return (
+                  <div key={source.label}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] font-bold">
+                        {source.label}
+                      </span>
 
-                    <span className="text-[11px] font-bold text-[#222]/40">
-                      {numberFormatter.format(
-                        source.value,
-                      )}{" "}
-                      ·{" "}
-                      {percentFormatter.format(
-                        percentage,
-                      )}
-                      %
-                    </span>
+                      <span className="text-[11px] font-bold text-[#222]/40">
+                        {numberFormatter.format(
+                          source.value,
+                        )}{" "}
+                        ·{" "}
+                        {percentFormatter.format(
+                          percentage,
+                        )}
+                        %
+                      </span>
+                    </div>
+
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#EEEEEC]">
+                      <div
+                        className="h-full rounded-full bg-[#DC2727] transition-all duration-500"
+                        style={{
+                          width: `${percentage}%`,
+                        }}
+                      />
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </article>
+        )}
+      </section>
 
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#EEEEEC]">
-                    <div
-                      className="h-full rounded-full bg-[#DC2727] transition-all duration-500"
-                      style={{
-                        width: `${percentage}%`,
-                      }}
-                    />
-                  </div>
+      {(menuEnabled || reviewsEnabled) && (
+        <section className={`grid grid-cols-1 gap-6 ${
+          menuEnabled && reviewsEnabled
+            ? "md:grid-cols-2"
+            : ""
+        }`}>
+          {menuEnabled && (
+            <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Conversion μενού
+              </p>
+
+              <div className="mt-6 flex items-end justify-between gap-4">
+                <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
+                  {percentFormatter.format(
+                    analytics.totals
+                      .menu_conversion_rate,
+                  )}
+                  %
+                </p>
+
+                <p className="text-right text-[11px] leading-relaxed text-[#222]/40">
+                  {
+                    analytics.totals
+                      .menu_opens_today
+                  }{" "}
+                  ανοίγματα σήμερα
+                </p>
+              </div>
+
+              <div className="mt-8 h-3 overflow-hidden rounded-full bg-[#EEEEEC]">
+                <div
+                  className="h-full rounded-full bg-[#222]"
+                  style={{
+                    width: `${Math.min(
+                      analytics.totals
+                        .menu_conversion_rate,
+                      100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </article>
+          )}
+
+          {reviewsEnabled && (
+            <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
+                Conversion κριτικών
+              </p>
+
+              <div className="mt-6 flex items-end justify-between gap-4">
+                <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
+                  {percentFormatter.format(
+                    analytics.totals
+                      .review_conversion_rate,
+                  )}
+                  %
+                </p>
+
+                <p className="text-right text-[11px] leading-relaxed text-white/55">
+                  {
+                    analytics.totals
+                      .review_clicks_today
+                  }{" "}
+                  κλικ σήμερα
+                </p>
+              </div>
+
+              <div className="mt-8 h-3 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-white"
+                  style={{
+                    width: `${Math.min(
+                      analytics.totals
+                        .review_conversion_rate,
+                      100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </article>
+          )}
+        </section>
+      )}
+
+      {appointmentsEnabled &&
+        analytics.appointments && (
+          <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                  Ραντεβού
+                </p>
+                <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+                  Απόδοση προγράμματος
+                </h2>
+              </div>
+
+              <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/45">
+                Πραγματικά δεδομένα
+              </span>
+            </div>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                {
+                  label: "Σήμερα",
+                  value:
+                    analytics.appointments.today,
+                },
+                {
+                  label: "Αυτή την εβδομάδα",
+                  value:
+                    analytics.appointments.week,
+                },
+                {
+                  label: "Αυτόν τον μήνα",
+                  value:
+                    analytics.appointments.month,
+                },
+                {
+                  label: "Ακυρώσεις μήνα",
+                  value:
+                    analytics.appointments
+                      .cancelled_month,
+                },
+                {
+                  label: "Δημοφιλέστερη ώρα",
+                  value:
+                    analytics.appointments
+                      .busiest_hour === null
+                      ? "—"
+                      : `${String(
+                          analytics.appointments
+                            .busiest_hour,
+                        ).padStart(2, "0")}:00`,
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[18px] bg-[#F6F6F4] p-5"
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/35">
+                    {item.label}
+                  </p>
+                  <p className="mt-4 text-[30px] font-black tracking-[-0.04em]">
+                    {item.value}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        </article>
-      </section>
-
-      {/* Conversions */}
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <article className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-            Menu conversion
-          </p>
-
-          <div className="mt-6 flex items-end justify-between gap-4">
-            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-              {percentFormatter.format(
-                analytics.totals
-                  .menu_conversion_rate,
-              )}
-              %
-            </p>
-
-            <p className="text-right text-[11px] leading-relaxed text-[#222]/40">
-              {
-                analytics.totals
-                  .menu_opens_today
-              }{" "}
-              ανοίγματα σήμερα
-            </p>
-          </div>
-
-          <div className="mt-8 h-3 overflow-hidden rounded-full bg-[#EEEEEC]">
-            <div
-              className="h-full rounded-full bg-[#222]"
-              style={{
-                width: `${Math.min(
-                  analytics.totals
-                    .menu_conversion_rate,
-                  100,
-                )}%`,
-              }}
-            />
-          </div>
-        </article>
-
-        <article className="rounded-[22px] border border-black/10 bg-[#DC2727] p-6 text-white md:p-8">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">
-            Review conversion
-          </p>
-
-          <div className="mt-6 flex items-end justify-between gap-4">
-            <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-              {percentFormatter.format(
-                analytics.totals
-                  .review_conversion_rate,
-              )}
-              %
-            </p>
-
-            <p className="text-right text-[11px] leading-relaxed text-white/55">
-              {
-                analytics.totals
-                  .review_clicks_today
-              }{" "}
-              clicks σήμερα
-            </p>
-          </div>
-
-          <div className="mt-8 h-3 overflow-hidden rounded-full bg-white/20">
-            <div
-              className="h-full rounded-full bg-white"
-              style={{
-                width: `${Math.min(
-                  analytics.totals
-                    .review_conversion_rate,
-                  100,
-                )}%`,
-              }}
-            />
-          </div>
-        </article>
-      </section>
+              ))}
+            </div>
+          </section>
+        )}
 
       <RecentActivity
         events={analytics.recent_activity}
@@ -2835,7 +3792,7 @@ function ReviewsTab({
         {[
           {
             label:
-              "Review clicks σήμερα",
+              "Κλικ για κριτική σήμερα",
             value:
               analytics.totals
                 .review_clicks_today,
@@ -2917,7 +3874,7 @@ function ReviewsTab({
               </p>
 
               <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-                Review clicks τελευταίων 7 ημερών
+                Κλικ για κριτική τελευταίων 7 ημερών
               </h2>
             </div>
 
@@ -3466,37 +4423,1533 @@ function SettingsTab({
   analytics,
   userEmail,
   onLogout,
+  onAnalyticsChange,
+  onSubscriptionBlocked,
 }: {
   analytics: AnalyticsResponse;
   userEmail: string;
   onLogout: () => Promise<void>;
+  onAnalyticsChange: (
+    analytics: AnalyticsResponse,
+  ) => void;
+  onSubscriptionBlocked: (
+    reason: "cancelled" | "payment",
+  ) => void;
 }) {
+  const [
+    centerTab,
+    setCenterTab,
+  ] = useState<
+    "profile" | "account" | "subscription"
+  >(() => {
+    if (typeof window === "undefined") {
+      return "profile";
+    }
+
+    const rawHash =
+      window.location.hash.replace(/^#/, "");
+    const [, search = ""] =
+      rawHash.split("?");
+
+    return new URLSearchParams(
+      search,
+    ).get("settings") ===
+      "subscription"
+      ? "subscription"
+      : "profile";
+  });
+
   const [newPassword, setNewPassword] =
     useState("");
-
-  const [confirmPassword, setConfirmPassword] =
-    useState("");
-
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState("");
   const [showPassword, setShowPassword] =
     useState(false);
-
-  const [savingPassword, setSavingPassword] =
-    useState(false);
-
+  const [
+    savingPassword,
+    setSavingPassword,
+  ] = useState(false);
   const [passwordError, setPasswordError] =
     useState("");
+  const [
+    passwordSuccess,
+    setPasswordSuccess,
+  ] = useState("");
 
-  const [passwordSuccess, setPasswordSuccess] =
-    useState("");
+  const [
+    uploadingAvatar,
+    setUploadingAvatar,
+  ] = useState(false);
+  const [
+    avatarError,
+    setAvatarError,
+  ] = useState("");
+
+  const [
+    avatarCrop,
+    setAvatarCrop,
+  ] = useState<{
+    file: File;
+    url: string;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [avatarZoom, setAvatarZoom] =
+    useState(1);
+  const [
+    avatarOffset,
+    setAvatarOffset,
+  ] = useState({ x: 0, y: 0 });
+  const avatarDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+
+  const AVATAR_CROP_SIZE = 300;
+
+  useEffect(() => {
+    return () => {
+      if (avatarCrop?.url) {
+        URL.revokeObjectURL(
+          avatarCrop.url,
+        );
+      }
+    };
+  }, [avatarCrop?.url]);
+
+  const [
+    managingSubscription,
+    setManagingSubscription,
+  ] = useState(false);
+  const [
+    openingBillingPortal,
+    setOpeningBillingPortal,
+  ] = useState(false);
+  const [
+    subscriptionError,
+    setSubscriptionError,
+  ] = useState("");
+  const [
+    invoicePreviewHtml,
+    setInvoicePreviewHtml,
+  ] = useState<string | null>(null);
+
+  const [
+    billingDocuments,
+    setBillingDocuments,
+  ] = useState<
+    Array<{
+      id: string;
+      document_type: string;
+      status: string;
+      source: string;
+      currency: string;
+      subtotal_cents: number;
+      vat_cents: number;
+      total_cents: number;
+      document_number:
+        | string
+        | null;
+      stripe_invoice_id:
+        | string
+        | null;
+      provider_name:
+        | string
+        | null;
+      provider_document_id:
+        | string
+        | null;
+      provider_mark:
+        | string
+        | null;
+      provider_uid:
+        | string
+        | null;
+      hosted_url:
+        | string
+        | null;
+      pdf_url:
+        | string
+        | null;
+      issued_at:
+        | string
+        | null;
+      due_at:
+        | string
+        | null;
+      paid_at:
+        | string
+        | null;
+      period_start:
+        | string
+        | null;
+      period_end:
+        | string
+        | null;
+      created_at: string;
+    }>
+  >([]);
+  const [
+    loadingBillingHistory,
+    setLoadingBillingHistory,
+  ] = useState(false);
+  const [
+    billingHistoryError,
+    setBillingHistoryError,
+  ] = useState("");
+
+
+  const [
+    billingIssuerProfile,
+    setBillingIssuerProfile,
+  ] = useState({
+    legal_name: "",
+    trade_name: "Zisto",
+    tax_id: "",
+    tax_country: "GR",
+    tax_office: "",
+    activity: "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    region: "",
+    postal_code: "",
+    country_code: "GR",
+    invoice_provider:
+      "unconfigured",
+    provider_account_id: "",
+    live_billing_enabled:
+      false,
+  });
+
+  const [
+    billingProfile,
+    setBillingProfile,
+  ] = useState({
+    customer_type: "business",
+    legal_name: "",
+    trade_name: "",
+    tax_id: "",
+    tax_country: "GR",
+    tax_office: "",
+    activity: "",
+    invoice_email:
+      userEmail ?? "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    region: "",
+    postal_code: "",
+    country_code: "GR",
+  });
+  const [
+    loadingBillingProfile,
+    setLoadingBillingProfile,
+  ] = useState(false);
+  const [
+    savingBillingProfile,
+    setSavingBillingProfile,
+  ] = useState(false);
+  const [
+    editingBillingProfile,
+    setEditingBillingProfile,
+  ] = useState(false);
+  const [
+    billingProfileError,
+    setBillingProfileError,
+  ] = useState("");
+  const [
+    billingProfileSuccess,
+    setBillingProfileSuccess,
+  ] = useState("");
+
+
 
   const roleLabels: Record<string, string> = {
     owner: "Ιδιοκτήτης",
-    manager: "Manager",
+    manager: "Διαχειριστής",
     staff: "Προσωπικό",
   };
 
   const membershipRole =
     analytics.membership_role ?? "staff";
+
+  const subscription =
+    analytics.subscription;
+
+  useEffect(() => {
+    if (
+      centerTab !== "subscription" ||
+      membershipRole !== "owner"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadBillingHistory() {
+      setBillingHistoryError("");
+
+      try {
+        setLoadingBillingHistory(
+          true,
+        );
+
+        const {
+          data: { session },
+        } =
+          await supabase.auth.getSession();
+
+        if (!session) {
+          window.location.hash =
+            "/login";
+          return;
+        }
+
+        const response =
+          await fetch(
+            `/api/analytics?business_id=${encodeURIComponent(
+              analytics.business_id,
+            )}&view=billing-history`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${session.access_token}`,
+              },
+              cache: "no-store",
+            },
+          );
+
+        const result =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Δεν ήταν δυνατή η φόρτωση του ιστορικού πληρωμών.",
+          );
+        }
+
+        if (!cancelled) {
+          setBillingDocuments(
+            Array.isArray(
+              result.documents,
+            )
+              ? result.documents
+              : [],
+          );
+
+          if (
+            result.billing_profile
+          ) {
+            const profile =
+              result.billing_profile;
+
+            setBillingProfile(
+              (current) => ({
+                ...current,
+                customer_type:
+                  profile.customer_type ??
+                  current.customer_type,
+                legal_name:
+                  profile.legal_name ??
+                  "",
+                trade_name:
+                  profile.trade_name ??
+                  "",
+                tax_id:
+                  profile.tax_id ?? "",
+                tax_country:
+                  profile.tax_country ??
+                  "GR",
+                tax_office:
+                  profile.tax_office ??
+                  "",
+                activity:
+                  profile.activity ??
+                  "",
+                invoice_email:
+                  profile.invoice_email ??
+                  "",
+                address_line1:
+                  profile.address_line1 ??
+                  "",
+                address_line2:
+                  profile.address_line2 ??
+                  "",
+                city:
+                  profile.city ?? "",
+                region:
+                  profile.region ?? "",
+                postal_code:
+                  profile.postal_code ??
+                  "",
+                country_code:
+                  profile.country_code ??
+                  "GR",
+              }),
+            );
+          }
+
+          if (
+            result.issuer_profile
+          ) {
+            const issuer =
+              result.issuer_profile;
+
+            setBillingIssuerProfile(
+              (current) => ({
+                ...current,
+                legal_name:
+                  issuer.legal_name ??
+                  "",
+                trade_name:
+                  issuer.trade_name ??
+                  "Zisto",
+                tax_id:
+                  issuer.tax_id ?? "",
+                tax_country:
+                  issuer.tax_country ??
+                  "GR",
+                tax_office:
+                  issuer.tax_office ??
+                  "",
+                activity:
+                  issuer.activity ?? "",
+                address_line1:
+                  issuer.address_line1 ??
+                  "",
+                address_line2:
+                  issuer.address_line2 ??
+                  "",
+                city:
+                  issuer.city ?? "",
+                region:
+                  issuer.region ?? "",
+                postal_code:
+                  issuer.postal_code ??
+                  "",
+                country_code:
+                  issuer.country_code ??
+                  "GR",
+                invoice_provider:
+                  issuer.invoice_provider ??
+                  "unconfigured",
+                provider_account_id:
+                  issuer.provider_account_id ??
+                  "",
+                live_billing_enabled:
+                  Boolean(
+                    issuer.live_billing_enabled,
+                  ),
+              }),
+            );
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBillingHistoryError(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η φόρτωση του ιστορικού πληρωμών.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingBillingHistory(
+            false,
+          );
+        }
+      }
+    }
+
+    void loadBillingHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    centerTab,
+    analytics.business_id,
+    membershipRole,
+  ]);
+
+
+  useEffect(() => {
+    if (
+      centerTab !== "account" ||
+      membershipRole !== "owner"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadBillingProfile() {
+      setBillingProfileError("");
+      setBillingProfileSuccess("");
+
+      try {
+        setLoadingBillingProfile(
+          true,
+        );
+
+        const {
+          data: { session },
+        } =
+          await supabase.auth.getSession();
+
+        if (!session) {
+          window.location.hash =
+            "/login";
+          return;
+        }
+
+        const response =
+          await fetch(
+            `/api/analytics?business_id=${encodeURIComponent(
+              analytics.business_id,
+            )}&view=billing-profile`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${session.access_token}`,
+              },
+            },
+          );
+
+        const result =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Δεν ήταν δυνατή η φόρτωση των στοιχείων τιμολόγησης.",
+          );
+        }
+
+        if (
+          !cancelled &&
+          result.billing_profile
+        ) {
+          const profile =
+            result.billing_profile;
+
+          setBillingProfile({
+            customer_type:
+              profile.customer_type ??
+              "business",
+            legal_name:
+              profile.legal_name ??
+              "",
+            trade_name:
+              profile.trade_name ??
+              "",
+            tax_id:
+              profile.tax_id ?? "",
+            tax_country:
+              profile.tax_country ??
+              "GR",
+            tax_office:
+              profile.tax_office ??
+              "",
+            activity:
+              profile.activity ??
+              "",
+            invoice_email:
+              profile.invoice_email ??
+              userEmail ??
+              "",
+            address_line1:
+              profile.address_line1 ??
+              "",
+            address_line2:
+              profile.address_line2 ??
+              "",
+            city:
+              profile.city ?? "",
+            region:
+              profile.region ?? "",
+            postal_code:
+              profile.postal_code ??
+              "",
+            country_code:
+              profile.country_code ??
+              "GR",
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBillingProfileError(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η φόρτωση των στοιχείων τιμολόγησης.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingBillingProfile(
+            false,
+          );
+        }
+      }
+    }
+
+    void loadBillingProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    centerTab,
+    analytics.business_id,
+    membershipRole,
+    userEmail,
+  ]);
+
+  async function saveBillingProfile(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    setBillingProfileError("");
+    setBillingProfileSuccess("");
+
+    try {
+      setSavingBillingProfile(
+        true,
+      );
+
+      const {
+        data: { session },
+      } =
+        await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash =
+          "/login";
+        return;
+      }
+
+      const response =
+        await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            analytics.business_id,
+          )}&view=billing-profile`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(
+              billingProfile,
+            ),
+          },
+        );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η αποθήκευση.",
+        );
+      }
+
+      if (result.billing_profile) {
+        const profile =
+          result.billing_profile;
+
+        setBillingProfile(
+          (current) => ({
+            ...current,
+            customer_type:
+              profile.customer_type ??
+              current.customer_type,
+            legal_name:
+              profile.legal_name ??
+              "",
+            trade_name:
+              profile.trade_name ??
+              "",
+            tax_id:
+              profile.tax_id ?? "",
+            tax_country:
+              profile.tax_country ??
+              "GR",
+            tax_office:
+              profile.tax_office ??
+              "",
+            activity:
+              profile.activity ??
+              "",
+            invoice_email:
+              profile.invoice_email ??
+              "",
+            address_line1:
+              profile.address_line1 ??
+              "",
+            address_line2:
+              profile.address_line2 ??
+              "",
+            city:
+              profile.city ?? "",
+            region:
+              profile.region ?? "",
+            postal_code:
+              profile.postal_code ??
+              "",
+            country_code:
+              profile.country_code ??
+              "GR",
+          }),
+        );
+      }
+
+      setBillingProfileSuccess(
+        "Τα στοιχεία τιμολόγησης αποθηκεύτηκαν.",
+      );
+      setEditingBillingProfile(false);
+    } catch (error) {
+      setBillingProfileError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η αποθήκευση.",
+      );
+    } finally {
+      setSavingBillingProfile(
+        false,
+      );
+    }
+  }
+
+
+
+  function formatMoney(
+    cents: number,
+    currency = "EUR",
+  ) {
+    return new Intl.NumberFormat("el-GR", {
+      style: "currency",
+      currency,
+    }).format(cents / 100);
+  }
+
+  function formatDate(
+    value: string | null,
+  ) {
+    if (!value) {
+      return "—";
+    }
+
+    return new Intl.DateTimeFormat("el-GR", {
+      dateStyle: "long",
+    }).format(new Date(value));
+  }
+
+  function escapeInvoiceHtml(
+    value:
+      | string
+      | number
+      | null
+      | undefined,
+  ) {
+    return String(
+      value ?? "",
+    )
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function openZistoInvoice(
+    document: {
+      id: string;
+      status: string;
+      currency: string;
+      subtotal_cents: number;
+      vat_cents: number;
+      total_cents: number;
+      document_number:
+        | string
+        | null;
+      provider_mark:
+        | string
+        | null;
+      provider_uid:
+        | string
+        | null;
+      provider_name?:
+        | string
+        | null;
+      provider_document_id?:
+        | string
+        | null;
+      metadata?: {
+        provider_qr_url?: string | null;
+        provider_qr_image_url?: string | null;
+        provider_auth_string?: string | null;
+        provider_software_license?: string | null;
+        provider_website?: string | null;
+        [key: string]: unknown;
+      } | null;
+      issued_at:
+        | string
+        | null;
+      paid_at:
+        | string
+        | null;
+      period_start:
+        | string
+        | null;
+      period_end:
+        | string
+        | null;
+      created_at: string;
+      pdf_url:
+        | string
+        | null;
+    },
+  ) {
+    const providerQrUrl =
+      (document.metadata
+        ?.provider_qr_image_url as
+        | string
+        | null
+        | undefined) ||
+      (document.metadata
+        ?.provider_qr_url as
+        | string
+        | null
+        | undefined) ||
+      "";
+
+    const providerAuthString =
+      (document.metadata
+        ?.provider_auth_string as
+        | string
+        | null
+        | undefined) ||
+      "";
+
+    const providerSoftwareLicense =
+      (document.metadata
+        ?.provider_software_license as
+        | string
+        | null
+        | undefined) ||
+      "";
+
+    const providerWebsite =
+      (document.metadata
+        ?.provider_website as
+        | string
+        | null
+        | undefined) ||
+      "";
+
+    const isFiscalDocument =
+      billingIssuerProfile
+        .live_billing_enabled &&
+      billingIssuerProfile
+        .invoice_provider !==
+        "unconfigured" &&
+      Boolean(
+        document.provider_mark &&
+          document.provider_document_id &&
+          providerQrUrl &&
+          providerAuthString,
+      );
+
+    const issuerName =
+      billingIssuerProfile
+        .legal_name ||
+      billingIssuerProfile
+        .trade_name ||
+      "Zisto";
+
+    const customerName =
+      billingProfile.legal_name ||
+      billingProfile.trade_name ||
+      analytics.business.name;
+
+    const customerAddress = [
+      billingProfile.address_line1,
+      billingProfile.address_line2,
+      billingProfile.city,
+      billingProfile.region,
+      billingProfile.postal_code,
+      billingProfile.country_code,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const issuerAddress = [
+      billingIssuerProfile
+        .address_line1,
+      billingIssuerProfile
+        .address_line2,
+      billingIssuerProfile.city,
+      billingIssuerProfile.region,
+      billingIssuerProfile
+        .postal_code,
+      billingIssuerProfile
+        .country_code,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const vatRate =
+      subscription?.vat_rate ??
+      0;
+
+    const statusLabel =
+      document.status === "paid"
+        ? "ΠΛΗΡΩΘΗΚΕ"
+        : document.status === "open"
+          ? "ΕΚΚΡΕΜΕΙ"
+          : document.status.toUpperCase();
+
+    const warningHtml =
+      isFiscalDocument
+        ? ""
+        : `
+          <div class="warning">
+            ΠΡΟΕΠΙΣΚΟΠΗΣΗ — ΔΕΝ ΑΠΟΤΕΛΕΙ ΦΟΡΟΛΟΓΙΚΟ ΠΑΡΑΣΤΑΤΙΚΟ
+          </div>
+        `;
+
+    const issuedAtValue =
+      document.issued_at ??
+      document.created_at;
+
+    const issuedTime =
+      new Intl.DateTimeFormat(
+        "el-GR",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        },
+      ).format(
+        new Date(issuedAtValue),
+      );
+
+    const fiscalHtml =
+      isFiscalDocument
+        ? `
+          <section class="provider-proof">
+            <div class="provider-proof-copy">
+              <div class="eyebrow">Στοιχεία ηλεκτρονικής έκδοσης</div>
+              <div class="proof-grid">
+                <div><span>MARK</span><strong>${escapeInvoiceHtml(
+                  document.provider_mark,
+                )}</strong></div>
+                <div><span>Αναγνωριστικό</span><strong>${escapeInvoiceHtml(
+                  document.provider_document_id,
+                )}</strong></div>
+                <div><span>UID</span><strong>${escapeInvoiceHtml(
+                  document.provider_uid || "—",
+                )}</strong></div>
+                <div><span>Ώρα έκδοσης</span><strong>${escapeInvoiceHtml(
+                  issuedTime,
+                )}</strong></div>
+                <div><span>Πάροχος</span><strong>${escapeInvoiceHtml(
+                  document.provider_name ||
+                    billingIssuerProfile.invoice_provider,
+                )}</strong></div>
+                <div><span>Άδεια λογισμικού ΥΠΑΗΕΣ</span><strong>${escapeInvoiceHtml(
+                  providerSoftwareLicense || "—",
+                )}</strong></div>
+              </div>
+              <div class="auth-string">
+                <span>Συμβολοσειρά αυθεντικοποίησης</span>
+                <code>${escapeInvoiceHtml(
+                  providerAuthString,
+                )}</code>
+              </div>
+              ${
+                providerWebsite
+                  ? `<a class="provider-site" href="${escapeInvoiceHtml(
+                      providerWebsite,
+                    )}" target="_blank" rel="noreferrer">Website παρόχου</a>`
+                  : ""
+              }
+            </div>
+            <div class="provider-qr">
+              <img
+                src="${escapeInvoiceHtml(
+                  providerQrUrl,
+                )}"
+                alt="QR επαλήθευσης ηλεκτρονικού τιμολογίου"
+              />
+              <span>Σάρωση για επαλήθευση</span>
+            </div>
+          </section>
+        `
+        : "";
+    
+    const stripeReference =
+      document.pdf_url
+        ? `
+          <a class="stripe-link" href="${escapeInvoiceHtml(
+            document.pdf_url,
+          )}" target="_blank" rel="noreferrer">
+            Stripe payment document
+          </a>
+        `
+        : "";
+
+    const html = `
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>${escapeInvoiceHtml(
+      document.document_number ??
+        "Zisto Invoice",
+    )}</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #efefed;
+    color: #222;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(239,239,237,.96);
+    border-bottom: 1px solid rgba(0,0,0,.08);
+  }
+  .toolbar button {
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 20px;
+    background: #222;
+    color: white;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .sheet {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 24px auto;
+    background: white;
+    padding: 18mm 17mm;
+    box-shadow: 0 24px 80px rgba(0,0,0,.12);
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    gap: 30px;
+    align-items: flex-start;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+  }
+  .logo-image {
+    display: block;
+    height: 30px;
+    width: auto;
+  }
+  .doc-meta { text-align: right; }
+  .eyebrow {
+    font-size: 9px;
+    letter-spacing: .18em;
+    font-weight: 800;
+    color: #DC2727;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 8px 0 0;
+    font-size: 28px;
+    letter-spacing: -1px;
+  }
+  .doc-number {
+    margin-top: 8px;
+    color: #777;
+    font-size: 12px;
+  }
+  .doc-detail {
+    margin-top: 7px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    color: #777;
+    font-size: 9px;
+  }
+  .provider-proof {
+    margin-top: 14mm;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 1fr 112px;
+    gap: 16px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+  }
+  .proof-grid {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px 18px;
+  }
+  .proof-grid div {
+    min-width: 0;
+  }
+  .proof-grid span,
+  .auth-string span {
+    display: block;
+    margin-bottom: 3px;
+    color: #888;
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .proof-grid strong {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: 9px;
+  }
+  .auth-string {
+    margin-top: 12px;
+  }
+  .auth-string code {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: 8px;
+    line-height: 1.45;
+  }
+  .provider-site {
+    display: inline-block;
+    margin-top: 10px;
+    color: #555;
+    font-size: 9px;
+    text-decoration: underline;
+  }
+  .provider-qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+  .provider-qr img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+  }
+  .provider-qr span {
+    color: #777;
+    font-size: 8px;
+    text-align: center;
+  }
+  .warning {
+    margin-top: 24px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff3f3;
+    color: #c52525;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-align: center;
+  }
+  .party-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14mm;
+    margin-top: 18mm;
+  }
+  .party {
+    border-top: 1px solid #ddd;
+    padding-top: 12px;
+  }
+  .party h2 {
+    margin: 8px 0 10px;
+    font-size: 15px;
+  }
+  .line {
+    margin: 5px 0;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #555;
+  }
+  .line strong { color: #222; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 18mm;
+  }
+  th {
+    padding: 10px 8px;
+    border-bottom: 1px solid #222;
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+  td {
+    padding: 15px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 11px;
+    vertical-align: top;
+  }
+  .right { text-align: right; }
+  .summary {
+    width: 48%;
+    margin-left: auto;
+    margin-top: 14mm;
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 8px 0;
+    font-size: 11px;
+  }
+  .summary-row.total {
+    margin-top: 5px;
+    padding-top: 12px;
+    border-top: 2px solid #222;
+    font-size: 18px;
+    font-weight: 900;
+  }
+  .status {
+    margin-top: 14mm;
+    display: inline-block;
+    border-radius: 999px;
+    padding: 8px 12px;
+    background: #dff7e8;
+    color: #13763a;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .1em;
+  }
+  .footer {
+    margin-top: 22mm;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    color: #999;
+    font-size: 9px;
+  }
+  .stripe-link {
+    color: #777;
+    text-decoration: underline;
+  }
+  @media print {
+    body { background: white; }
+    .toolbar { display: none; }
+    .sheet {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      min-height: 297mm;
+    }
+    @page {
+      size: A4;
+      margin: 0;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">Εκτύπωση / Αποθήκευση PDF</button>
+  </div>
+  <main class="sheet">
+    <div class="top">
+      <div class="logo">
+        <img
+          src="${escapeInvoiceHtml(
+            new URL(
+              WORDMARK,
+              window.location.origin,
+            ).toString(),
+          )}"
+          alt="Zisto"
+          class="logo-image"
+        />
+      </div>
+      <div class="doc-meta">
+        <div class="eyebrow">Χρεώσεις Zisto</div>
+        <h1>${
+          isFiscalDocument
+            ? "Τιμολόγιο Παροχής Υπηρεσιών"
+            : "Προεπισκόπηση τιμολογίου"
+        }</h1>
+        <div class="doc-number">
+          Αρ. παραστατικού: ${escapeInvoiceHtml(
+            document.document_number ??
+              "Χωρίς αριθμό",
+          )}
+        </div>
+        <div class="doc-detail">
+          <span>Ημερομηνία έκδοσης: <b>${escapeInvoiceHtml(
+            formatDate(issuedAtValue),
+          )}</b></span>
+          <span>Ώρα: <b>${escapeInvoiceHtml(
+            issuedTime,
+          )}</b></span>
+        </div>
+      </div>
+    </div>
+
+    ${warningHtml}
+
+    <section class="party-grid">
+      <div class="party">
+        <div class="eyebrow">Εκδότης</div>
+        <h2>${escapeInvoiceHtml(
+          issuerName,
+        )}</h2>
+        <div class="line"><strong>ΑΦΜ:</strong> ${escapeInvoiceHtml(
+          billingIssuerProfile
+            .tax_id ||
+            "Δεν έχει οριστεί",
+        )}</div>
+        <div class="line"><strong>ΔΟΥ:</strong> ${escapeInvoiceHtml(
+          billingIssuerProfile
+            .tax_office ||
+            "Δεν έχει οριστεί",
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          billingIssuerProfile
+            .activity,
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          issuerAddress ||
+            "Στοιχεία εκδότη θα συμπληρωθούν με την έναρξη της εταιρείας.",
+        )}</div>
+      </div>
+
+      <div class="party">
+        <div class="eyebrow">Πελάτης</div>
+        <h2>${escapeInvoiceHtml(
+          customerName,
+        )}</h2>
+        <div class="line"><strong>ΑΦΜ:</strong> ${escapeInvoiceHtml(
+          billingProfile.tax_id ||
+            "—",
+        )}</div>
+        <div class="line"><strong>ΔΟΥ:</strong> ${escapeInvoiceHtml(
+          billingProfile
+            .tax_office || "—",
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          billingProfile.activity,
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          customerAddress,
+        )}</div>
+        <div class="line">${escapeInvoiceHtml(
+          billingProfile
+            .invoice_email,
+        )}</div>
+      </div>
+    </section>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Περιγραφή υπηρεσίας</th>
+          <th>Περίοδος παροχής</th>
+          <th class="right">Ποσ.</th>
+          <th class="right">Τιμή μονάδας</th>
+          <th class="right">ΦΠΑ</th>
+          <th class="right">Καθαρή αξία</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            Συνδρομητική υπηρεσία Zisto — ${escapeInvoiceHtml(
+              analytics.business.name,
+            )}
+          </td>
+          <td>
+            ${escapeInvoiceHtml(
+              document.period_start
+                ? formatDate(
+                    document.period_start,
+                  )
+                : "—",
+            )}
+            —
+            ${escapeInvoiceHtml(
+              document.period_end
+                ? formatDate(
+                    document.period_end,
+                  )
+                : "—",
+            )}
+          </td>
+          <td class="right">1</td>
+          <td class="right">
+            ${escapeInvoiceHtml(
+              formatMoney(
+                document.subtotal_cents,
+                document.currency,
+              ),
+            )}
+          </td>
+          <td class="right">${escapeInvoiceHtml(
+            vatRate,
+          )}%</td>
+          <td class="right">
+            ${escapeInvoiceHtml(
+              formatMoney(
+                document.subtotal_cents,
+                document.currency,
+              ),
+            )}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div class="summary-row">
+        <span>Καθαρή αξία</span>
+        <strong>${escapeInvoiceHtml(
+          formatMoney(
+            document.subtotal_cents,
+            document.currency,
+          ),
+        )}</strong>
+      </div>
+      <div class="summary-row">
+        <span>ΦΠΑ ${escapeInvoiceHtml(
+          vatRate,
+        )}%</span>
+        <strong>${escapeInvoiceHtml(
+          formatMoney(
+            document.vat_cents,
+            document.currency,
+          ),
+        )}</strong>
+      </div>
+      <div class="summary-row total">
+        <span>Σύνολο</span>
+        <span>${escapeInvoiceHtml(
+          formatMoney(
+            document.total_cents,
+            document.currency,
+          ),
+        )}</span>
+      </div>
+    </section>
+
+    <div class="status">${escapeInvoiceHtml(
+      statusLabel,
+    )}</div>
+
+    ${fiscalHtml}
+
+    <footer class="footer">
+      <span>
+        Έκδοση: ${escapeInvoiceHtml(
+          formatDate(
+            document.issued_at ??
+              document.created_at,
+          ),
+        )}
+      </span>
+      <span>
+        ${
+          document.paid_at
+            ? `Πληρωμή: ${escapeInvoiceHtml(
+                formatDate(
+                  document.paid_at,
+                ),
+              )}`
+            : ""
+        }
+      </span>
+      ${stripeReference}
+    </footer>
+  </main>
+</body>
+</html>`;
+
+    setInvoicePreviewHtml(
+      html,
+    );
+  }
+
+  function intervalLabel(months: number) {
+    if (months === 1) return "Κάθε μήνα";
+    if (months === 3)
+      return "Κάθε 3 μήνες";
+    if (months === 6)
+      return "Κάθε 6 μήνες";
+    if (months === 12)
+      return "Κάθε χρόνο";
+    return `Κάθε ${months} μήνες`;
+  }
+
+  function subscriptionAgeText(
+    startsAt: string,
+  ) {
+    const startDate =
+      new Date(startsAt);
+    const now = new Date();
+
+    const months =
+      Math.max(
+        0,
+        (now.getFullYear() -
+          startDate.getFullYear()) *
+          12 +
+          now.getMonth() -
+          startDate.getMonth(),
+      );
+
+    if (months === 0) {
+      return "Λιγότερο από 1 μήνα";
+    }
+
+    if (months === 1) {
+      return "1 μήνα";
+    }
+
+    if (months < 12) {
+      return `${months} μήνες`;
+    }
+
+    const years =
+      Math.floor(months / 12);
+    const remainingMonths =
+      months % 12;
+
+    return remainingMonths
+      ? `${years} έτ. και ${remainingMonths} μ.`
+      : `${years} έτη`;
+  }
 
   async function handlePasswordUpdate(
     event: React.FormEvent<HTMLFormElement>,
@@ -3510,7 +5963,6 @@ function SettingsTab({
       setPasswordError(
         "Ο νέος κωδικός πρέπει να περιέχει τουλάχιστον 8 χαρακτήρες.",
       );
-
       return;
     }
 
@@ -3518,7 +5970,6 @@ function SettingsTab({
       setPasswordError(
         "Οι δύο κωδικοί δεν ταιριάζουν.",
       );
-
       return;
     }
 
@@ -3536,16 +5987,10 @@ function SettingsTab({
 
       setNewPassword("");
       setConfirmPassword("");
-
       setPasswordSuccess(
         "Ο κωδικός ενημερώθηκε επιτυχώς.",
       );
     } catch (error) {
-      console.error(
-        "Password update failed:",
-        error,
-      );
-
       setPasswordError(
         error instanceof Error
           ? error.message
@@ -3556,238 +6001,1968 @@ function SettingsTab({
     }
   }
 
+  function closeAvatarCrop() {
+    setAvatarCrop(null);
+    setAvatarZoom(1);
+    setAvatarOffset({ x: 0, y: 0 });
+    avatarDragRef.current = null;
+  }
+
+  function getAvatarCropMetrics(
+    zoom = avatarZoom,
+  ) {
+    if (!avatarCrop) {
+      return null;
+    }
+
+    const baseScale = Math.max(
+      AVATAR_CROP_SIZE /
+        avatarCrop.width,
+      AVATAR_CROP_SIZE /
+        avatarCrop.height,
+    );
+
+    const scale = baseScale * zoom;
+    const displayWidth =
+      avatarCrop.width * scale;
+    const displayHeight =
+      avatarCrop.height * scale;
+
+    return {
+      scale,
+      displayWidth,
+      displayHeight,
+      maxX: Math.max(
+        0,
+        (displayWidth -
+          AVATAR_CROP_SIZE) /
+          2,
+      ),
+      maxY: Math.max(
+        0,
+        (displayHeight -
+          AVATAR_CROP_SIZE) /
+          2,
+      ),
+    };
+  }
+
+  function clampAvatarOffset(
+    x: number,
+    y: number,
+    zoom = avatarZoom,
+  ) {
+    const metrics =
+      getAvatarCropMetrics(zoom);
+
+    if (!metrics) {
+      return { x: 0, y: 0 };
+    }
+
+    return {
+      x: Math.max(
+        -metrics.maxX,
+        Math.min(metrics.maxX, x),
+      ),
+      y: Math.max(
+        -metrics.maxY,
+        Math.min(metrics.maxY, y),
+      ),
+    };
+  }
+
+  function handleAvatarSelect(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setAvatarError("");
+
+    if (
+      ![
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+      ].includes(file.type)
+    ) {
+      setAvatarError(
+        "Χρησιμοποίησε JPG, PNG ή WebP.",
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError(
+        "Η εικόνα πρέπει να είναι έως 5MB.",
+      );
+      return;
+    }
+
+    const objectUrl =
+      URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      setAvatarZoom(1);
+      setAvatarOffset({
+        x: 0,
+        y: 0,
+      });
+      setAvatarCrop({
+        file,
+        url: objectUrl,
+        width:
+          image.naturalWidth,
+        height:
+          image.naturalHeight,
+      });
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(
+        objectUrl,
+      );
+      setAvatarError(
+        "Δεν ήταν δυνατή η ανάγνωση της εικόνας.",
+      );
+    };
+
+    image.src = objectUrl;
+  }
+
+  function handleAvatarPointerDown(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    if (!avatarCrop) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(
+      event.pointerId,
+    );
+
+    avatarDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      offsetX:
+        avatarOffset.x,
+      offsetY:
+        avatarOffset.y,
+    };
+  }
+
+  function handleAvatarPointerMove(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    const drag =
+      avatarDragRef.current;
+
+    if (
+      !drag ||
+      drag.pointerId !==
+        event.pointerId
+    ) {
+      return;
+    }
+
+    const next =
+      clampAvatarOffset(
+        drag.offsetX +
+          event.clientX -
+          drag.startX,
+        drag.offsetY +
+          event.clientY -
+          drag.startY,
+      );
+
+    setAvatarOffset(next);
+  }
+
+  function handleAvatarPointerEnd(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    if (
+      avatarDragRef.current
+        ?.pointerId ===
+      event.pointerId
+    ) {
+      avatarDragRef.current =
+        null;
+    }
+  }
+
+  function handleAvatarZoom(
+    nextZoom: number,
+  ) {
+    const next = Math.max(
+      1,
+      Math.min(3, nextZoom),
+    );
+
+    setAvatarZoom(next);
+    setAvatarOffset((current) =>
+      clampAvatarOffset(
+        current.x,
+        current.y,
+        next,
+      ),
+    );
+  }
+
+  async function createCroppedAvatarBlob() {
+    if (!avatarCrop) {
+      throw new Error(
+        "Δεν έχει επιλεγεί εικόνα.",
+      );
+    }
+
+    const image = new Image();
+    image.src = avatarCrop.url;
+
+    if ("decode" in image) {
+      await image.decode();
+    } else {
+      await new Promise<void>(
+        (resolve, reject) => {
+          image.onload = () =>
+            resolve();
+          image.onerror = () =>
+            reject(
+              new Error(
+                "Δεν ήταν δυνατή η ανάγνωση της εικόνας.",
+              ),
+            );
+        },
+      );
+    }
+
+    const metrics =
+      getAvatarCropMetrics();
+
+    if (!metrics) {
+      throw new Error(
+        "Δεν ήταν δυνατή η δημιουργία crop.",
+      );
+    }
+
+    const imageLeft =
+      AVATAR_CROP_SIZE / 2 -
+      metrics.displayWidth / 2 +
+      avatarOffset.x;
+
+    const imageTop =
+      AVATAR_CROP_SIZE / 2 -
+      metrics.displayHeight / 2 +
+      avatarOffset.y;
+
+    const sourceX =
+      Math.max(
+        0,
+        -imageLeft /
+          metrics.scale,
+      );
+
+    const sourceY =
+      Math.max(
+        0,
+        -imageTop /
+          metrics.scale,
+      );
+
+    const sourceSize =
+      AVATAR_CROP_SIZE /
+      metrics.scale;
+
+    const canvas =
+      document.createElement(
+        "canvas",
+      );
+
+    canvas.width = 800;
+    canvas.height = 800;
+
+    const context =
+      canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error(
+        "Δεν ήταν δυνατή η επεξεργασία της εικόνας.",
+      );
+    }
+
+    context.imageSmoothingEnabled =
+      true;
+    context.imageSmoothingQuality =
+      "high";
+
+    context.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      sourceSize,
+      sourceSize,
+      0,
+      0,
+      800,
+      800,
+    );
+
+    const blob =
+      await new Promise<Blob | null>(
+        (resolve) => {
+          canvas.toBlob(
+            resolve,
+            "image/jpeg",
+            0.9,
+          );
+        },
+      );
+
+    if (!blob) {
+      throw new Error(
+        "Δεν ήταν δυνατή η δημιουργία της φωτογραφίας.",
+      );
+    }
+
+    return blob;
+  }
+
+  async function uploadCroppedAvatar() {
+    if (!avatarCrop) {
+      return;
+    }
+
+    setAvatarError("");
+
+    try {
+      setUploadingAvatar(true);
+
+      const croppedBlob =
+        await createCroppedAvatarBlob();
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const signedResponse =
+        await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            analytics.business_id,
+          )}&view=business-avatar-upload`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              content_type:
+                "image/jpeg",
+            }),
+          },
+        );
+
+      const signedResult =
+        await signedResponse.json();
+
+      if (!signedResponse.ok) {
+        throw new Error(
+          signedResult.error ||
+            "Δεν ήταν δυνατή η προετοιμασία του upload.",
+        );
+      }
+
+      const objectPath =
+        signedResult.path;
+
+      const uploadToken =
+        signedResult.token;
+
+      if (
+        typeof objectPath !==
+          "string" ||
+        typeof uploadToken !==
+          "string"
+      ) {
+        throw new Error(
+          "Το upload token δεν είναι έγκυρο.",
+        );
+      }
+
+      const {
+        error: uploadError,
+      } = await supabase.storage
+        .from("business-avatars")
+        .uploadToSignedUrl(
+          objectPath,
+          uploadToken,
+          croppedBlob,
+          {
+            contentType:
+              "image/jpeg",
+          },
+        );
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const {
+        data: publicData,
+      } = supabase.storage
+        .from("business-avatars")
+        .getPublicUrl(objectPath);
+
+      const profileImageUrl =
+        `${publicData.publicUrl}?v=${Date.now()}`;
+
+      const response = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          analytics.business_id,
+        )}&view=business-profile`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            profile_image_url:
+              profileImageUrl,
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η ενημέρωση της φωτογραφίας.",
+        );
+      }
+
+      onAnalyticsChange({
+        ...analytics,
+        business: {
+          ...analytics.business,
+          profile_image_url:
+            profileImageUrl,
+        },
+      });
+
+      closeAvatarCrop();
+    } catch (error) {
+      setAvatarError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η αλλαγή φωτογραφίας.",
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  async function openBillingPortal() {
+    if (!subscription) {
+      return;
+    }
+
+    setSubscriptionError("");
+
+    try {
+      setOpeningBillingPortal(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const controller =
+        new AbortController();
+      const timeout =
+        window.setTimeout(
+          () => controller.abort(),
+          12000,
+        );
+
+      let response: Response;
+
+      try {
+        response = await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            analytics.business_id,
+          )}&view=billing-portal`,
+          {
+            method: "POST",
+            headers: {
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            signal:
+              controller.signal,
+          },
+        );
+      } finally {
+        window.clearTimeout(
+          timeout,
+        );
+      }
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατό να ανοίξει η διαχείριση πληρωμών.",
+        );
+      }
+
+      if (
+        typeof result.portal_url !==
+        "string"
+      ) {
+        throw new Error(
+          "Δεν επιστράφηκε έγκυρος σύνδεσμος πληρωμών.",
+        );
+      }
+
+      window.location.assign(
+        result.portal_url,
+      );
+    } catch (error) {
+      setSubscriptionError(
+        error instanceof DOMException &&
+          error.name === "AbortError"
+          ? "Η σύνδεση με το Stripe άργησε να απαντήσει. Δοκίμασε ξανά."
+          : error instanceof Error
+            ? error.message
+            : "Δεν ήταν δυνατό να ανοίξει η διαχείριση πληρωμών.",
+      );
+      setOpeningBillingPortal(false);
+    }
+  }
+
+  async function manageSubscription(
+    action:
+      | "cancel_subscription"
+      | "resume_renewal",
+  ) {
+    if (!subscription) {
+      return;
+    }
+
+    setSubscriptionError("");
+
+    if (
+      action === "cancel_subscription" &&
+      !window.confirm(
+        "Η συνδρομή θα παραμείνει ενεργή μέχρι το τέλος της ήδη πληρωμένης περιόδου και μετά δεν θα ανανεωθεί. Συνέχεια;",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setManagingSubscription(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const response = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          analytics.business_id,
+        )}&view=subscription`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action,
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η ενημέρωση της συνδρομής.",
+        );
+      }
+
+      const updatedSubscription = {
+        ...subscription,
+        ...result.subscription,
+      };
+
+      onAnalyticsChange({
+        ...analytics,
+        subscription:
+          updatedSubscription,
+      });
+
+      if (
+        updatedSubscription.billing_status ===
+          "cancelled" &&
+        updatedSubscription.access_status ===
+          "suspended"
+      ) {
+        onSubscriptionBlocked(
+          "cancelled",
+        );
+      }
+    } catch (error) {
+      setSubscriptionError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η ενημέρωση της συνδρομής.",
+      );
+    } finally {
+      setManagingSubscription(false);
+    }
+  }
+
+  const includedServices =
+    analytics.business
+      .dashboard_modules
+      .map((module) => {
+        const labels: Record<
+          ΠίνακαςModule,
+          string
+        > = {
+          analytics: "Στατιστικά",
+          reviews: "Αξιολογήσεις",
+          menu: "Ψηφιακό μενού",
+          nfc: "NFC κάρτες",
+          appointments: "Ραντεβού",
+        };
+
+        return labels[module];
+      });
+
   return (
     <div className="space-y-6">
-      {/* Business information */}
-      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+      {invoicePreviewHtml && (
+        <div className="fixed inset-0 z-[12000] flex flex-col bg-[#EFEFED]">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-black/10 bg-white px-4 sm:px-6">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#DC2727]">
+                Παραστατικό
+              </p>
+              <p className="mt-0.5 text-[14px] font-black">
+                Τιμολόγιο Zisto
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setInvoicePreviewHtml(
+                  null,
+                )
+              }
+              className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-white text-[18px] font-bold text-[#222] transition hover:bg-[#222] hover:text-white"
+              aria-label="Κλείσιμο τιμολογίου"
+            >
+              ×
+            </button>
+          </div>
+
+          <iframe
+            title="Τιμολόγιο Zisto"
+            srcDoc={
+              invoicePreviewHtml
+            }
+            className="min-h-0 flex-1 border-0 bg-[#EFEFED]"
+          />
+        </div>
+      )}
+
+      {avatarCrop && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Περικοπή φωτογραφίας επιχείρησης"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeAvatarCrop();
+            }
+          }}
+        >
+          <div className="w-full max-w-[430px] overflow-hidden rounded-[28px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-black/8 px-6 py-5">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#DC2727]">
+                  Φωτογραφία επιχείρησης
+                </p>
+                <h3 className="mt-1 text-[22px] font-black tracking-[-0.035em]">
+                  Προσαρμογή φωτογραφίας
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  closeAvatarCrop
+                }
+                disabled={
+                  uploadingAvatar
+                }
+                className="grid h-10 w-10 place-items-center rounded-full border border-black/10 text-lg text-[#222]/55 transition hover:bg-[#F3F3F1] hover:text-[#222]"
+                aria-label="Κλείσιμο"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center px-6 py-7">
+              <div
+                className="relative touch-none select-none overflow-hidden rounded-full bg-[#ECECEA] shadow-inner"
+                style={{
+                  width:
+                    AVATAR_CROP_SIZE,
+                  height:
+                    AVATAR_CROP_SIZE,
+                  cursor:
+                    avatarDragRef.current
+                      ? "grabbing"
+                      : "grab",
+                }}
+                onPointerDown={
+                  handleAvatarPointerDown
+                }
+                onPointerMove={
+                  handleAvatarPointerMove
+                }
+                onPointerUp={
+                  handleAvatarPointerEnd
+                }
+                onPointerCancel={
+                  handleAvatarPointerEnd
+                }
+              >
+                {(() => {
+                  const metrics =
+                    getAvatarCropMetrics();
+
+                  if (!metrics) {
+                    return null;
+                  }
+
+                  return (
+                    <img
+                      src={
+                        avatarCrop.url
+                      }
+                      alt="Crop preview"
+                      draggable={false}
+                      className="pointer-events-none absolute left-1/2 top-1/2 max-w-none select-none"
+                      style={{
+                        width:
+                          metrics.displayWidth,
+                        height:
+                          metrics.displayHeight,
+                        transform: `translate(calc(-50% + ${avatarOffset.x}px), calc(-50% + ${avatarOffset.y}px))`,
+                      }}
+                    />
+                  );
+                })()}
+
+                <div className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-inset ring-white/90" />
+                <div className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" />
+              </div>
+
+              <p className="mt-4 text-center text-[11px] text-[#222]/45">
+                Σύρε τη φωτογραφία για να αλλάξεις θέση.
+              </p>
+
+              <div className="mt-7 w-full">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Zoom
+                  </span>
+                  <span className="text-[10px] font-bold text-[#222]/45">
+                    {Math.round(
+                      avatarZoom *
+                        100,
+                    )}
+                    %
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-[#222]/35">
+                    −
+                  </span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.01"
+                    value={
+                      avatarZoom
+                    }
+                    onChange={(event) =>
+                      handleAvatarZoom(
+                        Number(
+                          event.target
+                            .value,
+                        ),
+                      )
+                    }
+                    className="h-1.5 w-full cursor-pointer accent-[#222]"
+                  />
+                  <span className="text-sm font-bold text-[#222]/35">
+                    +
+                  </span>
+                </div>
+              </div>
+
+              {avatarError && (
+                <p className="mt-5 w-full rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                  {avatarError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3 border-t border-black/8 bg-[#F7F5F1] px-6 py-5">
+              <button
+                type="button"
+                onClick={
+                  closeAvatarCrop
+                }
+                disabled={
+                  uploadingAvatar
+                }
+                className="flex-1 rounded-[16px] border border-black/10 bg-white px-5 py-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#222] transition hover:border-[#222] disabled:opacity-50"
+              >
+                Ακύρωση
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void uploadCroppedAvatar()
+                }
+                disabled={
+                  uploadingAvatar
+                }
+                className="flex-1 rounded-[16px] bg-[#222] px-5 py-4 text-[11px] font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+              >
+                {uploadingAvatar
+                  ? "Ανέβασμα..."
+                  : "Upload"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="overflow-hidden rounded-[26px] border border-black/10 bg-white">
+        <div className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between md:p-8">
+          <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:gap-5 md:text-left">
+            <div className="relative h-20 w-20 shrink-0 aspect-square overflow-hidden rounded-full bg-[#DC2727] text-white shadow-sm">
+              {analytics.business.profile_image_url ? (
+                <img
+                  src={
+                    analytics.business
+                      .profile_image_url
+                  }
+                  alt={
+                    analytics.business.name
+                  }
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="grid h-full w-full place-items-center text-2xl font-black">
+                  {analytics.business.name
+                    .charAt(0)
+                    .toLocaleUpperCase(
+                      "el-GR",
+                    )}
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Business Center
+              </p>
+              <h1 className="mt-2 text-[30px] font-black leading-[0.98] tracking-[-0.045em] md:text-[38px]">
+                {analytics.business.name}
+              </h1>
+              <p className="mt-2 text-[12px] text-[#222]/45 md:mt-1">
+                {
+                  analytics.business
+                    .location_name ??
+                  "Zisto client"
+                }
+              </p>
+            </div>
+          </div>
+
+          <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-full border border-black/10 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] transition hover:border-[#222] hover:bg-[#222] hover:text-white md:w-auto">
+            {uploadingAvatar
+              ? "Ανέβασμα..."
+              : "Αλλαγή φωτογραφίας"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={
+                handleAvatarSelect
+              }
+              disabled={uploadingAvatar}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        {avatarError && (
+          <p className="mx-6 mb-6 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700 md:mx-8">
+            {avatarError}
+          </p>
+        )}
+
+        <div className="flex gap-2 overflow-x-auto border-t border-black/8 bg-[#F7F5F1] p-2">
+          {[
+            {
+              id: "profile" as const,
+              label: "Προφίλ",
+            },
+            {
+              id: "account" as const,
+              label: "Λογαριασμός",
+            },
+            {
+              id: "subscription" as const,
+              label: "Συνδρομή Zisto",
+            },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() =>
+                setCenterTab(item.id)
+              }
+              className={`whitespace-nowrap rounded-[14px] px-5 py-3 text-[11px] font-bold transition ${
+                centerTab === item.id
+                  ? "bg-[#222] text-white"
+                  : "text-[#222]/50 hover:bg-white hover:text-[#222]"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {centerTab === "profile" && (
+        <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Προφίλ επιχείρησης
+          </p>
+
+          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+            Στοιχεία επιχείρησης
+          </h2>
+
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                Επωνυμία
+              </p>
+              <p className="mt-3 text-[15px] font-bold">
+                {analytics.business.name}
+              </p>
+            </div>
+
+            <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                Τοποθεσία
+              </p>
+              <p className="mt-3 text-[15px] font-bold">
+                {
+                  analytics.business
+                    .location_name ??
+                  "Δεν έχει οριστεί"
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[16px] border border-[#DC2727]/15 bg-[#DC2727]/5 p-5">
+            <p className="text-[11px] leading-relaxed text-[#222]/55">
+              Για αλλαγή επωνυμίας,
+              τοποθεσίας ή σύνδεσης με
+              διαφορετικό project,
+              επικοινώνησε με τη Zisto.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {centerTab === "account" && (
+        <>
+          <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-              Επιχείρηση
+              Λογαριασμός
             </p>
 
             <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-              Στοιχεία επιχείρησης
+              Στοιχεία χρήστη
             </h2>
 
-            <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-[#222]/45">
-              Τα στοιχεία αυτά χρησιμοποιούνται
-              στο dashboard και στα reports του
-              Zisto.
+            <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Email
+                </p>
+                <p className="mt-3 break-all text-[14px] font-bold">
+                  {userEmail}
+                </p>
+              </div>
+
+              <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Ρόλος
+                </p>
+                <p className="mt-3 text-[14px] font-bold">
+                  {
+                    roleLabels[
+                      membershipRole
+                    ] ?? membershipRole
+                  }
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {membershipRole === "owner" && (
+            <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+                Στοιχεία χρέωσης
+              </p>
+
+              <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-[28px] font-black tracking-[-0.04em]">
+                    Στοιχεία τιμολόγησης
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#222]/45">
+                    Τα στοιχεία που θα χρησιμοποιούνται για παραστατικά και ηλεκτρονική τιμολόγηση. Μπορείς να τα συμπληρώσεις ή να τα αλλάξεις αργότερα.
+                  </p>
+                </div>
+
+                <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                  Μόνο για ιδιοκτήτη
+                </span>
+              </div>
+
+              {loadingBillingProfile ? (
+                <div className="mt-8 rounded-[16px] bg-[#F6F6F4] px-5 py-8 text-[12px] font-semibold text-[#222]/45">
+                  Φόρτωση στοιχείων...
+                </div>
+              ) : (
+                <form
+                  onSubmit={
+                    saveBillingProfile
+                  }
+                  className="mt-8"
+                >
+                  <fieldset
+                    disabled={!editingBillingProfile}
+                    className={`grid grid-cols-1 gap-4 transition md:grid-cols-2 ${
+                      editingBillingProfile
+                        ? "opacity-100"
+                        : "opacity-55"
+                    }`}
+                  >
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Τύπος πελάτη
+                      </span>
+                      <select
+                        value={
+                          billingProfile.customer_type
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              customer_type:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      >
+                        <option value="business">
+                          Επιχείρηση
+                        </option>
+                        <option value="individual">
+                          Ιδιώτης
+                        </option>
+                      </select>
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Email παραστατικών
+                      </span>
+                      <input
+                        type="email"
+                        value={
+                          billingProfile.invoice_email
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              invoice_email:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder="billing@example.gr"
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Επωνυμία
+                      </span>
+                      <input
+                        value={
+                          billingProfile.legal_name
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              legal_name:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder="Νομική επωνυμία"
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Διακριτικός τίτλος
+                      </span>
+                      <input
+                        value={
+                          billingProfile.trade_name
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              trade_name:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder={analytics.business.name}
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        ΑΦΜ
+                      </span>
+                      <input
+                        value={
+                          billingProfile.tax_id
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              tax_id:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder="π.χ. 123456789"
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        ΔΟΥ
+                      </span>
+                      <input
+                        value={
+                          billingProfile.tax_office
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              tax_office:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder="Αρμόδια ΔΟΥ"
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2 md:col-span-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Δραστηριότητα
+                      </span>
+                      <input
+                        value={
+                          billingProfile.activity
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              activity:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder="Περιγραφή δραστηριότητας / επαγγέλματος"
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2 md:col-span-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Διεύθυνση
+                      </span>
+                      <input
+                        value={
+                          billingProfile.address_line1
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              address_line1:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder="Οδός και αριθμός"
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Πόλη
+                      </span>
+                      <SearchableSelect
+                        value={
+                          billingProfile.city
+                        }
+                        onChange={(city) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              city,
+                            }),
+                          )
+                        }
+                        loadOptions={
+                          loadGreekSettlements
+                        }
+                        placeholder="Αναζήτησε πόλη ή οικισμό"
+                        emptyMessage="Δεν βρέθηκε πόλη ή οικισμός."
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Τ.Κ.
+                      </span>
+                      <input
+                        value={
+                          billingProfile.postal_code
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              postal_code:
+                                event.target.value,
+                            }),
+                          )
+                        }
+                        placeholder="Ταχυδρομικός κώδικας"
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Περιφέρεια
+                      </span>
+                      <SearchableSelect
+                        value={
+                          billingProfile.region
+                        }
+                        onChange={(
+                          region,
+                        ) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              region,
+                            }),
+                          )
+                        }
+                        options={
+                          GREEK_REGIONS
+                        }
+                        placeholder="Αναζήτησε περιφέρεια"
+                        emptyMessage="Δεν βρέθηκε περιφέρεια."
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/40">
+                        Χώρα
+                      </span>
+                      <input
+                        value={
+                          billingProfile.country_code
+                        }
+                        onChange={(event) =>
+                          setBillingProfile(
+                            (current) => ({
+                              ...current,
+                              country_code:
+                                event.target.value
+                                  .toUpperCase()
+                                  .slice(0, 2),
+                            }),
+                          )
+                        }
+                        placeholder="GR"
+                        maxLength={2}
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[13px] font-semibold uppercase outline-none focus:border-[#222]"
+                      />
+                    </label>
+                  </fieldset>
+
+                  {billingProfileError && (
+                    <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                      {billingProfileError}
+                    </p>
+                  )}
+
+                  {billingProfileSuccess && (
+                    <p className="mt-5 rounded-[14px] bg-green-50 px-4 py-3 text-[11px] font-semibold text-green-700">
+                      {billingProfileSuccess}
+                    </p>
+                  )}
+
+                  {editingBillingProfile ? (
+                    <button
+                      type="submit"
+                      disabled={savingBillingProfile}
+                      className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+                    >
+                      {savingBillingProfile
+                        ? "Αποθήκευση..."
+                        : "Αποθήκευση αλλαγών"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setBillingProfileError("");
+                        setBillingProfileSuccess("");
+                        setEditingBillingProfile(true);
+                      }}
+                      className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727]"
+                    >
+                      Επεξεργασία
+                    </button>
+                  )}
+                </form>
+              )}
+            </section>
+          )}
+
+          <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Ασφάλεια
             </p>
-          </div>
 
-          <span className="inline-flex w-fit rounded-full bg-green-50 px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-green-700">
-            Ενεργή σύνδεση
-          </span>
-        </div>
+            <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
+              Αλλαγή κωδικού
+            </h2>
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Επωνυμία
-            </p>
-
-            <p className="mt-3 text-[15px] font-bold">
-              {analytics.business.name}
-            </p>
-          </div>
-
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Τοποθεσία
-            </p>
-
-            <p className="mt-3 text-[15px] font-bold">
-              {analytics.business.location_name ??
-                "Δεν έχει οριστεί"}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-[16px] border border-[#DC2727]/15 bg-[#DC2727]/5 p-5">
-          <p className="text-[11px] leading-relaxed text-[#222]/55">
-            Για αλλαγή επωνυμίας, τοποθεσίας ή
-            σύνδεσης με διαφορετικό project,
-            επικοινώνησε με τον διαχειριστή του
-            Zisto.
-          </p>
-        </div>
-      </section>
-
-      {/* Account */}
-      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Λογαριασμός
-        </p>
-
-        <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-          Στοιχεία χρήστη
-        </h2>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Email
-            </p>
-
-            <p className="mt-3 break-all text-[14px] font-bold">
-              {userEmail}
-            </p>
-          </div>
-
-          <div className="rounded-[16px] bg-[#F6F6F4] p-5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-              Ρόλος
-            </p>
-
-            <p className="mt-3 text-[14px] font-bold">
-              {roleLabels[membershipRole] ??
-                membershipRole}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Password */}
-      <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
-        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-          Ασφάλεια
-        </p>
-
-        <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">
-          Αλλαγή κωδικού
-        </h2>
-
-        <p className="mt-3 max-w-xl text-[12px] leading-relaxed text-[#222]/45">
-          Χρησιμοποίησε τουλάχιστον 8 χαρακτήρες
-          και απόφυγε κωδικούς που χρησιμοποιείς
-          σε άλλες υπηρεσίες.
-        </p>
-
-        <form
-          onSubmit={handlePasswordUpdate}
-          className="mt-8 max-w-2xl"
-        >
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <label className="block">
-              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40">
-                Νέος κωδικός
-              </span>
-
-              <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                value={newPassword}
-                onChange={(event) =>
-                  setNewPassword(
-                    event.target.value,
-                  )
-                }
-                autoComplete="new-password"
-                required
-                minLength={8}
-                className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/40">
-                Επιβεβαίωση κωδικού
-              </span>
-
-              <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
-                value={confirmPassword}
-                onChange={(event) =>
-                  setConfirmPassword(
-                    event.target.value,
-                  )
-                }
-                autoComplete="new-password"
-                required
-                minLength={8}
-                className="mt-3 w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none transition focus:border-[#222]"
-              />
-            </label>
-          </div>
-
-          <label className="mt-5 flex cursor-pointer items-center gap-3 text-[11px] font-semibold text-[#222]/50">
-            <input
-              type="checkbox"
-              checked={showPassword}
-              onChange={(event) =>
-                setShowPassword(
-                  event.target.checked,
-                )
+            <form
+              onSubmit={
+                handlePasswordUpdate
               }
-              className="h-4 w-4 accent-[#DC2727]"
-            />
+              className="mt-8 max-w-2xl"
+            >
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <input
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
+                  value={newPassword}
+                  onChange={(event) =>
+                    setNewPassword(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Νέος κωδικός"
+                  minLength={8}
+                  required
+                  className="rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none focus:border-[#222]"
+                />
+                <input
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
+                  value={
+                    confirmPassword
+                  }
+                  onChange={(event) =>
+                    setConfirmPassword(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Επιβεβαίωση"
+                  minLength={8}
+                  required
+                  className="rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-4 text-[14px] font-semibold outline-none focus:border-[#222]"
+                />
+              </div>
 
-            Εμφάνιση κωδικών
-          </label>
+              <label className="mt-5 flex cursor-pointer items-center gap-3 text-[11px] font-semibold text-[#222]/50">
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={(event) =>
+                    setShowPassword(
+                      event.target
+                        .checked,
+                    )
+                  }
+                  className="h-4 w-4 accent-[#DC2727]"
+                />
+                Εμφάνιση κωδικών
+              </label>
 
-          {passwordError && (
-            <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
-              {passwordError}
-            </p>
-          )}
+              {passwordError && (
+                <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                  {passwordError}
+                </p>
+              )}
 
-          {passwordSuccess && (
-            <p className="mt-5 rounded-[14px] bg-green-50 px-4 py-3 text-[11px] font-semibold text-green-700">
-              {passwordSuccess}
-            </p>
-          )}
+              {passwordSuccess && (
+                <p className="mt-5 rounded-[14px] bg-green-50 px-4 py-3 text-[11px] font-semibold text-green-700">
+                  {passwordSuccess}
+                </p>
+              )}
 
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="mt-7 inline-flex min-w-[190px] items-center justify-center rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {savingPassword
-              ? "Αποθήκευση..."
-              : "Αλλαγή κωδικού"}
-          </button>
-        </form>
-      </section>
+              <button
+                type="submit"
+                disabled={
+                  savingPassword
+                }
+                className="mt-7 rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+              >
+                {savingPassword
+                  ? "Αποθήκευση..."
+                  : "Αλλαγή κωδικού"}
+              </button>
+            </form>
+          </section>
 
-      {/* Session */}
-      <section className="rounded-[22px] border border-red-200 bg-red-50 p-6 md:p-8">
-        <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-red-600">
-          Session
-        </p>
-
-        <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-[22px] font-black tracking-[-0.03em] text-[#222]">
-              Αποσύνδεση λογαριασμού
+          <section className="rounded-[22px] border border-red-200 bg-red-50 p-6 md:p-8">
+            <h2 className="text-[22px] font-black">
+              Αποσύνδεση
             </h2>
+            <button
+              type="button"
+              onClick={() => {
+                void onLogout();
+              }}
+              className="mt-5 rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-red-600 transition hover:bg-red-600 hover:text-white"
+            >
+              Αποσύνδεση
+            </button>
+          </section>
+        </>
+      )}
 
-            <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-[#222]/50">
-              Θα χρειαστεί να εισαγάγεις ξανά το
-              email και τον κωδικό σου για να
-              αποκτήσεις πρόσβαση στο dashboard.
-            </p>
+      {centerTab === "subscription" && (
+        <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+            Χρεώσεις Zisto
+          </p>
+
+          <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-[28px] font-black tracking-[-0.04em]">
+                Η συνδρομή σου
+              </h2>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#222]/45">
+                Όλα τα στοιχεία της
+                συμφωνίας σου με τη Zisto
+                σε ένα σημείο.
+              </p>
+            </div>
+
+            {subscription && (
+              <span className={`w-fit rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-[0.14em] ${
+                subscription.access_status ===
+                "suspended"
+                  ? "bg-red-100 text-red-700"
+                  : subscription.billing_status ===
+                    "past_due"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-green-100 text-green-700"
+              }`}>
+                {
+                  subscription
+                    .cancel_at_period_end
+                    ? "Λήγει στην επόμενη ανανέωση"
+                    : subscription
+                          .billing_status ===
+                        "active"
+                      ? "Ενεργή"
+                      : subscription
+                          .billing_status
+                }
+              </span>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              void onLogout();
-            }}
-            className="w-full rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.16em] text-red-600 transition hover:bg-red-600 hover:text-white sm:w-auto"
-          >
-            Αποσύνδεση
-          </button>
-        </div>
-      </section>
+          {!subscription ? (
+            <div className="mt-8 rounded-[18px] bg-[#F6F6F4] p-6">
+              <p className="text-sm font-bold">
+                Δεν υπάρχει ενεργή
+                συνδρομή για αυτή την
+                επιχείρηση.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Χρέωση
+                  </p>
+                  <p className="mt-3 text-[20px] font-black">
+                    {formatMoney(
+                      Math.round(
+                        subscription
+                          .amount_cents *
+                          (1 +
+                            Number(
+                              subscription
+                                .vat_rate,
+                            ) /
+                              100),
+                      ),
+                      subscription
+                        .currency,
+                    )}
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#222]/40">
+                    {intervalLabel(
+                      subscription
+                        .billing_interval_months,
+                    )}{" "}
+                    · με ΦΠΑ
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Πελάτης Zisto
+                  </p>
+                  <p className="mt-3 text-[15px] font-black">
+                    {subscriptionAgeText(
+                      subscription.starts_at,
+                    )}
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#222]/40">
+                    Από{" "}
+                    {formatDate(
+                      subscription.starts_at,
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Επόμενη χρέωση
+                  </p>
+                  <p className="mt-3 text-[15px] font-black">
+                    {formatDate(
+                      subscription
+                        .next_billing_at,
+                    )}
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-[#F6F6F4] p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                    Email χρέωσης
+                  </p>
+                  <p className="mt-3 break-all text-[13px] font-black">
+                    {subscription
+                      .billing_email ??
+                      "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-[18px] border border-black/8 p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Τι περιλαμβάνει η Zisto
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {includedServices.map(
+                    (service) => (
+                      <span
+                        key={service}
+                        className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[11px] font-bold text-[#222]/70"
+                      >
+                        {service}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              {subscription
+                .cancel_at_period_end && (
+                <div className="mt-6 rounded-[18px] border border-amber-200 bg-amber-50 p-5">
+                  <p className="text-[12px] font-bold text-amber-900">
+                    Η αυτόματη ανανέωση έχει
+                    ακυρωθεί.
+                  </p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-amber-800/70">
+                    Η υπηρεσία παραμένει
+                    ενεργή έως{" "}
+                    {formatDate(
+                      subscription
+                        .next_billing_at,
+                    )}
+                    . Μπορείς να συνεχίσεις
+                    την ανανέωση πριν από
+                    αυτή την ημερομηνία.
+                  </p>
+                </div>
+              )}
+
+              {subscriptionError && (
+                <p className="mt-6 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                  {subscriptionError}
+                </p>
+              )}
+
+              {membershipRole ===
+                "owner" && (
+                  <div className="mt-6 rounded-[18px] border border-black/8">
+                    <div className="flex flex-col gap-3 border-b border-black/8 p-5 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                          Ιστορικό χρεώσεων
+                        </p>
+                        <h3 className="mt-2 text-[20px] font-black tracking-[-0.03em]">
+                          Παραστατικά & πληρωμές
+                        </h3>
+                      </div>
+
+                      <p className="text-[10px] text-[#222]/35">
+                        Τελευταία 50 παραστατικά
+                      </p>
+                    </div>
+
+                    {loadingBillingHistory ? (
+                      <div className="p-6 text-[12px] font-semibold text-[#222]/40">
+                        Φόρτωση ιστορικού...
+                      </div>
+                    ) : billingHistoryError ? (
+                      <div className="p-6">
+                        <p className="rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                          {billingHistoryError}
+                        </p>
+                      </div>
+                    ) : billingDocuments.length ===
+                      0 ? (
+                      <div className="p-6">
+                        <p className="text-[13px] font-bold">
+                          Δεν υπάρχουν ακόμη παραστατικά.
+                        </p>
+                        <p className="mt-2 text-[11px] leading-relaxed text-[#222]/40">
+                          Μόλις ολοκληρωθεί μια χρέωση, θα εμφανιστεί εδώ αυτόματα.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-black/8">
+                        {billingDocuments.map(
+                          (document) => {
+                            const statusLabels: Record<
+                              string,
+                              string
+                            > = {
+                              paid:
+                                "Πληρώθηκε",
+                              open:
+                                "Εκκρεμεί",
+                              draft:
+                                "Πρόχειρο",
+                              void:
+                                "Ακυρώθηκε",
+                              uncollectible:
+                                "Μη εισπράξιμο",
+                              refunded:
+                                "Επιστροφή",
+                            };
+
+                            const statusClass =
+                              document.status ===
+                              "paid"
+                                ? "bg-green-100 text-green-700"
+                                : document.status ===
+                                    "open"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : document.status ===
+                                      "void"
+                                    ? "bg-red-50 text-red-600"
+                                    : "bg-[#F6F6F4] text-[#222]/55";
+
+                            const documentUrl =
+                              document.pdf_url ??
+                              document.hosted_url;
+
+                            return (
+                              <div
+                                key={
+                                  document.id
+                                }
+                                className="grid gap-4 p-5 md:grid-cols-[1.2fr_0.9fr_0.8fr_auto] md:items-center"
+                              >
+                                <div>
+                                  <p className="text-[12px] font-black">
+                                    {document.document_number ??
+                                      "Παραστατικό Zisto"}
+                                  </p>
+                                  <p className="mt-1 text-[10px] text-[#222]/40">
+                                    {formatDate(
+                                      document.issued_at ??
+                                        document.created_at,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/30">
+                                    Περίοδος
+                                  </p>
+                                  <p className="mt-1 text-[11px] font-bold">
+                                    {document.period_start
+                                      ? formatDate(
+                                          document.period_start,
+                                        )
+                                      : "—"}
+                                    {document.period_end
+                                      ? ` → ${formatDate(
+                                          document.period_end,
+                                        )}`
+                                      : ""}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-3 md:block">
+                                  <p className="text-[15px] font-black">
+                                    {formatMoney(
+                                      document.total_cents,
+                                      document.currency,
+                                    )}
+                                  </p>
+                                  <span
+                                    className={`mt-1 inline-flex rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] ${statusClass}`}
+                                  >
+                                    {statusLabels[
+                                      document.status
+                                    ] ??
+                                      document.status}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openZistoInvoice(
+                                        document,
+                                      )
+                                    }
+                                    className="inline-flex justify-center rounded-full bg-[#222] px-4 py-3 text-[9px] font-bold uppercase tracking-[0.12em] text-white transition hover:bg-[#DC2727]"
+                                  >
+                                    Τιμολόγιο Zisto
+                                  </button>
+
+                                  {documentUrl && (
+                                    <a
+                                      href={
+                                        documentUrl
+                                      }
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-center text-[8px] font-bold uppercase tracking-[0.1em] text-[#222]/35 underline underline-offset-2"
+                                    >
+                                      Stripe PDF
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {membershipRole ===
+                "owner" && (
+                  <div className="mt-8 flex flex-col gap-3 border-t border-black/8 pt-6 sm:flex-row">
+                    {subscription.billing_status ===
+                    "cancelled" &&
+                    !subscription.stripe_subscription_id ? (
+                      <span className="rounded-full bg-red-50 px-5 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600">
+                        Η συνδρομή ακυρώθηκε
+                      </span>
+                    ) : subscription
+                      .cancel_at_period_end ? (
+                      <button
+                        type="button"
+                        disabled={
+                          managingSubscription
+                        }
+                        onClick={() =>
+                          void manageSubscription(
+                            "resume_renewal",
+                          )
+                        }
+                        className="rounded-full bg-[#222] px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+                      >
+                        {managingSubscription
+                          ? "Ενημέρωση..."
+                          : "Συνέχιση ανανέωσης"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={
+                          managingSubscription
+                        }
+                        onClick={() =>
+                          void manageSubscription(
+                            "cancel_subscription",
+                          )
+                        }
+                        className="rounded-full border border-red-200 bg-white px-6 py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600 transition hover:bg-red-600 hover:text-white disabled:opacity-50"
+                      >
+                        {managingSubscription
+                          ? "Ενημέρωση..."
+                          : "Ακύρωση συνδρομής"}
+                      </button>
+                    )}
+
+                    {subscription
+                      .stripe_customer_id && (
+                      <button
+                        type="button"
+                        disabled={
+                          openingBillingPortal
+                        }
+                        onClick={() =>
+                          void openBillingPortal()
+                        }
+                        className="rounded-full border border-black/10 bg-white px-6 py-4 text-center text-[10px] font-bold uppercase tracking-[0.15em] text-[#222] transition hover:border-[#222] hover:bg-[#222] hover:text-white disabled:opacity-50"
+                      >
+                        {openingBillingPortal
+                          ? "Άνοιγμα..."
+                          : "Πληρωμές & παραστατικά"}
+                      </button>
+                    )}
+
+                    <a
+                      href="/#/payments"
+                      className="rounded-full border border-black/10 px-6 py-4 text-center text-[10px] font-bold uppercase tracking-[0.15em] text-[#222]/60 transition hover:border-[#222] hover:text-[#222]"
+                    >
+                      Πολιτική πληρωμών
+                    </a>
+                  </div>
+                )}
+            </>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -3976,7 +8151,7 @@ function NfcCardsTab({
       if (!response.ok) {
         throw new Error(
           result.error ||
-            "Δεν ήταν δυνατή η φόρτωση των analytics.",
+            "Δεν ήταν δυνατή η φόρτωση των στατιστικών.",
         );
       }
 
@@ -4470,7 +8645,7 @@ if (loading) {
               </button>
     
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">
-                Analytics τραπεζιού
+                Στατιστικά τραπεζιού
               </p>
     
               <div className="mt-2 flex items-center gap-3">
@@ -4559,7 +8734,7 @@ if (loading) {
     
             <article className="rounded-[20px] border border-black/10 bg-white p-6">
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
-                Menu opens
+                Ανοίγματα μενού
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
@@ -4569,7 +8744,7 @@ if (loading) {
     
             <article className="rounded-[20px] border border-black/10 bg-white p-6">
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#222]/35">
-                Review clicks
+                Κλικ για κριτική
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
@@ -5128,7 +9303,7 @@ function DashboardTabPlaceholder({
     { eyebrow: string; title: string; description: string }
   > = {
     analytics: {
-      eyebrow: "Analytics",
+      eyebrow: "Στατιστικά",
       title: "Αναλυτικά δεδομένα",
       description:
         "Εδώ θα μπουν φίλτρα ημερομηνιών, σύγκριση NFC με QR, ώρες αιχμής και αναλυτικά conversion rates.",
@@ -5157,11 +9332,11 @@ function DashboardTabPlaceholder({
       description:
         "Το booking module του Zisto θα συγκεντρώνει διαθεσιμότητα, ραντεβού, πελάτες και υπενθυμίσεις σε ένα live ημερολόγιο.",
     },
-    settings: {
-      eyebrow: "Ρυθμίσεις",
+    business_center: {
+      eyebrow: "Business Center",
       title: "Ρυθμίσεις επιχείρησης",
       description:
-        "Εδώ θα διαχειρίζεσαι στοιχεία επιχείρησης, smart links, integrations και λογαριασμό.",
+        "Διαχείριση προφίλ, λογαριασμού και συνδρομής Zisto.",
     },
   };
 
@@ -5193,7 +9368,7 @@ function DashboardTabPlaceholder({
 
         <div className="rounded-[16px] bg-[#F6F6F4] p-5">
           <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-            Menu opens σήμερα
+            Ανοίγματα μενού σήμερα
           </p>
           <p className="mt-3 text-[34px] font-black">
             {numberFormatter.format(analytics?.totals.menu_opens_today ?? 0)}
@@ -5202,7 +9377,7 @@ function DashboardTabPlaceholder({
 
         <div className="rounded-[16px] bg-[#F6F6F4] p-5">
           <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
-            Review clicks σήμερα
+            Κλικ για κριτική σήμερα
           </p>
           <p className="mt-3 text-[34px] font-black">
             {numberFormatter.format(analytics?.totals.review_clicks_today ?? 0)}
@@ -5388,7 +9563,7 @@ type DashboardModule =
 type DashboardTab =
   | "overview"
   | DashboardModule
-  | "settings";
+  | "business_center";
 
 const DASHBOARD_NAV_ITEMS: {
   id: DashboardTab;
@@ -5396,12 +9571,11 @@ const DASHBOARD_NAV_ITEMS: {
   label: string;
   system?: boolean;
 }[] = [
-  { id: "analytics", icon: "↗", label: "Analytics" },
+  { id: "analytics", icon: "↗", label: "Στατιστικά" },
   { id: "reviews", icon: "★", label: "Αξιολογήσεις" },
   { id: "menu", icon: "☰", label: "Μενού" },
   { id: "nfc", icon: "⌁", label: "NFC κάρτες" },
   { id: "appointments", icon: "◷", label: "Ραντεβού" },
-  { id: "settings", icon: "⚙", label: "Ρυθμίσεις", system: true },
 ];
 
 function DashboardPage({
@@ -5413,14 +9587,74 @@ function DashboardPage({
   const [cardsLoading, setCardsLoading] = useState(true);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>("analytics");
+  const [activeTab, setActiveTab] =
+    useState<DashboardTab>(() => {
+      if (typeof window === "undefined") {
+        return "analytics";
+      }
+
+      const rawHash =
+        window.location.hash.replace(/^#/, "");
+      const [, search = ""] =
+        rawHash.split("?");
+      const settings =
+        new URLSearchParams(search).get(
+          "settings",
+        );
+
+      return settings === "subscription"
+        ? "business_center"
+        : "analytics";
+    });
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [awaitingApproval, setAwaitingApproval] = useState(false);
+  const [subscriptionSuspended, setSubscriptionSuspended] = useState(false);
+  const [
+    subscriptionBlockReason,
+    setSubscriptionBlockReason,
+  ] = useState<
+    "cancelled" | "payment" | null
+  >(null);
+  const [
+    reactivatingSubscription,
+    setReactivatingSubscription,
+  ] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [
+    billingSetup,
+    setBillingSetup,
+  ] = useState<BillingSetupPayload | null>(null);
+  const [
+    openingInitialCheckout,
+    setOpeningInitialCheckout,
+  ] = useState(false);
+  const [
+    initialBillingProfile,
+    setInitialBillingProfile,
+  ] = useState({
+    customer_type: "business",
+    legal_name: "",
+    trade_name: "",
+    tax_id: "",
+    tax_country: "GR",
+    tax_office: "",
+    activity: "",
+    invoice_email: "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    region: "",
+    postal_code: "",
+    country_code: "GR",
+  });
+  const [
+    loadingInitialBillingProfile,
+    setLoadingInitialBillingProfile,
+  ] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -5498,6 +9732,69 @@ function DashboardPage({
         }
       }
 
+      async function confirmStripeCheckoutIfNeeded() {
+        if (!businessId) {
+          return;
+        }
+
+        const rawHash =
+          window.location.hash.replace(/^#/, "");
+        const [, search = ""] =
+          rawHash.split("?");
+        const params =
+          new URLSearchParams(search);
+
+        if (
+          params.get("billing") !==
+            "success"
+        ) {
+          return;
+        }
+
+        const checkoutSessionId =
+          params.get("session_id");
+
+        if (!checkoutSessionId) {
+          return;
+        }
+
+        const response = await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            businessId,
+          )}&view=subscription`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              action:
+                "confirm_checkout",
+              session_id:
+                checkoutSessionId,
+            }),
+          },
+        );
+
+        const result =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Δεν ήταν δυνατή η επιβεβαίωση της πληρωμής.",
+          );
+        }
+
+        window.location.hash =
+          `/dashboard?business=${encodeURIComponent(
+            businessId,
+          )}`;
+      }
+
       async function loadAnalytics() {
         try {
           setAnalyticsLoading(true);
@@ -5510,7 +9807,10 @@ function DashboardPage({
 
           if (active) {
             setAnalytics(data);
+            setBillingSetup(null);
             setAwaitingApproval(false);
+            setSubscriptionSuspended(false);
+            setSubscriptionBlockReason(null);
 
             const tutorialKey = `zisto_tutorial_${session.user.id}`;
 
@@ -5528,15 +9828,66 @@ function DashboardPage({
               error.status === 403
             ) {
               setAwaitingApproval(true);
+              setSubscriptionSuspended(false);
+              setSubscriptionBlockReason(null);
+              setAnalyticsError(null);
+            } else if (
+              error instanceof AnalyticsRequestError &&
+              error.status === 402 &&
+              (error.message ===
+                "subscription_setup_required" ||
+                error.message ===
+                  "subscription_pending_owner_activation") &&
+              error.payload
+            ) {
+              setBillingSetup(
+                error.payload as unknown as BillingSetupPayload,
+              );
+              setSubscriptionSuspended(false);
+              setSubscriptionBlockReason(null);
+              setAwaitingApproval(false);
+              setAnalyticsError(null);
+            } else if (
+              error instanceof AnalyticsRequestError &&
+              error.status === 402
+            ) {
+              setBillingSetup(null);
+              setSubscriptionSuspended(true);
+              setSubscriptionBlockReason(
+                error.message ===
+                  "subscription_cancelled"
+                  ? "cancelled"
+                  : "payment",
+              );
+              setAwaitingApproval(false);
               setAnalyticsError(null);
             } else {
-              setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των analytics.");
+              setSubscriptionSuspended(false);
+              setSubscriptionBlockReason(null);
+              setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των στατιστικών.");
             }
           }
         } finally {
           if (active) {
             setAnalyticsLoading(false);
           }
+        }
+      }
+
+      try {
+        await confirmStripeCheckoutIfNeeded();
+      } catch (error) {
+        console.error(
+          "Stripe checkout confirmation failed:",
+          error,
+        );
+
+        if (active) {
+          setAnalyticsError(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η επιβεβαίωση της πληρωμής.",
+          );
         }
       }
 
@@ -5566,6 +9917,116 @@ function DashboardPage({
     };
   }, [businessId]);
 
+  useEffect(() => {
+    if (
+      !billingSetup ||
+      billingSetup.membership_role !== "owner"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadInitialBillingProfile() {
+      try {
+        setLoadingInitialBillingProfile(true);
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          window.location.hash = "/login";
+          return;
+        }
+
+        const response = await fetch(
+          `/api/analytics?business_id=${encodeURIComponent(
+            billingSetup.business.id,
+          )}&view=billing-profile`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${session.access_token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Δεν ήταν δυνατή η φόρτωση των στοιχείων τιμολόγησης.",
+          );
+        }
+
+        if (!cancelled) {
+          const profile =
+            result.billing_profile ?? {};
+
+          setInitialBillingProfile({
+            customer_type:
+              profile.customer_type ??
+              "business",
+            legal_name:
+              profile.legal_name ?? "",
+            trade_name:
+              profile.trade_name ??
+              billingSetup.business.name ??
+              "",
+            tax_id:
+              profile.tax_id ?? "",
+            tax_country:
+              profile.tax_country ?? "GR",
+            tax_office:
+              profile.tax_office ?? "",
+            activity:
+              profile.activity ?? "",
+            invoice_email:
+              profile.invoice_email ||
+              session.user.email ||
+              "",
+            address_line1:
+              profile.address_line1 ?? "",
+            address_line2:
+              profile.address_line2 ?? "",
+            city:
+              profile.city ?? "",
+            region:
+              profile.region ?? "",
+            postal_code:
+              profile.postal_code ?? "",
+            country_code:
+              profile.country_code ?? "GR",
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAnalyticsError(
+            error instanceof Error
+              ? error.message
+              : "Δεν ήταν δυνατή η φόρτωση των στοιχείων τιμολόγησης.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingInitialBillingProfile(false);
+        }
+      }
+    }
+
+    void loadInitialBillingProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    billingSetup?.business.id,
+    billingSetup?.membership_role,
+  ]);
+
   const dashboardMetrics = analytics
     ? [
         {
@@ -5581,7 +10042,7 @@ function DashboardPage({
           note: `${percentFormatter.format(analytics.totals.menu_conversion_rate)}% των σημερινών επισκέψεων`,
         },
         {
-          label: "Review clicks σήμερα",
+          label: "Κλικ για κριτική σήμερα",
           value: numberFormatter.format(analytics.totals.review_clicks_today),
           change: "Live",
           note: `${percentFormatter.format(analytics.totals.review_conversion_rate)}% των σημερινών επισκέψεων`,
@@ -5643,13 +10104,13 @@ function DashboardPage({
     }
 
     if (
-      activeTab !== "settings" &&
+      activeTab !== "business_center" &&
       !enabledModules.includes(
         activeTab as DashboardModule,
       )
     ) {
       setActiveTab(
-        enabledModules[0] ?? "settings",
+        enabledModules[0] ?? "business_center",
       );
     }
   }, [
@@ -5662,13 +10123,618 @@ function DashboardPage({
   if (
     analyticsLoading &&
     !analytics &&
-    !awaitingApproval
+    !awaitingApproval &&
+    !subscriptionSuspended &&
+    !billingSetup
   ) {
     return (
       <GlobalLoader
         fullScreen
         message="Φόρτωση dashboard..."
       />
+    );
+  }
+
+  async function openInitialSubscriptionCheckout() {
+    if (
+      !billingSetup ||
+      billingSetup.membership_role !== "owner"
+    ) {
+      return;
+    }
+
+    try {
+      setOpeningInitialCheckout(true);
+      setAnalyticsError(null);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const requiredBillingFields = [
+        initialBillingProfile.legal_name,
+        initialBillingProfile.tax_id,
+        initialBillingProfile.invoice_email,
+        initialBillingProfile.address_line1,
+        initialBillingProfile.city,
+        initialBillingProfile.postal_code,
+      ];
+
+      if (
+        requiredBillingFields.some(
+          (value) => !value.trim(),
+        )
+      ) {
+        throw new Error(
+          "Συμπλήρωσε τα υποχρεωτικά στοιχεία τιμολόγησης πριν συνεχίσεις.",
+        );
+      }
+
+      const billingResponse = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          billingSetup.business.id,
+        )}&view=billing-profile`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(
+            initialBillingProfile,
+          ),
+        },
+      );
+
+      const billingResult =
+        await billingResponse.json();
+
+      if (!billingResponse.ok) {
+        throw new Error(
+          billingResult.error ||
+            "Δεν ήταν δυνατή η αποθήκευση των στοιχείων τιμολόγησης.",
+        );
+      }
+
+      const response = await fetch(
+        `/api/analytics?business_id=${encodeURIComponent(
+          billingSetup.business.id,
+        )}&view=subscription`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "resume_renewal",
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατό να ανοίξει το Stripe Checkout.",
+        );
+      }
+
+      if (
+        typeof result.checkout_url !== "string" ||
+        !result.checkout_url
+      ) {
+        throw new Error(
+          "Η Stripe δεν επέστρεψε Checkout URL.",
+        );
+      }
+
+      window.location.href = result.checkout_url;
+    } catch (error) {
+      console.error(
+        "Initial subscription checkout failed:",
+        error,
+      );
+      setAnalyticsError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατό να ανοίξει το Stripe Checkout.",
+      );
+      setOpeningInitialCheckout(false);
+    }
+  }
+
+  if (billingSetup) {
+    const subscription =
+      billingSetup.subscription;
+    const isOwner =
+      billingSetup.membership_role === "owner";
+    const totalCents = Math.round(
+      subscription.amount_cents *
+        (1 + Number(subscription.vat_rate) / 100),
+    );
+
+    const moduleLabels: Record<
+      DashboardModule,
+      string
+    > = {
+      analytics: "Στατιστικά",
+      reviews: "Κριτικές",
+      menu: "Μενού",
+      nfc: "NFC",
+      appointments: "Ραντεβού",
+    };
+
+    return (
+      <main className="min-h-screen bg-[#F6F6F4] px-5 py-10 font-sans text-[#222] sm:px-8 sm:py-16">
+        <section className="mx-auto w-full max-w-[760px] overflow-hidden rounded-[30px] border border-black/10 bg-white shadow-[0_30px_80px_-45px_rgba(34,34,34,0.35)]">
+          <div className="border-b border-black/[0.06] p-6 sm:p-10">
+            <img
+              src={WORDMARK}
+              alt="Zisto"
+              className="h-7 w-auto"
+              draggable={false}
+            />
+
+            <p className="mt-10 text-[10px] font-black uppercase tracking-[0.24em] text-[#DC2727]">
+              Χρεώσεις Zisto
+            </p>
+            <h1 className="mt-3 text-[36px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[52px]">
+              Η συνδρομή σου είναι έτοιμη.
+            </h1>
+            <p className="mt-5 max-w-xl text-[14px] leading-7 text-[#222]/55">
+              {isOwner
+                ? "Έλεγξε τη συμφωνία της επιχείρησής σου και ενεργοποίησε τη συνδρομή για να ανοίξει το Zisto dashboard."
+                : "Η συνδρομή έχει δημιουργηθεί και περιμένει ενεργοποίηση από τον ιδιοκτήτη της επιχείρησης."}
+            </p>
+          </div>
+
+          <div className="p-6 sm:p-10">
+            <div className="rounded-[22px] bg-[#F6F6F4] p-5 sm:p-6">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                Επιχείρηση
+              </p>
+              <h2 className="mt-2 text-[24px] font-black tracking-[-0.035em]">
+                {billingSetup.business.name}
+              </h2>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[16px] bg-white p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/35">
+                    Χρέωση
+                  </p>
+                  <p className="mt-2 text-[27px] font-black tracking-[-0.04em]">
+                    {formatMoney(
+                      totalCents,
+                      subscription.currency,
+                    )}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#222]/45">
+                    {intervalLabel(
+                      subscription.billing_interval_months,
+                    )}{" "}
+                    · περιλαμβάνει {subscription.vat_rate}% ΦΠΑ
+                  </p>
+                </div>
+
+                <div className="rounded-[16px] bg-white p-5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#222]/35">
+                    Email χρέωσης
+                  </p>
+                  <p className="mt-2 break-all text-[13px] font-black">
+                    {userEmail || "—"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#222]/45">
+                    Η απόδειξη της πληρωμής θα συνδεθεί με αυτό το email.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {isOwner && (
+              <div className="mt-5 rounded-[20px] border border-black/[0.08] p-5 sm:p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#DC2727]">
+                  Στοιχεία τιμολόγησης
+                </p>
+                <p className="mt-2 text-[12px] leading-6 text-[#222]/50">
+                  Συμπλήρωσέ τα πριν την πρώτη πληρωμή. Το email πληρωμής παραμένει το email του owner.
+                </p>
+
+                {loadingInitialBillingProfile ? (
+                  <div className="mt-5 rounded-[14px] bg-[#F6F6F4] p-5 text-[12px] font-semibold text-[#222]/45">
+                    Φόρτωση στοιχείων...
+                  </div>
+                ) : (
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Επωνυμία *
+                      </span>
+                      <input
+                        value={initialBillingProfile.legal_name}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            legal_name: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Email παραστατικών *
+                      </span>
+                      <input
+                        type="email"
+                        value={initialBillingProfile.invoice_email}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            invoice_email: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        ΑΦΜ *
+                      </span>
+                      <input
+                        value={initialBillingProfile.tax_id}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            tax_id: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        ΔΟΥ
+                      </span>
+                      <input
+                        value={initialBillingProfile.tax_office}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            tax_office: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Διεύθυνση *
+                      </span>
+                      <input
+                        value={initialBillingProfile.address_line1}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            address_line1: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Πόλη *
+                      </span>
+                      <SearchableSelect
+                        value={initialBillingProfile.city}
+                        onChange={(city) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            city,
+                          }))
+                        }
+                        loadOptions={loadGreekSettlements}
+                        placeholder="Αναζήτησε πόλη ή οικισμό"
+                        emptyMessage="Δεν βρέθηκε πόλη ή οικισμός."
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Περιφέρεια
+                      </span>
+                      <SearchableSelect
+                        value={initialBillingProfile.region}
+                        onChange={(region) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            region,
+                          }))
+                        }
+                        options={GREEK_REGIONS}
+                        placeholder="Αναζήτησε περιφέρεια"
+                        emptyMessage="Δεν βρέθηκε περιφέρεια."
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Τ.Κ. *
+                      </span>
+                      <input
+                        value={initialBillingProfile.postal_code}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            postal_code: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#222]/40">
+                        Δραστηριότητα
+                      </span>
+                      <input
+                        value={initialBillingProfile.activity}
+                        onChange={(event) =>
+                          setInitialBillingProfile((current) => ({
+                            ...current,
+                            activity: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-[14px] border border-black/10 bg-[#F6F6F4] px-4 py-3.5 text-[13px] font-semibold outline-none focus:border-[#222]"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {billingSetup.business.dashboard_modules.length > 0 && (
+              <div className="mt-5 rounded-[20px] border border-black/[0.08] p-5 sm:p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Τι περιλαμβάνει
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {billingSetup.business.dashboard_modules.map(
+                    (module) => (
+                      <span
+                        key={module}
+                        className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[11px] font-bold"
+                      >
+                        {moduleLabels[module] ?? module}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
+            {subscription.notes && (
+              <div className="mt-5 rounded-[20px] border border-black/[0.08] p-5 sm:p-6">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#222]/35">
+                  Συμφωνία
+                </p>
+                <p className="mt-3 text-[13px] leading-6 text-[#222]/65">
+                  {subscription.notes}
+                </p>
+              </div>
+            )}
+
+            {analyticsError && (
+              <p className="mt-5 rounded-[14px] bg-red-50 px-4 py-3 text-[11px] font-semibold text-red-700">
+                {analyticsError}
+              </p>
+            )}
+
+            {isOwner ? (
+              <>
+                <button
+                  type="button"
+                  disabled={openingInitialCheckout}
+                  onClick={() =>
+                    void openInitialSubscriptionCheckout()
+                  }
+                  className="mt-7 flex w-full items-center justify-between rounded-full bg-[#222] px-6 py-4 text-[11px] font-black uppercase tracking-[0.16em] text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+                >
+                  <span>
+                    {openingInitialCheckout
+                      ? "Άνοιγμα Stripe..."
+                      : "Ενεργοποίηση συνδρομής"}
+                  </span>
+                  <span>→</span>
+                </button>
+
+                <p className="mt-4 text-center text-[10px] leading-5 text-[#222]/40">
+                  Θα μεταφερθείς στο ασφαλές Stripe Checkout. Με την επιτυχημένη πληρωμή το dashboard ενεργοποιείται αυτόματα.
+                </p>
+              </>
+            ) : (
+              <div className="mt-7 rounded-[18px] bg-amber-50 p-5 text-[12px] font-bold leading-6 text-amber-900">
+                Περιμένουμε τον ιδιοκτήτη της επιχείρησης να ολοκληρώσει την πρώτη πληρωμή.
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-between gap-4 border-t border-black/[0.06] pt-5">
+              <a
+                href="/#/payments"
+                className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#222]/45 underline underline-offset-4"
+              >
+                Πολιτική πληρωμών
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  window.location.hash = "/login";
+                }}
+                className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#222]/45"
+              >
+                Αποσύνδεση
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  async function reactivateCancelledSubscription() {
+    try {
+      setReactivatingSubscription(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+
+      const query = businessId
+        ? `?business_id=${encodeURIComponent(
+            businessId,
+          )}&view=subscription`
+        : "?view=subscription";
+
+      const response = await fetch(
+        `/api/analytics${query}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action:
+              "resume_renewal",
+          }),
+        },
+      );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Δεν ήταν δυνατή η επανενεργοποίηση.",
+        );
+      }
+
+      if (
+        typeof result.checkout_url ===
+          "string" &&
+        result.checkout_url
+      ) {
+        window.location.href =
+          result.checkout_url;
+        return;
+      }
+
+      window.location.reload();
+    } catch (error) {
+      console.error(
+        "Subscription reactivation failed:",
+        error,
+      );
+      setAnalyticsError(
+        error instanceof Error
+          ? error.message
+          : "Δεν ήταν δυνατή η επανενεργοποίηση.",
+      );
+    } finally {
+      setReactivatingSubscription(false);
+    }
+  }
+
+  if (subscriptionSuspended) {
+    const isCancelled =
+      subscriptionBlockReason ===
+      "cancelled";
+
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#F6F6F4] px-6 font-sans text-[#222]">
+        <section className="w-full max-w-2xl rounded-[32px] border border-black/10 bg-white p-8 text-center shadow-sm sm:p-12">
+          <img
+            src={WORDMARK}
+            alt="Zisto"
+            className="mx-auto h-9 w-auto"
+            draggable={false}
+          />
+          <p className="mt-10 text-[11px] font-black uppercase tracking-[0.24em] text-[#DC2727]">
+            {isCancelled
+              ? "Συνδρομή ακυρωμένη"
+              : "Συνδρομή σε παύση"}
+          </p>
+          <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] sm:text-5xl">
+            {isCancelled
+              ? "Η συνδρομή σου ακυρώθηκε."
+              : "Η πρόσβασή σου έχει τεθεί προσωρινά σε παύση."}
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#666] sm:text-base">
+            {isCancelled
+              ? "Η αυτόματη συνδρομή Zisto έχει ακυρωθεί. Μπορείς να την επανενεργοποιήσεις και να συνεχίσεις από εκεί που σταμάτησες."
+              : "Υπάρχει εκκρεμής πληρωμή για την υπηρεσία Zisto. Μόλις τακτοποιηθεί, η πρόσβαση στο dashboard θα ενεργοποιηθεί ξανά."}
+          </p>
+
+          {isCancelled ? (
+            <button
+              type="button"
+              disabled={
+                reactivatingSubscription
+              }
+              onClick={() =>
+                void reactivateCancelledSubscription()
+              }
+              className="mt-8 inline-flex rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727] disabled:opacity-50"
+            >
+              {reactivatingSubscription
+                ? "Επανενεργοποίηση..."
+                : "Επανενεργοποίηση συνδρομής"}
+            </button>
+          ) : (
+            <a
+              href="mailto:zisto.gr@gmail.com"
+              className="mt-8 inline-flex rounded-2xl bg-[#222] px-6 py-4 text-sm font-bold text-white transition hover:bg-[#DC2727]"
+            >
+              Επικοινωνία με Zisto
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.hash = "/login";
+            }}
+            className="mt-4 block w-full text-xs font-bold text-[#777] transition hover:text-[#222]"
+          >
+            Αποσύνδεση
+          </button>
+        </section>
+      </main>
     );
   }
 
@@ -5700,24 +10766,51 @@ function DashboardPage({
           </button>
         </div>
 
-        <div className="mt-12 rounded-[16px] border border-white/10 bg-white/[0.04] p-4">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("business_center");
+            setSidebarOpen(false);
+          }}
+          className={`mt-12 w-full rounded-[16px] border p-4 text-left transition ${
+            activeTab === "business_center"
+              ? "border-[#DC2727] bg-[#DC2727]/10"
+              : "border-white/10 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
+          }`}
+        >
           <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">
-            Επιχείρηση
+            Επιχείρηση · Ρυθμίσεις
           </p>
 
           <div className="mt-4 flex items-center gap-3">
-            <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-full bg-[#DC2727] text-[15px] font-black">
-              {clientInitial}
+            <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-full bg-[#DC2727] text-[15px] font-black">
+              {analytics?.business.profile_image_url ? (
+                <img
+                  src={analytics.business.profile_image_url}
+                  alt={businessName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="grid h-full w-full place-items-center">
+                  {clientInitial}
+                </div>
+              )}
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold">
                 {businessName}
               </p>
-              <p className="mt-1 text-[10px] text-white/40">{businessLocation}</p>
+              <p className="mt-1 truncate text-[10px] text-white/40">
+                {businessLocation}
+              </p>
             </div>
+
+            <span className="text-white/35">
+              →
+            </span>
           </div>
-        </div>
+        </button>
 
         <nav className="mt-10 flex flex-col gap-2">
           {visibleNavItems.map((item) => {
@@ -5869,11 +10962,24 @@ function DashboardPage({
                   <AppointmentsTab
                     businessId={businessId}
                   />
-                ) : activeTab === "settings" &&
+                ) : activeTab === "business_center" &&
                   analytics ? (
                   <SettingsTab
                     analytics={analytics}
                     userEmail={userEmail}
+                    onAnalyticsChange={
+                      setAnalytics
+                    }
+                    onSubscriptionBlocked={(
+                      reason,
+                    ) => {
+                      setSubscriptionBlockReason(
+                        reason,
+                      );
+                      setSubscriptionSuspended(
+                        true,
+                      );
+                    }}
                     onLogout={async () => {
                       await supabase.auth.signOut();
                       window.location.hash = "/login";
@@ -6549,7 +11655,7 @@ function CookiePolicyPage() {
 
           <section>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
-              03 — Analytics
+              03 — Στατιστικά
             </p>
 
             <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
@@ -6608,6 +11714,193 @@ function CookiePolicyPage() {
 
         <p className="mt-20 border-t border-black/10 pt-6 text-[11px] uppercase tracking-[0.18em] text-[#222]/35">
           Τελευταία ενημέρωση — Οκτώβριος 2026
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/* ================================================================== */
+/*  PAYMENT POLICY                                                    */
+/* ================================================================== */
+
+function PaymentPolicyPage() {
+  return (
+    <main className="min-h-screen bg-white font-sans text-[#222]">
+      <header className="border-b border-black/10">
+        <div className="mx-auto flex h-20 w-full max-w-[1100px] items-center justify-between px-5 md:px-10">
+          <a href="/#/" aria-label="Zisto — αρχική">
+            <img
+              src={WORDMARK}
+              alt="Zisto"
+              className="h-7 w-auto"
+              draggable={false}
+            />
+          </a>
+
+          <a
+            href="/#/"
+            className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#222]/60 transition hover:text-[#222]"
+          >
+            ← Πίσω
+          </a>
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-[900px] px-5 py-20 md:px-10 md:py-28">
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#DC2727]">
+          Χρεώσεις
+        </p>
+
+        <h1 className="mt-5 text-[13vw] font-black leading-[0.9] tracking-[-0.045em] md:text-[64px]">
+          Πολιτική Πληρωμών
+          <br />
+          & Συνδρομών.
+        </h1>
+
+        <p className="mt-8 max-w-2xl text-[16px] leading-relaxed text-[#222]/60">
+          Η παρούσα πολιτική περιγράφει τον τρόπο χρέωσης,
+          ανανέωσης, ακύρωσης και διαχείρισης καθυστερημένων
+          πληρωμών για τις υπηρεσίες Zisto.
+        </p>
+
+        <div className="mt-16 space-y-14 border-t border-black/10 pt-14">
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              01 — Χρέωση
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Custom τιμή ανά επιχείρηση
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Η τιμή και η περίοδος χρέωσης συμφωνούνται
+              ξεχωριστά με κάθε επιχείρηση. Πριν από την πρώτη
+              πληρωμή εμφανίζονται το ποσό, η συχνότητα χρέωσης
+              και τυχόν εφαρμοζόμενος ΦΠΑ.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              02 — Αυτόματη ανανέωση
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Η συνδρομή ανανεώνεται αυτόματα
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Με την ολοκλήρωση της πρώτης πληρωμής, ο πελάτης
+              εξουσιοδοτεί την επαναλαμβανόμενη χρέωση σύμφωνα
+              με τη συμφωνημένη περίοδο. Η συνδρομή συνεχίζεται
+              μέχρι να ακυρωθεί.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              03 — Τρόποι πληρωμής
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Ασφαλής επεξεργασία μέσω Stripe
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Οι ηλεκτρονικές πληρωμές επεξεργάζονται μέσω
+              Stripe. Οι διαθέσιμες μέθοδοι μπορεί να
+              περιλαμβάνουν κάρτα, Apple Pay, Google Pay,
+              SEPA Direct Debit ή άλλες συμβατές μεθόδους,
+              ανάλογα με τη χώρα, τη συσκευή και τη
+              διαθεσιμότητα του παρόχου.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              04 — Αποτυχημένη πληρωμή
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              10 ημέρες περίοδος χάριτος
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Αν μια επαναλαμβανόμενη πληρωμή αποτύχει, η
+              συνδρομή μεταφέρεται σε κατάσταση καθυστέρησης
+              και αποστέλλεται σχετική ενημέρωση. Η πρόσβαση
+              παραμένει διαθέσιμη για έως 10 ημερολογιακές
+              ημέρες από την ημερομηνία οφειλής.
+            </p>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Αν η οφειλή δεν τακτοποιηθεί εντός της περιόδου
+              χάριτος, η υπηρεσία μπορεί να τεθεί προσωρινά σε
+              παύση. Μετά από επιτυχημένη πληρωμή, η πρόσβαση
+              επανενεργοποιείται αυτόματα.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              05 — Ακύρωση
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Ακύρωση πριν από την επόμενη ανανέωση
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Η ακύρωση μπορεί να ζητηθεί οποιαδήποτε στιγμή
+              πριν από την επόμενη ημερομηνία χρέωσης. Εκτός
+              αν συμφωνηθεί διαφορετικά, η ακύρωση ισχύει για
+              την επόμενη ανανέωση και η ήδη πληρωμένη περίοδος
+              παραμένει ενεργή μέχρι τη λήξη της.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              06 — Επιστροφές χρημάτων
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Refunds και λανθασμένες χρεώσεις
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Πληρωμές για περίοδο υπηρεσίας που έχει ήδη
+              ξεκινήσει δεν επιστρέφονται αναλογικά, εκτός αν
+              υπάρχει λανθασμένη ή διπλή χρέωση, αδυναμία
+              παροχής της συμφωνημένης υπηρεσίας ή άλλη
+              περίπτωση όπου απαιτείται επιστροφή από την
+              εφαρμοστέα νομοθεσία.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              07 — Ειδική συμφωνία
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Η γραπτή συμφωνία υπερισχύει
+            </h2>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-[#222]/65">
+              Επειδή οι υπηρεσίες Zisto διαμορφώνονται custom,
+              μπορεί να συμφωνηθούν ειδικοί εμπορικοί όροι με
+              συγκεκριμένο πελάτη. Σε περίπτωση διαφοράς,
+              υπερισχύει η ειδική γραπτή συμφωνία, με την
+              επιφύλαξη τυχόν υποχρεωτικών διατάξεων του νόμου.
+            </p>
+          </section>
+
+          <section>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-[#DC2727]">
+              08 — Επικοινωνία
+            </p>
+            <h2 className="mt-4 text-[28px] font-black tracking-[-0.025em]">
+              Θέμα με πληρωμή ή συνδρομή;
+            </h2>
+            <a
+              href="mailto:zisto.gr@gmail.com"
+              className="mt-5 inline-block text-[15px] font-bold underline decoration-[#DC2727] decoration-2 underline-offset-4"
+            >
+              zisto.gr@gmail.com
+            </a>
+          </section>
+        </div>
+
+        <p className="mt-20 border-t border-black/10 pt-6 text-[11px] uppercase tracking-[0.18em] text-[#222]/35">
+          Τελευταία ενημέρωση — Νοέμβριος 2026
         </p>
       </div>
     </main>
@@ -6703,6 +11996,10 @@ useEffect(() => {
 
   if (route === "/privacy") {
     return <PrivacyPolicyPage />;
+  }
+
+  if (route === "/payments") {
+    return <PaymentPolicyPage />;
   }
 
   if (route === "/login") {
