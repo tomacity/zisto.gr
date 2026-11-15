@@ -2680,6 +2680,17 @@ type AnalyticsResponse = {
   };
   daily_activity: DailyActivity[];
   recent_activity: AnalyticsEvent[];
+  selection_activity?: {
+    days: number;
+    cart_opens: number;
+    selection_sessions: number;
+    items_added: number;
+    items_removed: number;
+    groups_created: number;
+    group_joins: number;
+    waiter_views: number;
+    top_products: {id: string; name: string; additions: number}[];
+  } | null;
   appointments: {
     today: number;
     week: number;
@@ -2806,6 +2817,15 @@ function formatEventName(eventName: string) {
     review_click: "Review click",
     wifi_open: "Άνοιγμα Wi-Fi",
     social_open: "Άνοιγμα social",
+    cart_open: "Άνοιγμα επιλογών",
+    cart_add: "Προσθήκη στις επιλογές",
+    cart_remove: "Αφαίρεση από τις επιλογές",
+    cart_clear: "Άδειασμα επιλογών",
+    cart_waiter_view: "Προβολή στον σερβιτόρο",
+    group_create: "Δημιουργία παρέας",
+    group_join: "Συμμετοχή σε παρέα",
+    group_close: "Κλείσιμο παρέας",
+    group_leave: "Αποχώρηση από παρέα",
   };
 
   return names[eventName] ?? eventName;
@@ -3727,6 +3747,38 @@ function AnalyticsTab({
           </section>
         )}
 
++      {menuEnabled && analytics.selection_activity && (
+        <section className="rounded-[22px] border border-black/10 bg-white p-6 md:p-8">
+          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#DC2727]">Τελευταίες 7 ημέρες</p>
+          <h2 className="mt-3 text-[28px] font-black tracking-[-0.04em]">Οι επιλογές των πελατών</h2>
+          <p className="mt-2 text-[12px] text-[#222]/50">Ενδιαφέρον στον κατάλογο. Οι επιλογές δεν αποτελούν επιβεβαιωμένες παραγγελίες ή πωλήσεις.</p>
+          <dl className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[
+              {label:"Προσθήκες προϊόντων",value:analytics.selection_activity.items_added},
+              {label:"Επισκέψεις με επιλογές",value:analytics.selection_activity.selection_sessions},
+              {label:"Παρέες που δημιουργήθηκαν",value:analytics.selection_activity.groups_created},
+              {label:"Προβολές στον σερβιτόρο",value:analytics.selection_activity.waiter_views},
+            ].map(item=>(
+              <div key={item.label} className="rounded-[16px] bg-[#F6F6F4] p-4">
+                <dt className="text-[11px] text-[#222]/50">{item.label}</dt>
+                <dd className="mt-3 text-[30px] font-black">{numberFormatter.format(item.value)}</dd>
+              </div>
+            ))}
+          </dl>
+          <h3 className="mt-8 text-[15px] font-bold">Προϊόντα με τις περισσότερες προσθήκες</h3>
+          {analytics.selection_activity.top_products.length === 0 ? (
+            <p className="mt-3 text-[12px] text-[#222]/45">Δεν έχουν καταγραφεί ακόμη επιλογές προϊόντων.</p>
+          ) : (
+            <ol className="mt-3 divide-y divide-black/10">
+              {analytics.selection_activity.top_products.map(product=>(
+                <li key={product.id} className="flex items-center justify-between gap-4 py-3 text-[13px]">
+                  <span>{product.name}</span><span className="shrink-0 font-bold">{numberFormatter.format(product.additions)} προσθήκες</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
       <RecentActivity
         events={analytics.recent_activity}
       />
@@ -12020,3 +12072,4 @@ useEffect(() => {
 
   return <LandingPage />;
 }
+

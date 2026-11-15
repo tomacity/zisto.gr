@@ -1,4 +1,5 @@
 import { cancelAppointmentReminder } from "../lib/appointment-reminders.js";
+import { selectionEventName, summarizeSelections } from "../lib/selection-analytics.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://zistogr.vercel.app",
@@ -134,9 +135,7 @@ function getEventSource(event) {
 
 function normalizeEvent(event) {
   return {
-    event_name: getEventName(
-      event.event_type,
-    ),
+    event_name: selectionEventName(event) || getEventName(event.event_type),
 
     source: getEventSource(event),
 
@@ -3358,6 +3357,10 @@ export default async function handler(
           sourceCounts.unknown || 0,
       },
 
+      selection_activity: enabledDashboardModules.includes("menu")
+        ? summarizeSelections(rawEvents, now, business.timezone || "Europe/Athens")
+        : null,
+
       daily_activity:
         dailyActivity,
 
@@ -3378,3 +3381,4 @@ export default async function handler(
     });
   }
 }
+

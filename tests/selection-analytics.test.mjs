@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {summarizeSelections,selectionEventName} from '../lib/selection-analytics.js';
+const event=(action,extra={})=>({event_type:'button_click',created_at:'2026-11-15T15:00:00Z',session_id:'anon-1',metadata:{component:'selection_cart',action,product_id:'dinner-0-0',product_name:'Ψωμί',quantity_delta:action==='cart_remove'?-1:1,...extra}});
+const events=[event('cart_add'),event('cart_add'),event('cart_remove'),event('group_create'),event('cart_waiter_view'),event('cart_open')];
+const result=summarizeSelections(events,new Date('2026-11-15T16:00:00Z'));
+assert.equal(result.items_added,2);assert.equal(result.items_removed,1);assert.equal(result.selection_sessions,1);assert.equal(result.groups_created,1);assert.equal(result.waiter_views,1);assert.equal(result.top_products[0].additions,2);
+assert.equal(selectionEventName({event_type:'page_view',metadata:{action:'cart_add'}}),null);
+const boundary=[{...event('cart_add'),created_at:'2026-11-08T22:30:00Z'},{...event('cart_add'),created_at:'2026-11-08T21:30:00Z'},{...event('cart_add'),created_at:'2026-11-16T12:00:00Z'}];
+assert.equal(summarizeSelections(boundary,new Date('2026-11-15T16:00:00Z')).items_added,1,'Athens midnight and future events');
+assert.equal(summarizeSelections([event('cart_add',{quantity_delta:99})],new Date('2026-11-15T16:00:00Z')).items_added,0);
+console.log('Selection analytics tests passed: aggregation, unique sessions, labels, time zone, future events and invalid quantities.');
