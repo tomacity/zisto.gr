@@ -49,9 +49,9 @@ try {
   assert.equal(res.body.card.landing_page_name,'Smart Link');
   assert.equal(res.body.card.location_name,'Main');
   const tracking = new URL(res.body.card.tracking_url);
-  assert.equal(tracking.hash,'#dinner-gr');
-  assert.equal(tracking.searchParams.get('card'),res.body.card.public_token);
-  assert.equal(tracking.searchParams.get('source'),'nfc');
+  assert.equal(tracking.origin,'https://zisto.app');
+  assert.equal(tracking.pathname,'/n/'+res.body.card.public_token);
+  assert.equal(Buffer.byteLength(tracking.href),56);
 
   // Exercise the actual createTable callback with the API's old empty-success response.
   const site = readFileSync(new URL('../src/components/zisto/Site.tsx',import.meta.url),'utf8');
