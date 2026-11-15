@@ -8558,9 +8558,9 @@ function NfcCardsTab({
   
       const result = await response.json();
   
-      if (!response.ok) {
+      if (!response.ok || !result?.card?.id || !result.card.tracking_url) {
         throw new Error(
-          result.error ||
+          result?.error ||
             "Απέτυχε η δημιουργία του τραπεζιού.",
         );
       }
