@@ -468,7 +468,15 @@ const smartLinkLiveUrl =
     );
 
     if (locationIds.length === 0) {
+      if (req.method !== "GET") {
+        return res.status(409).json({
+          error:
+            "Η επιχείρηση δεν έχει ακόμη τοποθεσία. Ολοκλήρωσε πρώτα το Smart Link setup.",
+        });
+      }
+
       return res.status(200).json({
+        business_id: businessId,
         cards: [],
       });
     }
