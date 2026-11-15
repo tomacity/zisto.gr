@@ -201,6 +201,73 @@ function buildTrackingUrl(
   return url.toString();
 }
 
+
+function buildCardUrl(source: "nfc" | "qr", cardToken: string) {
+  return `https://zisto.app/${source === "qr" ? "q" : "n"}/${encodeURIComponent(cardToken)}`;
+}
+
+async function redirectCard(
+  req: any,
+  res: any,
+  requestUrl: URL,
+  supabaseUrl: string,
+  supabaseSecretKey: string,
+) {
+  const token = requestUrl.searchParams.get("public_token") ?? "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
+    return res.status(404).json({ error: "Το link δεν βρέθηκε." });
+  }
+
+  try {
+    const query = new URLSearchParams({
+      public_token: `eq.${token}`,
+      is_active: "eq.true",
+      select: "public_token,landing_pages!inner(is_active,locations!inner(business_id))",
+      limit: "1",
+    });
+    const cardResponse = await supabaseRequest({
+      supabaseUrl, supabaseSecretKey,
+      path: `/rest/v1/cards?${query}`,
+    });
+    if (!cardResponse.ok) throw new Error("Card lookup failed");
+    const [card] = await cardResponse.json();
+    const page = card?.landing_pages;
+    const businessId = page?.locations?.business_id;
+    if (!businessId || !page.is_active) {
+      return res.status(404).json({ error: "Το link δεν είναι διαθέσιμο." });
+    }
+
+    const projectQuery = new URLSearchParams({
+      business_id: `eq.${businessId}`,
+      status: "eq.active",
+      select: "live_url",
+      order: "created_at.desc",
+      limit: "1",
+    });
+    const projectResponse = await supabaseRequest({
+      supabaseUrl, supabaseSecretKey,
+      path: `/rest/v1/connected_projects?${projectQuery}`,
+    });
+    if (!projectResponse.ok) throw new Error("Smart Link lookup failed");
+    const [project] = await projectResponse.json();
+    if (!project?.live_url) {
+      return res.status(404).json({ error: "Το Smart Link δεν είναι διαθέσιμο." });
+    }
+
+    const destination = new URL(project.live_url);
+    if (!["https:", "http:"].includes(destination.protocol) || destination.username || destination.password) {
+      throw new Error("Invalid Smart Link destination");
+    }
+    const source = requestUrl.searchParams.get("source") === "qr" ? "qr" : "nfc";
+    res.setHeader("Location", buildTrackingUrl(destination.toString(), source, card.public_token));
+    res.setHeader("Referrer-Policy", "no-referrer");
+    return res.status(302).end();
+  } catch (error) {
+    console.error("Card redirect failed:", error);
+    return res.status(503).json({ error: "Το Smart Link δεν είναι προσωρινά διαθέσιμο." });
+  }
+}
+
 export default async function handler(
   req: any,
   res: any,
@@ -247,6 +314,11 @@ export default async function handler(
       req.url ?? "/api/cards",
       `https://${req.headers.host ?? "localhost"}`,
     );
+
+  // Public scans resolve only a token; dashboard actions still require authentication.
+  if (req.method === "GET" && requestUrl.searchParams.has("public_token")) {
+    return redirectCard(req, res, requestUrl, supabaseUrl, supabaseSecretKey);
+  }
 
   const requestedBusinessId =
     requestUrl.searchParams.get(
@@ -1063,11 +1135,7 @@ const calendarEndKey = [
           location_name:
             createdLocation?.name ?? null,
           tracking_url:
-            buildTrackingUrl(
-              smartLinkLiveUrl,
-              "nfc",
-              created[0].public_token,
-            ),
+            buildCardUrl("nfc", created[0].public_token),
         },
       });
     }
@@ -1249,11 +1317,7 @@ const calendarEndKey = [
   
        tracking_url:
         smartLinkLiveUrl
-          ? buildTrackingUrl(
-              smartLinkLiveUrl,
-              source,
-              card.public_token,
-            )
+          ? buildCardUrl(source, card.public_token)
           : null,
   
         analytics: {

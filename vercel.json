@@ -7,6 +7,14 @@
   ],
   "rewrites": [
     {
+      "source": "/n/:token",
+      "destination": "/api/cards?public_token=:token&source=nfc"
+    },
+    {
+      "source": "/q/:token",
+      "destination": "/api/cards?public_token=:token&source=qr"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
