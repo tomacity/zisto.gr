@@ -3,7 +3,7 @@ import {supabase} from '../../lib/supabase';
 import './menu-management.css';
 type Names={gr:string;en:string};
 type Price={id:string;label:string;cents:number};
-type Product={id:string;category_id:string;names:Names;descriptions:Names;prices:Price[]};
+type Product={type?:'heading';id:string;category_id:string;names:Names;descriptions:Names;prices:Price[]};
 type Catalog={categories:{id:string;section:string;names:Names}[];products:Product[]};
 type Snapshot={catalog:Catalog;revision:number;updated_at:string};
 const name=(n:Names)=>n.gr||n.en;
@@ -41,7 +41,7 @@ export default function MenuManagement({businessId}:{businessId?:string|null}){
  }
  function remove(p:Product){setRemoveTarget(p);setFormError('');}
  function cancelRemove(){if(!saving){deleteDialog.current?.close();setRemoveTarget(null);}}
- const shown=data?.catalog.products.filter(p=>(!category||p.category_id===category)&&[...Object.values(p.names),...Object.values(p.descriptions)].some(s=>s.toLocaleLowerCase('el').includes(search.toLocaleLowerCase('el'))))||[];
+ const shown=data?.catalog.products.filter(p=>p.type!=='heading'&&(!category||p.category_id===category)&&[...Object.values(p.names),...Object.values(p.descriptions)].some(s=>s.toLocaleLowerCase('el').includes(search.toLocaleLowerCase('el'))))||[];
  return <section className="menu-manager" aria-label="Διαχείριση μενού">
   <header className="mm-header"><div><p className="mm-eyebrow">ΜΕΝΟΥ</p><h1>Διαχείριση μενού</h1><p>Ενημέρωσε προϊόντα και τιμές. Οι αλλαγές περνούν απευθείας στο Smart Link.</p></div><button className="mm-primary" onClick={add} disabled={!data?.catalog.categories.length||saving}>+ Προσθήκη προϊόντος</button></header>
   {loading&&<p role="status">Φόρτωση καταλόγου…</p>}
