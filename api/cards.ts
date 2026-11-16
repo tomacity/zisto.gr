@@ -1,3 +1,4 @@
+import menuHandler from "../lib/menu-api.js";
 const ALLOWED_ORIGINS = new Set([
   "https://zistogr.vercel.app",
   "https://zisto.app",
@@ -272,6 +273,7 @@ export default async function handler(
   req: any,
   res: any,
 ) {
+  if (new URL(req.url ?? "/api/cards", "https://zisto.app").searchParams.get("view") === "menu") return menuHandler(req,res);
   setCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {

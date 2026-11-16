@@ -1,3 +1,4 @@
+import MenuManagement from "./MenuManagement";
 import { GlobalLoader } from "../ui/GlobalLoader";
 import { CountUp, MetricValue } from "../ui/CountUp";
 import { startLiveRefresh } from "../../lib/live-refresh.js";
@@ -9571,7 +9572,8 @@ type DashboardModule =
 type DashboardTab =
   | "overview"
   | DashboardModule
-  | "business_center";
+  | "business_center"
+  | "menu_management";
 
 const DASHBOARD_NAV_ITEMS: {
   id: DashboardTab;
@@ -9595,6 +9597,7 @@ function DashboardPage({
   const [cardsLoading, setCardsLoading] = useState(true);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [menuExpanded,setMenuExpanded] = useState(false);
   const [activeTab, setActiveTab] =
     useState<DashboardTab>(() => {
       if (typeof window === "undefined") {
@@ -10127,7 +10130,7 @@ function DashboardPage({
     if (
       activeTab !== "business_center" &&
       !enabledModules.includes(
-        activeTab as DashboardModule,
+        (activeTab === "menu_management" ? "menu" : activeTab) as DashboardModule,
       )
     ) {
       setActiveTab(
@@ -10835,6 +10838,12 @@ function DashboardPage({
 
         <nav className="mt-10 flex flex-col gap-2">
           {visibleNavItems.map((item) => {
+            if(item.id === "menu") return <div key="menu">
+              <button type="button" aria-expanded={menuExpanded} aria-controls="dashboard-menu-subnav" onClick={()=>setMenuExpanded(!menuExpanded)} className={'flex w-full items-center gap-4 rounded-[12px] px-4 py-3.5 text-left text-[12px] font-bold transition-colors '+(activeTab === 'menu' || activeTab === 'menu_management' ? 'bg-[#DC2727] text-white' : 'text-white/50 hover:bg-white/[0.06] hover:text-white')}>
+                <span className="w-4 text-center">{item.icon}</span><span className="flex-1">Μενού</span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{transform:menuExpanded?'rotate(180deg)':'none',transition:'transform .2s'}}><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {menuExpanded && <div id="dashboard-menu-subnav" className="dashboard-menu-subnav">{([{id:'menu',label:'Στατιστικά'},{id:'menu_management',label:'Διαχείριση'}] as const).map(sub=><button type="button" key={sub.id} aria-current={activeTab===sub.id?'page':undefined} onClick={()=>{setActiveTab(sub.id);setSidebarOpen(false);}}>{sub.label}</button>)}</div>}
+            </div>;
             const isActive = activeTab === item.id;
 
             return (
@@ -10954,6 +10963,8 @@ function DashboardPage({
                 ) : activeTab === "reviews" &&
                   analytics ? (
                   <ReviewsTab analytics={analytics} />
+                ) : activeTab === "menu_management" ? (
+                  <MenuManagement businessId={analytics?.business_id ?? businessId} />
                 ) : activeTab === "menu" &&
                   analytics ? (
                   <MenuTab analytics={analytics} />
