@@ -36,3 +36,12 @@ response=await request('PUT','',{catalog:{...edited,products:[]},revision:2});as
 assert.equal((await request('PUT','',{catalog:sample,revision:3})).statusCode,200);
 assert.equal((await request('DELETE')).statusCode,405);
 console.log('Menu checks passed: schema, integer prices, duplicates, public read, authentication, tenant isolation, role checks, edits, add/remove and version conflict.');
+
+const legacy = structuredClone(sample);
+legacy.products.push({id:'cocktails-26',category_id:'food',names:{en:"Greenall's"},descriptions:{},prices:[{id:'cocktails-26-0',label:'',cents:800}]});
+legacy.products.push({id:'wine-heading',type:'heading',category_id:'food',names:{gr:'ΛΕΥΚΑ',en:'WHITE'},descriptions:{},prices:[]});
+assert.equal(validateCatalog(legacy).products.length,3);
+assert.equal(validateCatalog(legacy).products.at(-1).type,'heading');
+legacy.products[1].names={gr:'',en:''};
+assert.throws(()=>validateCatalog(legacy),/cocktails-26/,'Identify the invalid existing product rather than blaming a filled new-product form');
+console.log('Legacy name and heading regression checks passed.');
