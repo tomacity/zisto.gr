@@ -1,5 +1,6 @@
 import { GlobalLoader } from "../components/ui/GlobalLoader";
 import { useEffect, useRef, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { InviteClientPanel } from "../components/admin/InviteClientPanel";
 import { SubscriptionsPanel, type AdminSubscription } from "../components/admin/SubscriptionsPanel";
@@ -1536,6 +1537,12 @@ function ΕπιχειρήσειςPanel({
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
+  const [resettingBusiness, setResettingBusiness] = useState<Business | null>(null);
+  const [resetConfirmation, setResetConfirmation] = useState("");
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
+
   const [deletingBusiness, setDeletingBusiness] =
     useState<Business | null>(null);
   
@@ -1886,6 +1893,61 @@ async function updateBusiness(
   }
 }
 
+  function startResettingBusiness(business: Business) {
+    if (editSaving || resetSaving) return;
+    setResettingBusiness(business);
+    setResetConfirmation("");
+    setResetError("");
+    setResetSuccess("");
+  }
+
+  function cancelResettingBusiness() {
+    if (resetSaving) return;
+    setResettingBusiness(null);
+    setResetConfirmation("");
+    setResetError("");
+  }
+
+  async function resetBusiness() {
+    if (!resettingBusiness || resetSaving || resetConfirmation.trim() !== resettingBusiness.slug) return;
+    try {
+      setResetSaving(true);
+      setResetError("");
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session) {
+        window.location.hash = "/login";
+        return;
+      }
+      const response = await fetch("/api/admin/businesses?action=reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          id: resettingBusiness.id,
+          confirm_slug: resetConfirmation.trim(),
+          confirm_reset: true,
+        }),
+      });
+      const result = await response.json();
+      if (response.status === 401) {
+        await supabase.auth.signOut();
+        window.location.hash = "/login";
+        return;
+      }
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Δεν ολοκληρώθηκε η επαναφορά.");
+      }
+      setResetSuccess(`Έγινε επαναφορά της επιχείρησης «${resettingBusiness.name}». Τα παλιά στατιστικά και ραντεβού διαγράφηκαν. Η νέα δραστηριότητα καταγράφεται κανονικά.`);
+      setResettingBusiness(null);
+      setResetConfirmation("");
+      cancelEditingBusiness();
+    } catch (resetBusinessError) {
+      setResetError(resetBusinessError instanceof Error ? resetBusinessError.message : "Δεν ήταν δυνατή η επαναφορά.");
+    } finally {
+      setResetSaving(false);
+    }
+  }
+
   function startDeletingBusiness(business: Business) {
     setDeletingBusiness(business);
     setDeleteConfirmation("");
@@ -2043,6 +2105,12 @@ async function updateBusiness(
             : "+ Νέα Επιχείρηση"}
         </button>
       </div>
+
+      {resetSuccess && (
+        <div role="status" className="rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-700">
+          {resetSuccess}
+        </div>
+      )}
 
       {showCreateForm && (
         <form
@@ -2643,6 +2711,24 @@ async function updateBusiness(
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#DC2727]">
                   Danger zone
                 </p>
+                <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-red-700">Επαναφορά επιχείρησης</p>
+                    <p className="mt-1 text-xs leading-5 text-red-600/70">
+                      Μηδενισμός στατιστικών και διαγραφή ιστορικού ενεργειών και ραντεβού.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => startResettingBusiness(editingBusiness)}
+                    disabled={editSaving || resetSaving}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-5 py-3.5 text-sm font-bold text-[#DC2727] transition hover:border-[#DC2727] disabled:opacity-50"
+                  >
+                    <RotateCcw size={18} aria-hidden="true" />
+                    Επαναφορά
+                  </button>
+                </div>
+
 
                 <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -2796,6 +2882,97 @@ async function updateBusiness(
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {resettingBusiness && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/50 px-5 py-8" role="dialog" aria-modal="true" aria-labelledby="reset-business-title">
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl sm:p-8">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#DC2727]">
+              Επαναφορά δεδομένων
+            </p>
+      
+            <h3 id="reset-business-title" className="mt-4 text-3xl font-black tracking-[-0.04em]">
+              Επαναφορά επιχείρησης;
+            </h3>
+      
+            <p className="mt-4 text-sm leading-6 text-[#666]">
+              Πρόκειται να μηδενίσεις τη δραστηριότητα της επιχείρησης{" "}
+              <strong className="text-[#222]">
+                {resettingBusiness.name}
+              </strong>
+              .
+            </p>
+      
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-700">
+                Θα διαγραφούν οριστικά επισκέψεις, κλικ, στατιστικά μενού/κριτικών/NFC, επιλογές προϊόντων και όλα τα ραντεβού. Η ενέργεια δεν μπορεί να αναιρεθεί.
+              </p>
+            </div>
+      
+            <p className="mt-4 text-xs leading-5 text-[#666]">
+              Διατηρούνται η επιχείρηση, το Smart Link, οι NFC κάρτες, οι χρήστες, οι ρυθμίσεις και η συνδρομή.
+              Οι αξιολογήσεις στη Google δεν επηρεάζονται.
+            </p>
+            <label className="mt-6 block">
+              <span className="text-xs font-bold uppercase tracking-[0.15em] text-[#666]">
+                Πληκτρολόγησε το slug για επιβεβαίωση
+              </span>
+      
+              <div className="mt-2 rounded-2xl bg-[#F7F5F1] px-4 py-3">
+                <code className="text-sm font-bold">
+                  {resettingBusiness.slug}
+                </code>
+              </div>
+      
+              <input
+                type="text"
+                value={resetConfirmation}
+                onChange={(event) =>
+                  setResetConfirmation(event.target.value)
+                }
+                disabled={resetSaving}
+                autoFocus
+                autoComplete="off"
+                placeholder={resettingBusiness.slug}
+                className="mt-3 w-full rounded-2xl border border-black/10 px-4 py-4 font-mono text-sm outline-none transition focus:border-[#DC2727]"
+              />
+            </label>
+      
+            {resetError && (
+              <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-red-700">
+                  {resetError}
+                </p>
+              </div>
+            )}
+      
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={cancelResettingBusiness}
+                disabled={resetSaving}
+                className="rounded-2xl border border-black/10 px-6 py-4 text-sm font-bold transition hover:border-[#222] disabled:opacity-50"
+              >
+                Ακύρωση
+              </button>
+      
+              <button
+                type="button"
+                onClick={resetBusiness}
+                disabled={
+                  resetSaving ||
+                  resetConfirmation.trim() !==
+                    resettingBusiness.slug
+                }
+                className="rounded-2xl bg-[#DC2727] px-6 py-4 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {resetSaving
+                  ? "Επαναφορά..."
+                  : "Επαναφορά δεδομένων"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
