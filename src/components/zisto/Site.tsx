@@ -1,4 +1,6 @@
 import { GlobalLoader } from "../ui/GlobalLoader";
+import { CountUp, MetricValue } from "../ui/CountUp";
+import { startLiveRefresh } from "../../lib/live-refresh.js";
 
 import {
   useEffect,
@@ -2743,6 +2745,7 @@ class AnalyticsRequestError extends Error {
 async function fetchAnalytics(
   accessToken: string,
   businessId?: string | null,
+  signal?: AbortSignal,
 ): Promise<AnalyticsResponse> {
   const query = businessId
     ? `?business_id=${encodeURIComponent(businessId)}`
@@ -2755,6 +2758,7 @@ async function fetchAnalytics(
       Authorization: `Bearer ${accessToken}`,
     },
     cache: "no-store",
+    signal,
   });
 
   if (response.status === 401) {
@@ -2854,7 +2858,7 @@ function DashboardMetric({
   index,
 }: {
   label: string;
-  value: string;
+  value: number | string;
   change: string;
   note: string;
   index: number;
@@ -2933,7 +2937,7 @@ function DashboardMetric({
 
         <div className="mt-14">
           <p className="text-[15vw] font-black leading-none tracking-[-0.06em] sm:text-[10vw] md:text-[6vw] lg:text-[4.2vw]">
-            {value}
+            <MetricValue value={value} />
           </p>
 
           <p
@@ -2989,7 +2993,7 @@ function DashboardChart({ data }: { data: DailyActivity[] }) {
 
         <div className="text-right">
           <p className="text-[32px] font-black tracking-[-0.04em]">
-            {numberFormatter.format(totalViews)}
+            <CountUp value={totalViews} />
           </p>
 
           <p className="text-[10px] uppercase tracking-[0.2em] text-[#222]/40">
@@ -3370,9 +3374,7 @@ function AnalyticsTab({
     if (menuEnabled) {
       return {
         label: "Conversion μενού",
-        value: `${percentFormatter.format(
-          analytics.totals.menu_conversion_rate,
-        )}%`,
+        value: `$<CountUp value={analytics.totals.menu_conversion_rate} fractionDigits={1} />%`,
         note: `${analytics.totals.menu_opens_today} ανοίγματα σήμερα`,
       };
     }
@@ -3380,9 +3382,7 @@ function AnalyticsTab({
     if (reviewsEnabled) {
       return {
         label: "Conversion κριτικών",
-        value: `${percentFormatter.format(
-          analytics.totals.review_conversion_rate,
-        )}%`,
+        value: `$<CountUp value={analytics.totals.review_conversion_rate} fractionDigits={1} />%`,
         note: `${analytics.totals.review_clicks_today} κλικ σήμερα`,
       };
     }
@@ -3438,11 +3438,7 @@ function AnalyticsTab({
             </p>
 
             <p className="mt-8 text-[44px] font-black leading-none tracking-[-0.05em]">
-              {typeof item.value === "number"
-                ? numberFormatter.format(
-                    item.value,
-                  )
-                : item.value}
+              <MetricValue value={item.value} />
             </p>
 
             <p
@@ -3565,13 +3561,9 @@ function AnalyticsTab({
                       </span>
 
                       <span className="text-[11px] font-bold text-[#222]/40">
-                        {numberFormatter.format(
-                          source.value,
-                        )}{" "}
+                        <CountUp value={source.value} />{" "}
                         ·{" "}
-                        {percentFormatter.format(
-                          percentage,
-                        )}
+                        <CountUp value={percentage} fractionDigits={1} />
                         %
                       </span>
                     </div>
@@ -3606,10 +3598,7 @@ function AnalyticsTab({
 
               <div className="mt-6 flex items-end justify-between gap-4">
                 <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-                  {percentFormatter.format(
-                    analytics.totals
-                      .menu_conversion_rate,
-                  )}
+                  <CountUp value={analytics.totals.menu_conversion_rate} fractionDigits={1} />
                   %
                 </p>
 
@@ -3645,10 +3634,7 @@ function AnalyticsTab({
 
               <div className="mt-6 flex items-end justify-between gap-4">
                 <p className="text-[54px] font-black leading-none tracking-[-0.06em]">
-                  {percentFormatter.format(
-                    analytics.totals
-                      .review_conversion_rate,
-                  )}
+                  <CountUp value={analytics.totals.review_conversion_rate} fractionDigits={1} />
                   %
                 </p>
 
@@ -3739,7 +3725,7 @@ function AnalyticsTab({
                     {item.label}
                   </p>
                   <p className="mt-4 text-[30px] font-black tracking-[-0.04em]">
-                    {item.value}
+                    <MetricValue value={item.value} />
                   </p>
                 </div>
               ))}
@@ -3761,7 +3747,7 @@ function AnalyticsTab({
             ].map(item=>(
               <div key={item.label} className="rounded-[16px] bg-[#F6F6F4] p-4">
                 <dt className="text-[11px] text-[#222]/50">{item.label}</dt>
-                <dd className="mt-3 text-[30px] font-black">{numberFormatter.format(item.value)}</dd>
+                <dd className="mt-3 text-[30px] font-black"><CountUp value={item.value} /></dd>
               </div>
             ))}
           </dl>
@@ -3772,7 +3758,7 @@ function AnalyticsTab({
             <ol className="mt-3 divide-y divide-black/10">
               {analytics.selection_activity.top_products.map(product=>(
                 <li key={product.id} className="flex items-center justify-between gap-4 py-3 text-[13px]">
-                  <span>{product.name}</span><span className="shrink-0 font-bold">{numberFormatter.format(product.additions)} προσθήκες</span>
+                  <span>{product.name}</span><span className="shrink-0 font-bold"><CountUp value={product.additions} /> προσθήκες</span>
                 </li>
               ))}
             </ol>
@@ -3854,10 +3840,7 @@ function ReviewsTab({
           {
             label:
               "Conversion σήμερα",
-            value: `${percentFormatter.format(
-              analytics.totals
-                .review_conversion_rate,
-            )}%`,
+            value: `$<CountUp value={analytics.totals.review_conversion_rate} fractionDigits={1} />%`,
             note:
               "Clicks ανά σημερινή επίσκεψη",
           },
@@ -3896,12 +3879,7 @@ function ReviewsTab({
             </p>
 
             <p className="mt-8 text-[44px] font-black leading-none tracking-[-0.05em]">
-              {typeof item.value ===
-              "number"
-                ? numberFormatter.format(
-                    item.value,
-                  )
-                : item.value}
+              <MetricValue value={item.value} />
             </p>
 
             <p
@@ -3931,9 +3909,7 @@ function ReviewsTab({
             </div>
 
             <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/40">
-              {percentFormatter.format(
-                sevenDayConversion,
-              )}
+              <CountUp value={sevenDayConversion} fractionDigits={1} />
               % conversion
             </span>
           </div>
@@ -4005,9 +3981,7 @@ function ReviewsTab({
             </p>
 
             <p className="mt-8 text-[72px] font-black leading-none tracking-[-0.07em]">
-              {numberFormatter.format(
-                reviewOpportunity,
-              )}
+              <CountUp value={reviewOpportunity} />
             </p>
 
             <h2 className="mt-5 text-[25px] font-black leading-tight tracking-[-0.04em]">
@@ -4034,9 +4008,7 @@ function ReviewsTab({
             </div>
 
             <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
-              {percentFormatter.format(
-                sevenDayConversion,
-              )}
+              <CountUp value={sevenDayConversion} fractionDigits={1} />
               % ολοκλήρωσαν την ενέργεια
             </p>
           </div>
@@ -4201,10 +4173,7 @@ function MenuTab({
           },
           {
             label: "Conversion σήμερα",
-            value: `${percentFormatter.format(
-              analytics.totals
-                .menu_conversion_rate,
-            )}%`,
+            value: `$<CountUp value={analytics.totals.menu_conversion_rate} fractionDigits={1} />%`,
             note:
               "Ανοίγματα ανά σημερινή επίσκεψη",
           },
@@ -4239,11 +4208,7 @@ function MenuTab({
             </p>
 
             <p className="mt-8 text-[44px] font-black leading-none tracking-[-0.05em]">
-              {typeof item.value === "number"
-                ? numberFormatter.format(
-                    item.value,
-                  )
-                : item.value}
+              <MetricValue value={item.value} />
             </p>
 
             <p
@@ -4273,9 +4238,7 @@ function MenuTab({
             </div>
 
             <span className="rounded-full bg-[#F6F6F4] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.15em] text-[#222]/40">
-              {percentFormatter.format(
-                sevenDayConversion,
-              )}
+              <CountUp value={sevenDayConversion} fractionDigits={1} />
               % conversion
             </span>
           </div>
@@ -4338,9 +4301,7 @@ function MenuTab({
           </p>
 
           <p className="mt-8 text-[72px] font-black leading-none tracking-[-0.07em]">
-            {numberFormatter.format(
-              menuOpportunity,
-            )}
+            <CountUp value={menuOpportunity} />
           </p>
 
           <h2 className="mt-5 text-[25px] font-black leading-tight tracking-[-0.04em]">
@@ -4367,9 +4328,7 @@ function MenuTab({
           </div>
 
           <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">
-            {percentFormatter.format(
-              sevenDayConversion,
-            )}
+            <CountUp value={sevenDayConversion} fractionDigits={1} />
             % άνοιξαν το μενού
           </p>
         </article>
@@ -8136,9 +8095,9 @@ function NfcCardsTab({
 
   let cancelled = false;
 
-  async function loadCardAnalytics() {
+  async function loadCardAnalytics({ initial, signal }: { initial: boolean; signal: AbortSignal }) {
     try {
-      setCardAnalyticsLoading(true);
+      if (initial) setCardAnalyticsLoading(true);
 
       const {
         data: { session },
@@ -8194,6 +8153,7 @@ function NfcCardsTab({
               `Bearer ${session.access_token}`,
           },
           cache: "no-store",
+          signal,
         },
       );
 
@@ -8207,29 +8167,31 @@ function NfcCardsTab({
         );
       }
 
-      if (!cancelled) {
+      if (!cancelled && !signal.aborted) {
         setCardAnalytics(result);
       }
     } catch (error) {
+      if (signal.aborted) return;
       console.error(
         "Card analytics loading failed:",
         error,
       );
 
-      if (!cancelled) {
+      if (!cancelled && !signal.aborted && initial) {
         setCardAnalytics(null);
       }
     } finally {
-      if (!cancelled) {
+      if (!cancelled && !signal.aborted) {
         setCardAnalyticsLoading(false);
       }
     }
   }
 
-  void loadCardAnalytics();
+  const stopRefresh = startLiveRefresh(loadCardAnalytics);
 
   return () => {
     cancelled = true;
+    stopRefresh();
   };
 }, [
   analyticsCard?.id,
@@ -8780,7 +8742,7 @@ if (loading) {
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
-                {cardAnalytics?.totals?.taps ?? 0}
+                <CountUp value={cardAnalytics?.totals?.taps ?? 0} />
               </p>
             </article>
     
@@ -8790,7 +8752,7 @@ if (loading) {
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
-                {cardAnalytics?.totals?.menu_opens ?? 0}
+                <CountUp value={cardAnalytics?.totals?.menu_opens ?? 0} />
               </p>
             </article>
     
@@ -8800,7 +8762,7 @@ if (loading) {
               </p>
     
               <p className="mt-8 text-[48px] font-black leading-none">
-                {cardAnalytics?.totals?.review_clicks ?? 0}
+                <CountUp value={cardAnalytics?.totals?.review_clicks ?? 0} />
               </p>
             </article>
             
@@ -9165,7 +9127,7 @@ if (loading) {
           </p>
 
           <p className="mt-8 text-[48px] font-black leading-none">
-            {cards.length}
+            <CountUp value={cards.length} />
           </p>
         </article>
 
@@ -9175,10 +9137,7 @@ if (loading) {
           </p>
 
           <p className="mt-8 text-[48px] font-black leading-none">
-            {
-              cards.filter((card) => card.is_active)
-                .length
-            }
+            <CountUp value={cards.filter((card) => card.is_active).length} />
           </p>
         </article>
 
@@ -9188,10 +9147,7 @@ if (loading) {
           </p>
 
           <p className="mt-8 text-[48px] font-black leading-none">
-            {
-              cards.filter((card) => !card.is_active)
-                .length
-            }
+            <CountUp value={cards.filter((card) => !card.is_active).length} />
           </p>
         </article>
         </section>
@@ -9414,7 +9370,7 @@ function DashboardTabPlaceholder({
             Επισκέψεις μήνα
           </p>
           <p className="mt-3 text-[34px] font-black">
-            {numberFormatter.format(analytics?.totals.page_views_month ?? 0)}
+            <CountUp value={analytics?.totals.page_views_month ?? 0} />
           </p>
         </div>
 
@@ -9423,7 +9379,7 @@ function DashboardTabPlaceholder({
             Ανοίγματα μενού σήμερα
           </p>
           <p className="mt-3 text-[34px] font-black">
-            {numberFormatter.format(analytics?.totals.menu_opens_today ?? 0)}
+            <CountUp value={analytics?.totals.menu_opens_today ?? 0} />
           </p>
         </div>
 
@@ -9432,7 +9388,7 @@ function DashboardTabPlaceholder({
             Κλικ για κριτική σήμερα
           </p>
           <p className="mt-3 text-[34px] font-black">
-            {numberFormatter.format(analytics?.totals.review_clicks_today ?? 0)}
+            <CountUp value={analytics?.totals.review_clicks_today ?? 0} />
           </p>
         </div>
       </div>
@@ -9710,25 +9666,29 @@ function DashboardPage({
 
   useEffect(() => {
     let active = true;
-    let refreshTimer: number | null = null;
+    let stopRefresh: (() => void) | undefined;
 
     async function loadProtectedDashboard() {
-      const {
+      let {
         data: { session },
       } = await supabase.auth.getSession();
 
+      if (!active) return;
       if (!session) {
         window.location.hash = "/login";
         return;
       }
 
+      let accessToken = session.access_token;
+      const sessionUserId = session.user.id;
+
       if (active) {
         setUserEmail(session.user.email ?? "");
       }
 
-      async function loadCards() {
+      async function loadCards(background = false, signal?: AbortSignal) {
         try {
-          setCardsLoading(true);
+          if (!background) setCardsLoading(true);
           setCardsError(null);
       
           const query = businessId
@@ -9738,9 +9698,10 @@ function DashboardPage({
           const response = await fetch(`/api/cards${query}`, {
             method: "GET",
             headers: {
-              Authorization: `Bearer ${session.access_token}`,
+              Authorization: `Bearer ${accessToken}`,
             },
             cache: "no-store",
+            signal,
           });
       
           const responseText = await response.text();
@@ -9764,13 +9725,14 @@ function DashboardPage({
             );
           }
       
-          if (active) {
+          if (active && !signal?.aborted) {
             setCards((result as CardsResponse).cards ?? []);
           }
         } catch (error) {
+          if (signal?.aborted) return;
           console.error("Cards loading failed:", error);
       
-          if (active) {
+          if (active && !signal?.aborted && !background) {
             setCardsError(
               error instanceof Error
                 ? error.message
@@ -9778,7 +9740,7 @@ function DashboardPage({
             );
           }
         } finally {
-          if (active) {
+          if (active && !signal?.aborted) {
             setCardsLoading(false);
           }
         }
@@ -9820,7 +9782,7 @@ function DashboardPage({
               "Content-Type":
                 "application/json",
               Authorization:
-                `Bearer ${session.access_token}`,
+                `Bearer ${accessToken}`,
             },
             body: JSON.stringify({
               action:
@@ -9847,34 +9809,36 @@ function DashboardPage({
           )}`;
       }
 
-      async function loadAnalytics() {
+      async function loadAnalytics(background = false, signal?: AbortSignal) {
         try {
-          setAnalyticsLoading(true);
+          if (!background) setAnalyticsLoading(true);
           setAnalyticsError(null);
 
           const data = await fetchAnalytics(
-            session.access_token,
+            accessToken,
             businessId,
+            signal,
           );
 
-          if (active) {
+          if (active && !signal?.aborted) {
             setAnalytics(data);
             setBillingSetup(null);
             setAwaitingApproval(false);
             setSubscriptionSuspended(false);
             setSubscriptionBlockReason(null);
 
-            const tutorialKey = `zisto_tutorial_${session.user.id}`;
+            const tutorialKey = `zisto_tutorial_${sessionUserId}`;
 
-            if (!window.localStorage.getItem(tutorialKey)) {
+            if (!background && !window.localStorage.getItem(tutorialKey)) {
               setShowTutorial(true);
               setTutorialStep(0);
             }
           }
         } catch (error) {
+          if (signal?.aborted) return;
           console.error(error);
 
-          if (active) {
+          if (active && !signal?.aborted) {
             if (
               error instanceof AnalyticsRequestError &&
               error.status === 403
@@ -9913,14 +9877,14 @@ function DashboardPage({
               );
               setAwaitingApproval(false);
               setAnalyticsError(null);
-            } else {
+            } else if (!background) {
               setSubscriptionSuspended(false);
               setSubscriptionBlockReason(null);
               setAnalyticsError("Δεν ήταν δυνατή η φόρτωση των στατιστικών.");
             }
           }
         } finally {
-          if (active) {
+          if (active && !signal?.aborted) {
             setAnalyticsLoading(false);
           }
         }
@@ -9943,10 +9907,17 @@ function DashboardPage({
         }
       }
 
-      await loadAnalytics();
-      await loadCards();
-
-      refreshTimer = window.setInterval(loadAnalytics, 60_000);
+      if (!active) return;
+      stopRefresh = startLiveRefresh(async ({ initial, signal }: { initial: boolean; signal: AbortSignal }) => {
+        const { data: { session: freshSession } } = await supabase.auth.getSession();
+        if (!active || signal.aborted) return;
+        if (!freshSession) {
+          window.location.hash = "/login";
+          return;
+        }
+        accessToken = freshSession.access_token;
+        await Promise.all([loadAnalytics(!initial, signal), loadCards(!initial, signal)]);
+      });
     }
 
     loadProtectedDashboard();
@@ -9963,9 +9934,7 @@ function DashboardPage({
       active = false;
       subscription.unsubscribe();
 
-      if (refreshTimer !== null) {
-        window.clearInterval(refreshTimer);
-      }
+      stopRefresh?.();
     };
   }, [businessId]);
 
@@ -10085,7 +10054,7 @@ function DashboardPage({
           label: "Επισκέψεις μήνα",
           value: numberFormatter.format(analytics.totals.page_views_month),
           change: "Live",
-          note: `${numberFormatter.format(analytics.totals.unique_visitors_month)} μοναδικοί επισκέπτες`,
+          note: `$<CountUp value={analytics.totals.unique_visitors_month} /> μοναδικοί επισκέπτες`,
         },
         {
           label: "Ανοίγματα μενού σήμερα",
@@ -10103,7 +10072,7 @@ function DashboardPage({
           label: "Μοναδικοί σήμερα",
           value: numberFormatter.format(analytics.totals.unique_visitors_today),
           change: "Live",
-          note: `${numberFormatter.format(analytics.totals.page_views_today)} συνολικές επισκέψεις σήμερα`,
+          note: `$<CountUp value={analytics.totals.page_views_today} /> συνολικές επισκέψεις σήμερα`,
         },
       ]
     : [];
