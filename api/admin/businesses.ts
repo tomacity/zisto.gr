@@ -3,6 +3,7 @@ import type {
   VercelResponse,
 } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
+import { resetBusinessActivity } from "../../lib/business-reset.js";
 
 type BusinessStatus = "active" | "inactive";
 
@@ -173,6 +174,10 @@ export default async function handler(
       return response.status(403).json({
         error: "Zisto admin access required",
       });
+    }
+
+    if (request.method === "POST" && request.query.action === "reset") {
+      return await resetBusinessActivity(request, response, supabaseAdmin, requestingUser.id);
     }
 
     if (request.method === "GET") {
