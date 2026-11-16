@@ -1,5 +1,6 @@
+import { CountUp, MetricValue } from "../ui/CountUp";
+import { useLiveRefresh, type LiveRefreshContext } from "../../hooks/useLiveRefresh";
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -163,9 +164,9 @@ export function AppointmentsTab({
         appointment.status !== "cancelled",
     ) ?? null;
 
-  async function loadAppointments() {
+  async function loadAppointments({ initial, signal }: LiveRefreshContext) {
     try {
-      setLoading(true);
+      if (initial) setLoading(true);
       setError(null);
 
       const {
@@ -201,6 +202,7 @@ export function AppointmentsTab({
               `Bearer ${session.access_token}`,
           },
           cache: "no-store",
+          signal,
         },
       );
 
@@ -217,6 +219,7 @@ export function AppointmentsTab({
         );
       }
 
+      if (signal.aborted) return;
       const data = result as AppointmentResponse;
       setAppointments(data.appointments ?? []);
       setServices(
@@ -230,24 +233,18 @@ export function AppointmentsTab({
         ),
       );
     } catch (loadError) {
+      if (signal.aborted || !initial) return;
       setError(
         loadError instanceof Error
           ? loadError.message
           : "Δεν ήταν δυνατή η φόρτωση των ραντεβού.",
       );
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
-  useEffect(() => {
-    void loadAppointments();
-  }, [
-    businessId,
-    weekStart.getFullYear(),
-    weekStart.getMonth(),
-    weekStart.getDate(),
-  ]);
+  useLiveRefresh(loadAppointments, `${businessId ?? "own"}:${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`);
 
   async function cancelAppointment(
     appointment: Appointment,
@@ -531,7 +528,7 @@ export function AppointmentsTab({
             </div>
 
             <span className="rounded-full bg-[#F6F6F4] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#222]/45">
-              {dayAppointments.length} ραντεβού
+              <CountUp value={dayAppointments.length} /> ραντεβού
             </span>
           </div>
 
@@ -599,7 +596,7 @@ export function AppointmentsTab({
           </div>
 
           <span className="w-fit rounded-full bg-[#222] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
-            {weekAppointments.length} συνολικά
+            <CountUp value={weekAppointments.length} /> συνολικά
           </span>
         </div>
 
@@ -664,7 +661,7 @@ export function AppointmentsTab({
                     </div>
 
                     <span className="rounded-full bg-[#F6F6F4] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.1em] text-[#222]/45">
-                      {items.length}{" "}
+                      <CountUp value={items.length} />{" "}
                       {items.length === 1
                         ? "ραντεβού"
                         : "ραντεβού"}
@@ -727,7 +724,7 @@ function AppointmentMetric({
         {label}
       </p>
       <p className="mt-3 text-3xl font-black tracking-[-0.04em]">
-        {value}
+        <MetricValue value={value} />
       </p>
       <p className="mt-1 text-[11px] text-[#222]/35">
         {note}
