@@ -3374,7 +3374,7 @@ function AnalyticsTab({
     if (menuEnabled) {
       return {
         label: "Conversion μενού",
-        value: `$<CountUp value={analytics.totals.menu_conversion_rate} fractionDigits={1} />%`,
+        value: `${percentFormatter.format(analytics.totals.menu_conversion_rate)}%`,
         note: `${analytics.totals.menu_opens_today} ανοίγματα σήμερα`,
       };
     }
@@ -3382,7 +3382,7 @@ function AnalyticsTab({
     if (reviewsEnabled) {
       return {
         label: "Conversion κριτικών",
-        value: `$<CountUp value={analytics.totals.review_conversion_rate} fractionDigits={1} />%`,
+        value: `${percentFormatter.format(analytics.totals.review_conversion_rate)}%`,
         note: `${analytics.totals.review_clicks_today} κλικ σήμερα`,
       };
     }
@@ -3840,7 +3840,7 @@ function ReviewsTab({
           {
             label:
               "Conversion σήμερα",
-            value: `$<CountUp value={analytics.totals.review_conversion_rate} fractionDigits={1} />%`,
+            value: `${percentFormatter.format(analytics.totals.review_conversion_rate)}%`,
             note:
               "Clicks ανά σημερινή επίσκεψη",
           },
@@ -4173,7 +4173,7 @@ function MenuTab({
           },
           {
             label: "Conversion σήμερα",
-            value: `$<CountUp value={analytics.totals.menu_conversion_rate} fractionDigits={1} />%`,
+            value: `${percentFormatter.format(analytics.totals.menu_conversion_rate)}%`,
             note:
               "Ανοίγματα ανά σημερινή επίσκεψη",
           },
@@ -10054,7 +10054,7 @@ function DashboardPage({
           label: "Επισκέψεις μήνα",
           value: numberFormatter.format(analytics.totals.page_views_month),
           change: "Live",
-          note: `$<CountUp value={analytics.totals.unique_visitors_month} /> μοναδικοί επισκέπτες`,
+          note: `${numberFormatter.format(analytics.totals.unique_visitors_month)} μοναδικοί επισκέπτες`,
         },
         {
           label: "Ανοίγματα μενού σήμερα",
@@ -10072,7 +10072,7 @@ function DashboardPage({
           label: "Μοναδικοί σήμερα",
           value: numberFormatter.format(analytics.totals.unique_visitors_today),
           change: "Live",
-          note: `$<CountUp value={analytics.totals.page_views_today} /> συνολικές επισκέψεις σήμερα`,
+          note: `${numberFormatter.format(analytics.totals.page_views_today)} συνολικές επισκέψεις σήμερα`,
         },
       ]
     : [];
