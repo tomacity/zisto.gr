@@ -5,5 +5,5 @@
 @media(max-width:700px){.mm-sortable-product{grid-template-columns:40px minmax(0,1fr) auto;gap:12px}.mm-sortable-product .mm-actions{grid-column:2/-1}.mm-sortable-product .mm-prices{font-size:12px}.mm-sortable-product .mm-prices span{white-space:normal}}
 
 .mm-hidden-label{display:inline-block;margin-top:.25rem;border-radius:.25rem;padding:.125rem .375rem;background:#e9e5e1;color:#4a4038;font-size:.75rem;font-weight:600}
-.mm-actions button svg{vertical-align:middle;margin-inline-end:.35rem}
 .mm-actions{flex-wrap:wrap}
+.mm-actions button{display:inline-grid;place-items:center;width:44px;height:44px;padding:0}

@@ -1,6 +1,6 @@
 import {DndContext,DragOverlay,PointerSensor,KeyboardSensor,useSensor,useSensors,pointerWithin,closestCenter,type CollisionDetection,type DragEndEvent} from '@dnd-kit/core';
 import {SortableContext,verticalListSortingStrategy,sortableKeyboardCoordinates} from '@dnd-kit/sortable';
-import {Eye,EyeOff} from 'lucide-react';
+import {Eye,EyeOff,Pencil,Trash2} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {MenuDropCategory,MenuSortableProduct} from './MenuProductSort';
 import {moveMenuProduct} from '../../lib/menu-reorder.js';
@@ -106,7 +106,13 @@ export default function MenuManagement({businessId}:{businessId?:string|null}){
      {shown.filter(p=>p.category_id===c.id).map(p=><MenuSortableProduct key={p.id} id={p.id} categoryId={c.id} title={name(p.names)} disabled={dragDisabled} over={overId==='product:'+p.id&&activeProductId!==p.id}>
       <div><h3>{name(p.names)}</h3>{p.hidden&&<span className="mm-hidden-label">Κρυφό προϊόν</span>}{p.names.en&&p.names.en!==p.names.gr&&<p>{p.names.en}</p>}{name(p.descriptions)&&<p>{name(p.descriptions)}</p>}</div>
       <div className="mm-prices">{p.prices.map(v=><span key={v.id}>{variant(v.label)} {money(v.cents)}</span>)}</div>
-      <div className="mm-actions"><button type="button" onClick={()=>toggleVisibility(p)} disabled={saving||!!activeProductId} aria-label={(p.hidden?'Επανεμφάνιση ':'Απόκρυψη ')+name(p.names)}>{p.hidden?<EyeOff size={16} aria-hidden="true"/>:<Eye size={16} aria-hidden="true"/>}{p.hidden?'Επανεμφάνιση':'Απόκρυψη'}</button><button onClick={()=>edit(p)} disabled={saving||!!activeProductId} aria-label={'Επεξεργασία '+name(p.names)}>✎ Edit</button><button className="mm-delete" onClick={()=>remove(p)} disabled={saving||!!activeProductId} aria-label={'Αφαίρεση '+name(p.names)}>Αφαίρεση</button></div>
+      <div className="mm-actions">
+       <button type="button" onClick={()=>toggleVisibility(p)} disabled={saving||!!activeProductId} aria-label={(p.hidden?'Επανεμφάνιση ':'Απόκρυψη ')+name(p.names)} title={p.hidden?'Επανεμφάνιση':'Απόκρυψη'}>
+        {p.hidden?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}
+       </button>
+       <button type="button" onClick={()=>edit(p)} disabled={saving||!!activeProductId} aria-label={'Επεξεργασία '+name(p.names)} title="Επεξεργασία"><Pencil size={18} aria-hidden="true"/></button>
+       <button type="button" className="mm-delete" onClick={()=>remove(p)} disabled={saving||!!activeProductId} aria-label={'Αφαίρεση '+name(p.names)} title="Αφαίρεση"><Trash2 size={18} aria-hidden="true"/></button>
+      </div>
      </MenuSortableProduct>)}
     </SortableContext>
     {!shown.some(p=>p.category_id===c.id)&&<p className="mm-empty-drop">Σύρε ένα προϊόν εδώ ή πρόσθεσε νέο προϊόν.</p>}
