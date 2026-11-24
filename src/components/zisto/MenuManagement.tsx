@@ -1,5 +1,6 @@
 import {DndContext,DragOverlay,PointerSensor,KeyboardSensor,useSensor,useSensors,pointerWithin,closestCenter,type CollisionDetection,type DragEndEvent} from '@dnd-kit/core';
 import {SortableContext,verticalListSortingStrategy,sortableKeyboardCoordinates} from '@dnd-kit/sortable';
+import {Eye,EyeOff} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {MenuDropCategory,MenuSortableProduct} from './MenuProductSort';
 import {moveMenuProduct} from '../../lib/menu-reorder.js';
@@ -8,7 +9,7 @@ import {supabase} from '../../lib/supabase';
 import './menu-management.css';
 type Names={gr:string;en:string};
 type Price={id:string;label:string;cents:number};
-type Product={type?:'heading';id:string;category_id:string;names:Names;descriptions:Names;prices:Price[]};
+type Product={hidden?:boolean;type?:'heading';id:string;category_id:string;names:Names;descriptions:Names;prices:Price[]};
 type Catalog={categories:{id:string;section:string;names:Names}[];products:Product[]};
 type Snapshot={catalog:Catalog;revision:number;updated_at:string};
 const name=(n:Names)=>n.gr||n.en;
@@ -50,7 +51,7 @@ export default function MenuManagement({businessId}:{businessId?:string|null}){
  function edit(p:Product){setDraft(structuredClone(p));setPriceTexts(p.prices.map(v=>(v.cents/100).toFixed(2).replace('.',',')));setFormError('');setMessage('');}
  function add(){const cat=data?.catalog.categories.find(c=>c.id===category)||data?.catalog.categories[0];if(!cat)return;const id='p-'+crypto.randomUUID();edit({id,category_id:cat.id,names:{gr:'',en:''},descriptions:{gr:'',en:''},prices:[{id:id+'-0',label:'',cents:0}]});}
  function close(){if(!saving){dialog.current?.close();setDraft(null);}}
- async function publish(catalog:Catalog){if(!data)return;const current=generation.current;setSaving(true);setFormError('');setError('');try{const result=await request('PUT',{revision:data.revision,catalog});if(current!==generation.current)return;setData(result);setMessage('Οι αλλαγές αποθηκεύτηκαν και εμφανίζονται στο Smart Link.');dialog.current?.close();setDraft(null);return true;}catch(e){if(current===generation.current){setFormError((e as Error).message);setError((e as Error).message);}return false;}finally{if(current===generation.current)setSaving(false);}}
+ async function publish(catalog:Catalog,success='Οι αλλαγές αποθηκεύτηκαν και εμφανίζονται στο Smart Link.'){if(!data||saving)return;const current=generation.current;setSaving(true);setFormError('');setError('');try{const result=await request('PUT',{revision:data.revision,catalog});if(current!==generation.current)return;setData(result);setMessage(success);dialog.current?.close();setDraft(null);return true;}catch(e){if(current===generation.current){setFormError((e as Error).message);setError((e as Error).message);}return false;}finally{if(current===generation.current)setSaving(false);}}
  async function finishMove(event:DragEndEvent){
   setActiveProductId(null);setOverId(null);
   if(!data||!event.over||dragDisabled||movePending.current)return;
@@ -82,6 +83,12 @@ export default function MenuManagement({businessId}:{businessId?:string|null}){
   const p={...draft,prices:draft.prices.map((v,i)=>({...v,cents:Math.round(Number(values[i])*100)}))};
   const exists=data.catalog.products.some(x=>x.id===p.id);await publish({...data.catalog,products:exists?data.catalog.products.map(x=>x.id===p.id?p:x):[...data.catalog.products,p]});
  }
+ function toggleVisibility(p:Product){
+  if(!data||saving||activeProductId)return;
+  const hidden=p.hidden!==true;
+  setMessage('');
+  void publish({...data.catalog,products:data.catalog.products.map(product=>product.id===p.id?{...product,hidden}:product)},hidden?'Το προϊόν αποκρύφθηκε από το Smart Link.':'Το προϊόν εμφανίζεται ξανά στο Smart Link.');
+ }
  function remove(p:Product){setRemoveTarget(p);setFormError('');}
  function cancelRemove(){if(!saving){deleteDialog.current?.close();setRemoveTarget(null);}}
  const shown=data?.catalog.products.filter(p=>p.type!=='heading'&&(!category||p.category_id===category)&&[...Object.values(p.names),...Object.values(p.descriptions)].some(s=>s.toLocaleLowerCase('el').includes(search.toLocaleLowerCase('el'))))||[];
@@ -97,9 +104,9 @@ export default function MenuManagement({businessId}:{businessId?:string|null}){
    {data.catalog.categories.filter(c=>(!category||c.id===category)&&(!search.trim()||shown.some(p=>p.category_id===c.id))).map(c=><MenuDropCategory key={c.id} id={c.id} disabled={dragDisabled} active={overId==='category:'+c.id}><header><p className="mm-eyebrow">{c.section}</p><h2>{name(c.names)}</h2></header>
     <SortableContext id={'menu-category:'+c.id} items={shown.filter(p=>p.category_id===c.id).map(p=>'product:'+p.id)} strategy={verticalListSortingStrategy}>
      {shown.filter(p=>p.category_id===c.id).map(p=><MenuSortableProduct key={p.id} id={p.id} categoryId={c.id} title={name(p.names)} disabled={dragDisabled} over={overId==='product:'+p.id&&activeProductId!==p.id}>
-      <div><h3>{name(p.names)}</h3>{p.names.en&&p.names.en!==p.names.gr&&<p>{p.names.en}</p>}{name(p.descriptions)&&<p>{name(p.descriptions)}</p>}</div>
+      <div><h3>{name(p.names)}</h3>{p.hidden&&<span className="mm-hidden-label">Κρυφό προϊόν</span>}{p.names.en&&p.names.en!==p.names.gr&&<p>{p.names.en}</p>}{name(p.descriptions)&&<p>{name(p.descriptions)}</p>}</div>
       <div className="mm-prices">{p.prices.map(v=><span key={v.id}>{variant(v.label)} {money(v.cents)}</span>)}</div>
-      <div className="mm-actions"><button onClick={()=>edit(p)} disabled={saving||!!activeProductId} aria-label={'Επεξεργασία '+name(p.names)}>✎ Edit</button><button className="mm-delete" onClick={()=>remove(p)} disabled={saving||!!activeProductId} aria-label={'Αφαίρεση '+name(p.names)}>Αφαίρεση</button></div>
+      <div className="mm-actions"><button type="button" onClick={()=>toggleVisibility(p)} disabled={saving||!!activeProductId} aria-label={(p.hidden?'Επανεμφάνιση ':'Απόκρυψη ')+name(p.names)}>{p.hidden?<EyeOff size={16} aria-hidden="true"/>:<Eye size={16} aria-hidden="true"/>}{p.hidden?'Επανεμφάνιση':'Απόκρυψη'}</button><button onClick={()=>edit(p)} disabled={saving||!!activeProductId} aria-label={'Επεξεργασία '+name(p.names)}>✎ Edit</button><button className="mm-delete" onClick={()=>remove(p)} disabled={saving||!!activeProductId} aria-label={'Αφαίρεση '+name(p.names)}>Αφαίρεση</button></div>
      </MenuSortableProduct>)}
     </SortableContext>
     {!shown.some(p=>p.category_id===c.id)&&<p className="mm-empty-drop">Σύρε ένα προϊόν εδώ ή πρόσθεσε νέο προϊόν.</p>}

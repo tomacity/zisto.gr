@@ -45,3 +45,23 @@ assert.equal(validateCatalog(legacy).products.at(-1).type,'heading');
 legacy.products[1].names={gr:'',en:''};
 assert.throws(()=>validateCatalog(legacy),/cocktails-26/,'Identify the invalid existing product rather than blaming a filled new-product form');
 console.log('Legacy name and heading regression checks passed.');
+
+const publicMenu = '&project_key=d007b558-b9d8-487f-b64e-6b9b76b01810';
+const withHidden = structuredClone(sample);
+withHidden.products.unshift({
+ ...structuredClone(sample.products[0]), id:'hidden', hidden:true,
+ prices:[{id:'hidden-glass',label:'glass',cents:500},{id:'hidden-bottle',label:'bottle',cents:2200}]
+});
+assert.throws(()=>validateCatalog({...sample,products:[{...sample.products[0],hidden:'false'}]}),/ορατότητα/);
+role='manager';
+const hidden = await request('PUT','',{revision,catalog:withHidden});
+assert.equal(hidden.statusCode,200);
+assert.equal((await request('GET')).body.catalog.products[0].hidden,true);
+assert.deepEqual((await request('GET',publicMenu,undefined,'')).body.catalog.products.map(p=>p.id),['test']);
+assert.equal(hidden.body.catalog.products[1].hidden,false);
+withHidden.products[0].hidden=false;
+assert.equal((await request('PUT','',{revision,catalog:withHidden})).statusCode,200);
+const restored=(await request('GET',publicMenu,undefined,'')).body.catalog.products;
+assert.deepEqual(restored.map(p=>p.id),['hidden','test']);
+assert.deepEqual(restored[0].prices,withHidden.products[0].prices);
+console.log('Product visibility persists and public menus preserve the order and prices after restoration.');
