@@ -8056,6 +8056,7 @@ function NfcCardsTab({
   businessId,
   onCardCreated,
   onCardUpdated,
+  onCardDeleted,
 }: {
   cards: NfcCard[];
   loading: boolean;
@@ -8063,6 +8064,7 @@ function NfcCardsTab({
   businessId?: string | null;
   onCardCreated: (card: NfcCard) => void;
   onCardUpdated: (card: NfcCard) => void;
+  onCardDeleted: (cardId: string) => void;
 }) {
   const [selectedCard, setSelectedCard] =
     useState<NfcCard | null>(null);
@@ -8326,47 +8328,37 @@ function NfcCardsTab({
   const [createError, setCreateError] =
     useState<string | null>(null);
 
-  async function deleteCard(
-    cardId: string,
-  ) {
-    const confirmed =
-      window.confirm(
-        "Θέλεις σίγουρα να διαγράψεις αυτό το τραπέζι;"
-      );
-  
-    if (!confirmed) {
-      return;
-    }
-  
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-  
-    if (!session) {
-      return;
-    }
-  
-    const response = await fetch(
-      `/api/cards?card_id=${cardId}`,
-      {
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const deletingCardRef = useRef(false);
+
+  async function deleteCard(cardId: string) {
+    if (deletingCardRef.current || !window.confirm("Θέλεις σίγουρα να διαγράψεις αυτό το τραπέζι;")) return;
+    deletingCardRef.current = true;
+    setDeletingCardId(cardId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Η σύνδεσή σου έληξε. Συνδέσου ξανά.");
+      const params = new URLSearchParams({ card_id: cardId });
+      if (businessId) params.set("business_id", businessId);
+      const response = await fetch(`/api/cards?${params.toString()}`, {
         method: "DELETE",
-  
-        headers: {
-          Authorization:
-            `Bearer ${session.access_token}`,
-        },
-      },
-    );
-  
-    if (!response.ok) {
-      alert(
-        "Απέτυχε η διαγραφή."
-      );
-  
-      return;
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.success !== true || result?.deleted_id !== cardId) {
+        throw new Error(result?.error || "Απέτυχε η διαγραφή.");
+      }
+      onCardDeleted(cardId);
+      setSelectedCard(current => current?.id === cardId ? null : current);
+      setAnalyticsCard(current => current?.id === cardId ? null : current);
+      setEditingCard(current => current?.id === cardId ? null : current);
+      setDrawerOpen(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Απέτυχε η διαγραφή.");
+    } finally {
+      deletingCardRef.current = false;
+      setDeletingCardId(null);
     }
-  
-    window.location.reload();
   }
 
   async function updateCardName(
@@ -9003,11 +8995,11 @@ if (loading) {
                           if (!selectedCard) return;
                       
                           void deleteCard(selectedCard.id);
-                          setDrawerOpen(false);
                         }}
-                        className="rounded-xl border border-red-200 p-4 text-left text-red-500 transition hover:bg-red-50"
+                        disabled={deletingCardId !== null}
+                        className="rounded-xl border border-red-200 p-4 text-left text-red-500 transition hover:bg-red-50 disabled:opacity-50"
                       >
-                        🗑️ Διαγραφή
+                        {deletingCardId ? "Διαγραφή…" : "🗑️ Διαγραφή"}
                       </button>
                       </div>
                     </div>
@@ -9594,6 +9586,7 @@ function DashboardPage({
   businessId?: string | null;
 }) {
   const [cards, setCards] = useState<NfcCard[]>([]);
+  const deletedCardIds = useRef(new Set<string>());
   const [cardsLoading, setCardsLoading] = useState(true);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -9729,7 +9722,7 @@ function DashboardPage({
           }
       
           if (active && !signal?.aborted) {
-            setCards((result as CardsResponse).cards ?? []);
+            setCards(((result as CardsResponse).cards ?? []).filter(card => !deletedCardIds.current.has(card.id)));
           }
         } catch (error) {
           if (signal?.aborted) return;
@@ -10974,6 +10967,10 @@ function DashboardPage({
                     loading={cardsLoading}
                     error={cardsError}
                     businessId={businessId}
+                    onCardDeleted={(cardId) => {
+                      deletedCardIds.current.add(cardId);
+                      setCards(currentCards => currentCards.filter(card => card.id !== cardId));
+                    }}
                     onCardCreated={(createdCard) => {
                       setCards((currentCards) => [
                         createdCard,
