@@ -1020,38 +1020,42 @@ const calendarEndKey = [
     }
 
     if (req.method === "DELETE") {
-      const cardId =
-        requestUrl.searchParams.get("card_id");
-    
-      if (!cardId) {
-        return res.status(400).json({
-          error: "Λείπει το card_id",
-        });
+      const cardId = requestUrl.searchParams.get("card_id");
+      if (!cardId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cardId)) {
+        return res.status(400).json({ error: "Μη έγκυρο card_id" });
       }
-    
-      const deleteResponse =
-        await supabaseRequest({
-          supabaseUrl,
-          supabaseSecretKey,
-          path: `/rest/v1/cards?id=eq.${cardId}`,
-          method: "DELETE",
-        });
-    
-      if (!deleteResponse.ok) {
-        const errorText =
-          await deleteResponse.text();
-    
-        console.error(errorText);
-    
-        return res.status(500).json({
-          error:
-            "Απέτυχε η διαγραφή",
-        });
+
+      const allowedLandingPageIds = landingPages.map(
+        (page: { id: string }) => page.id,
+      );
+      if (!allowedLandingPageIds.length) {
+        return res.status(404).json({ error: "Το τραπέζι δεν βρέθηκε." });
       }
-    
-      return res.status(200).json({
-        success: true,
+
+      const deleteQuery = new URLSearchParams({
+        id: `eq.${cardId}`,
+        landing_page_id: `in.(${allowedLandingPageIds.join(",")})`,
+        select: "id",
       });
+      const deleteResponse = await supabaseRequest({
+        supabaseUrl,
+        supabaseSecretKey,
+        path: `/rest/v1/cards?${deleteQuery.toString()}`,
+        method: "DELETE",
+        headers: { Prefer: "return=representation" },
+      });
+
+      if (!deleteResponse.ok) {
+        console.error("Card deletion failed:", await deleteResponse.text());
+        return res.status(500).json({ error: "Απέτυχε η διαγραφή του τραπεζιού." });
+      }
+
+      const deletedCards = await deleteResponse.json();
+      if (!Array.isArray(deletedCards) || deletedCards.length !== 1 || deletedCards[0].id !== cardId) {
+        return res.status(404).json({ error: "Το τραπέζι δεν βρέθηκε ή δεν ανήκει σε αυτή την επιχείρηση." });
+      }
+
+      return res.status(200).json({ success: true, deleted_id: cardId });
     }
 
     if (req.method === "POST") {
