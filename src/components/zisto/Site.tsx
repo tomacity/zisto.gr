@@ -1,4 +1,5 @@
 import MenuManagement from "./MenuManagement";
+import { Pencil as TablePencil, Copy as TableCopy, Check as TableCheck, Eye as TableEye, EyeOff as TableEyeOff, Trash2 as TableTrash, X as TableClose } from "lucide-react";
 import { GlobalLoader } from "../ui/GlobalLoader";
 import { CountUp, MetricValue } from "../ui/CountUp";
 import { startLiveRefresh } from "../../lib/live-refresh.js";
@@ -8940,7 +8941,7 @@ if (loading) {
                           className="grid h-10 w-10 place-items-center rounded-full border border-black/10 transition hover:bg-black/5"
                           aria-label="Κλείσιμο"
                         >
-                          ✕
+                          <TableClose size={18} aria-hidden="true" />
                         </button>
                       </div>
               
@@ -8956,9 +8957,9 @@ if (loading) {
                             setEditError(null);
                             setDrawerOpen(false);
                           }}
-                          className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
+                          className="flex items-center gap-3 rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
                         >
-                          ✏️ Μετονομασία
+                          <TablePencil size={18} aria-hidden="true" /> Μετονομασία
                         </button>
               
                         <button
@@ -8967,11 +8968,11 @@ if (loading) {
                             if (!selectedCard) return;
                             void copyTrackingUrl(selectedCard);
                           }}
-                          className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
+                          className="flex items-center gap-3 rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
                         >
                           {selectedCard && copiedCardId === selectedCard.id
-                            ? "✅ Αντιγράφηκε"
-                            : "📋 Αντιγραφή URL"}
+                            ? <><TableCheck size={18} aria-hidden="true" /> Αντιγράφηκε</>
+                            : <><TableCopy size={18} aria-hidden="true" /> Αντιγραφή URL</>}
                         </button>
               
                         <button
@@ -8982,11 +8983,11 @@ if (loading) {
                             void toggleCard(selectedCard);
                             setDrawerOpen(false);
                           }}
-                          className="rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
+                          className="flex items-center gap-3 rounded-xl border border-black/10 p-4 text-left transition hover:border-[#222] hover:bg-[#F6F6F4]"
                         >
                           {selectedCard?.is_active
-                            ? "🔴 Απενεργοποίηση"
-                            : "🟢 Ενεργοποίηση"}
+                            ? <><TableEyeOff size={18} aria-hidden="true" /> Απενεργοποίηση</>
+                            : <><TableEye size={18} aria-hidden="true" /> Ενεργοποίηση</>}
                         </button>
               
                       <button
@@ -8997,9 +8998,10 @@ if (loading) {
                           void deleteCard(selectedCard.id);
                         }}
                         disabled={deletingCardId !== null}
-                        className="rounded-xl border border-red-200 p-4 text-left text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                        className="flex items-center gap-3 rounded-xl border border-red-200 p-4 text-left text-red-500 transition hover:bg-red-50 disabled:opacity-50"
                       >
-                        {deletingCardId ? "Διαγραφή…" : "🗑️ Διαγραφή"}
+                        <TableTrash size={18} aria-hidden="true" />
+                        {deletingCardId ? "Διαγραφή…" : "Διαγραφή"}
                       </button>
                       </div>
                     </div>
